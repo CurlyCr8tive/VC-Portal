@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verified Consulting — Log In</title>
+  <link rel="stylesheet" href="portal-styles.css" />
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="sidebar-brand">
+        <span class="logo-mark" aria-hidden="true">V</span>
+        <span class="brand-name">Verified Consulting</span>
+      </div>
+      <h1>Welcome back</h1>
+      <p class="header-sub">Log in to your dashboard.</p>
+
+      <div class="auth-error" id="auth-error" role="alert"></div>
+
+      <form class="auth-form" id="login-form">
+        <div class="field-row">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" required />
+        </div>
+        <div class="field-row">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Anything works in this demo" required />
+        </div>
+        <button type="submit" class="btn-primary">Log In</button>
+      </form>
+
+      <div class="demo-accounts">
+        <p>Demo accounts (any password):</p>
+        <ul id="demo-account-list"></ul>
+        <p style="margin-top:10px; font-weight:400;">This is a mock login for demo purposes — no real authentication is enforced.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/loginApp.js"></script>
+</body>
+</html>

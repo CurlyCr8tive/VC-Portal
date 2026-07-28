@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verified Consulting — Client Portal</title>
+  <link rel="stylesheet" href="portal-styles.css" />
+</head>
+<body>
+  <div class="client-shell">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="client-sidebar" id="client-sidebar" aria-label="Client portal navigation sidebar"></aside>
+
+    <main class="client-main">
+      <header class="client-header" id="client-header"></header>
+
+      <div id="view-dashboard" class="client-view active">
+        <div id="dashboard-content"></div>
+      </div>
+
+      <div id="view-campaigns" class="client-view">
+        <div id="campaigns-content"></div>
+      </div>
+
+      <div id="view-placements" class="client-view">
+        <div id="placements-content"></div>
+      </div>
+
+      <div id="view-reports" class="client-view">
+        <div id="reports-content"></div>
+      </div>
+
+      <div id="view-analytics" class="client-view">
+        <div id="analytics-content"></div>
+      </div>
+
+      <div id="view-resources" class="client-view">
+        <div id="resources-content"></div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="src/client/app.js"></script>
+</body>
+</html>

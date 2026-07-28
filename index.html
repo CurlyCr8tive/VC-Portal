@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Verified Consulting — Placement Tracker (v1)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Placement Tracker</h1>
+    <p class="subtitle">Owner-side manual entry — v1 (local, single-user, no login)</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Add a Placement</h2>
+      <form id="placement-form">
+        <div class="field-row">
+          <label for="publication">Publication *</label>
+          <input type="text" id="publication" name="publication" placeholder="e.g. Forbes" required />
+        </div>
+
+        <div class="field-row">
+          <label for="headline">Headline *</label>
+          <input type="text" id="headline" name="headline" placeholder="Title of the piece" required />
+        </div>
+
+        <div class="field-row">
+          <label for="articleUrl">Article URL</label>
+          <input type="url" id="articleUrl" name="articleUrl" placeholder="https://..." />
+        </div>
+
+        <div class="field-row">
+          <label for="client">Client *</label>
+          <input type="text" id="client" name="client" placeholder="Client name" required />
+        </div>
+
+        <div class="field-row two-col">
+          <div>
+            <label for="publicationDate">Publication Date</label>
+            <input type="date" id="publicationDate" name="publicationDate" />
+          </div>
+          <div>
+            <label for="aveValue">AVE ($)</label>
+            <input type="number" id="aveValue" name="aveValue" step="0.01" min="0" placeholder="0.00" />
+          </div>
+        </div>
+
+        <div class="field-row two-col">
+          <div>
+            <label for="pitchSentDate">Pitch Sent Date</label>
+            <input type="date" id="pitchSentDate" name="pitchSentDate" />
+          </div>
+          <div>
+            <label for="landedDate">Landed Date</label>
+            <input type="date" id="landedDate" name="landedDate" />
+          </div>
+        </div>
+        <p class="hint">Lead time (days) is calculated automatically from these two dates — leave either blank and it will just show as "—".</p>
+
+        <div class="field-row">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" rows="3" placeholder="Owner-only notes (e.g. journalist wants a follow-up, syndicated nationally)"></textarea>
+        </div>
+
+        <details class="optional-block">
+          <summary>Additional (optional)</summary>
+          <div class="field-row">
+            <label for="campaign">Campaign</label>
+            <input type="text" id="campaign" name="campaign" placeholder="e.g. Techstars Launch" />
+          </div>
+        </details>
+
+        <div class="form-actions">
+          <button type="submit">Add Placement</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Placements <span id="placement-count" class="count"></span></h2>
+      <div class="table-wrap">
+        <table id="placement-table">
+          <thead>
+            <tr>
+              <th>Publication</th>
+              <th>Headline</th>
+              <th>Client</th>
+              <th>Campaign</th>
+              <th>Pub. Date</th>
+              <th>AVE</th>
+              <th>Pitch Sent</th>
+              <th>Landed</th>
+              <th>Lead Time (days)</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="placement-table-body">
+            <!-- rows injected by src/table.js -->
+          </tbody>
+        </table>
+        <p id="empty-state" class="hint">No placements yet — add one above.</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
