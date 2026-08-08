@@ -11,8 +11,14 @@ import { renderEmptyState } from "./EmptyState.js";
  * client.html never passes this flag, so a client only ever sees a table
  * with no client column at all — there's nothing in the markup for another
  * client's name to even appear in.
+ *
+ * `onEdit`/`onDelete` are optional and only ever passed from the owner
+ * dashboard's dedicated Press Placements view — client.html never passes
+ * them, and neither does the compact "Recent Press Placements" preview on
+ * either dashboard's overview, so there's no edit/delete control anywhere
+ * outside the one screen meant to manage data.
  */
-export function renderPlacementsTable(container, placements, { showClient = false } = {}) {
+export function renderPlacementsTable(container, placements, { showClient = false, onEdit, onDelete } = {}) {
   if (!placements || placements.length === 0) {
     renderEmptyState(container, {
       icon: "📰",
@@ -21,6 +27,8 @@ export function renderPlacementsTable(container, placements, { showClient = fals
     });
     return;
   }
+
+  const showActions = Boolean(onEdit || onDelete);
 
   const rows = placements.map((p) => {
     const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate);
@@ -36,6 +44,25 @@ export function renderPlacementsTable(container, placements, { showClient = fals
   const clientTd = (p) => (showClient ? `<td>${escapeHtml(p.clientName || "—")}</td>` : "");
   const clientPcRow = (p) => (showClient ? `<div class="pc-row"><span>Client</span><span>${escapeHtml(p.clientName || "—")}</span></div>` : "");
 
+  const sentimentBadge = (p) =>
+    p.sentiment ? `<span class="sentiment-badge ${escapeHtml(p.sentiment)}">${escapeHtml(p.sentiment)}</span>` : "—";
+
+  const actionsTh = showActions ? "<th></th>" : "";
+  const actionsTd = (p) =>
+    showActions
+      ? `<td style="white-space:nowrap;">
+          ${onEdit ? `<button class="link-btn" data-edit="${escapeHtml(p.id)}">Edit</button>` : ""}
+          ${onDelete ? `<button class="link-btn" style="color:var(--color-coral-dark);" data-delete="${escapeHtml(p.id)}">Delete</button>` : ""}
+        </td>`
+      : "";
+  const actionsPcRow = (p) =>
+    showActions
+      ? `<div class="pc-row"><span>Actions</span><span>
+          ${onEdit ? `<button class="link-btn" data-edit="${escapeHtml(p.id)}">Edit</button>` : ""}
+          ${onDelete ? `<button class="link-btn" style="color:var(--color-coral-dark);" data-delete="${escapeHtml(p.id)}">Delete</button>` : ""}
+        </span></div>`
+      : "";
+
   const tableRows = rows
     .map(
       ({ p, leadTime, statusClass, headlineCell }) => `
@@ -48,6 +75,8 @@ export function renderPlacementsTable(container, placements, { showClient = fals
         <td>${leadTime == null ? "—" : `${leadTime} days`}</td>
         <td>${escapeHtml(p.campaign) || "—"}</td>
         <td><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></td>
+        <td>${sentimentBadge(p)}</td>
+        ${actionsTd(p)}
       </tr>`
     )
     .join("");
@@ -64,6 +93,8 @@ export function renderPlacementsTable(container, placements, { showClient = fals
         <div class="pc-row"><span>Lead time</span><span>${leadTime == null ? "—" : `${leadTime} days`}</span></div>
         <div class="pc-row"><span>Campaign</span><span>${escapeHtml(p.campaign) || "—"}</span></div>
         <div class="pc-row"><span>Status</span><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></div>
+        <div class="pc-row"><span>Sentiment</span><span>${sentimentBadge(p)}</span></div>
+        ${actionsPcRow(p)}
       </div>`
     )
     .join("");
@@ -81,6 +112,8 @@ export function renderPlacementsTable(container, placements, { showClient = fals
             <th>Lead Time</th>
             <th>Campaign</th>
             <th>Status</th>
+            <th>Sentiment</th>
+            ${actionsTh}
           </tr>
         </thead>
         <tbody>${tableRows}</tbody>
@@ -88,4 +121,15 @@ export function renderPlacementsTable(container, placements, { showClient = fals
     </div>
     <div class="placement-cards">${cardsMarkup}</div>
   `;
+
+  if (onEdit) {
+    container.querySelectorAll("[data-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => onEdit(btn.dataset.edit));
+    });
+  }
+  if (onDelete) {
+    container.querySelectorAll("[data-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => onDelete(btn.dataset.delete));
+    });
+  }
 }

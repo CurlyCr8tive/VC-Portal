@@ -17,7 +17,7 @@ const NAV_ITEMS = [
  * allowed to exist — none of it is reachable from client.html.
  */
 export function renderOwnerSidebar(container, opts) {
-  const { ownerName, sessionEmail, currentView, demoState, onNavigate, onDemoStateChange, onLogout, onClose } = opts;
+  const { ownerName, sessionEmail, currentView, demoState, dataSource, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
 
   container.innerHTML = `
     <button class="sidebar-close" aria-label="Close menu">✕ Close</button>
@@ -46,7 +46,12 @@ export function renderOwnerSidebar(container, opts) {
       <button data-action="logout">Log Out</button>
     </div>
     <div class="demo-controls">
-      <label for="owner-demo-state-select">Demo: data state</label>
+      <label for="owner-data-source-select">Data source</label>
+      <select id="owner-data-source-select">
+        <option value="real" ${dataSource === "real" ? "selected" : ""}>Real (actual placements)</option>
+        <option value="mock" ${dataSource === "mock" ? "selected" : ""}>Mock (demo preview)</option>
+      </select>
+      <label for="owner-demo-state-select" style="margin-top:8px;">Demo: data state</label>
       <select id="owner-demo-state-select">
         <option value="normal" ${demoState === "normal" ? "selected" : ""}>Normal</option>
         <option value="loading" ${demoState === "loading" ? "selected" : ""}>Loading</option>
@@ -60,6 +65,7 @@ export function renderOwnerSidebar(container, opts) {
     btn.addEventListener("click", () => onNavigate(btn.dataset.nav));
   });
   container.querySelector('[data-action="logout"]').addEventListener("click", onLogout);
+  container.querySelector("#owner-data-source-select").addEventListener("change", (e) => onDataSourceChange(e.target.value));
   container.querySelector("#owner-demo-state-select").addEventListener("change", (e) => onDemoStateChange(e.target.value));
   const closeBtn = container.querySelector(".sidebar-close");
   if (onClose) closeBtn.addEventListener("click", onClose);

@@ -10,10 +10,16 @@
 
 const SESSION_KEY = "vc_session";
 
+// Role naming matches the Final PRD's reserved schema field exactly:
+// owner / pr_client / coaching_mentee. `coaching_mentee` has no accounts and
+// no gated page yet — the 90-day coaching program is explicitly future
+// scope (see PRD "Coaching Program — future scope, add"), not something to
+// build now. It's named here only so the role field doesn't need a second
+// rename later when that program actually starts.
 export const MOCK_ACCOUNTS = [
   { email: "tenyse@verifiedconsulting.com", role: "owner", name: "Tenyse Williams" },
-  { email: "hello@veganhood.com", role: "client", clientId: "veganhood", name: "VeganHood" },
-  { email: "hello@sunnysparkling.com", role: "client", clientId: "sunny-sparkling", name: "Sunny Sparkling Co." },
+  { email: "hello@veganhood.com", role: "pr_client", clientId: "veganhood", name: "VeganHood" },
+  { email: "hello@sunnysparkling.com", role: "pr_client", clientId: "sunny-sparkling", name: "Sunny Sparkling Co." },
 ];
 
 export function login(email) {

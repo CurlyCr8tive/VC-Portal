@@ -1,4 +1,5 @@
 import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getClientById } from "./mockData.js";
+import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport } from "../realDataSource.js";
 import { requireSession, logout, landingPageFor } from "../auth.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
 import { renderHeader } from "./components/DashboardHeader.js";
@@ -10,6 +11,8 @@ import { renderInsightCard } from "./components/CampaignInsightCard.js";
 import { renderReportCard } from "./components/LatestReportCard.js";
 import { renderLoadingState } from "./components/LoadingState.js";
 import { renderErrorState } from "./components/ErrorState.js";
+import { renderCampaignDetail } from "./components/CampaignDetailView.js";
+import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 
 // ---------------------------------------------------------------------------
 // This is a mock, client-scoped view. `state.clientId` stands in for "the
@@ -28,45 +31,59 @@ import { renderErrorState } from "./components/ErrorState.js";
 // scoped by a server-verified session, is the actual remaining work.
 // ---------------------------------------------------------------------------
 
-const session = requireSession("client");
+const session = requireSession("pr_client");
 
 const state = {
   clientId: session ? session.clientId : "veganhood",
   view: "dashboard",
   demoState: "normal", // normal | loading | empty | error
+  dataSource: "real", // real | mock — real reads storage.js placements filtered by session.name
   chartRange: "30d",
   searchTerm: "",
+  selectedCampaignId: null,
 };
+
+// Real-data mode matches on the logged-in client's display NAME (whatever
+// was typed into the "Client" field on the owner's manual entry form) — the
+// mock clientId slugs (e.g. "veganhood") only exist for the mock accounts,
+// not for real placements.
+const clientName = session ? session.name : "";
 
 function getMetrics(clientId) {
   if (state.demoState === "empty") {
-    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: 0, placementsDelta: 0, leadTimeDelta: 0 };
+    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
   }
+  if (state.dataSource === "real") return getRealMetrics(clientName);
   return METRICS[clientId]["1y"];
 }
 
 function getPlacements(clientId) {
   if (state.demoState === "empty") return [];
+  if (state.dataSource === "real") return getRealPlacements(clientName);
   return PLACEMENTS[clientId] || [];
 }
 
 function getCampaigns(clientId) {
   if (state.demoState === "empty") return [];
+  if (state.dataSource === "real") return getRealCampaigns(clientName);
   return CAMPAIGNS[clientId] || [];
 }
 
 function getChartSeries(clientId, range) {
   if (state.demoState === "empty") return [{ label: "—", ave: 0, placements: 0 }];
+  if (state.dataSource === "real") return getRealChartSeries(clientName, range);
   return (CHART_SERIES[clientId] && CHART_SERIES[clientId][range]) || [];
 }
 
 function getInsight(clientId) {
   if (state.demoState === "empty") return null;
+  if (state.dataSource === "real") return getRealInsight();
   return INSIGHTS[clientId] || null;
 }
 
 function getReport(clientId) {
   if (state.demoState === "empty") return null;
+  if (state.dataSource === "real") return getRealReport(clientName);
   return REPORTS[clientId] || null;
 }
 
@@ -144,7 +161,7 @@ function renderDashboard() {
   renderPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements);
 
   renderCampaignsGrid(document.getElementById("dashboard-campaigns"), getCampaigns(state.clientId), {
-    onViewCampaign: () => navigate("campaigns"),
+    onViewCampaign: (id) => showCampaignDetail(id),
   });
 
   renderPerformanceChart(document.getElementById("dashboard-chart"), {
@@ -174,7 +191,9 @@ function renderCampaignsView() {
     <div class="section-heading"><h2>My Campaigns</h2></div>
     <div class="campaigns-grid" id="campaigns-full-grid"></div>
   `;
-  renderCampaignsGrid(document.getElementById("campaigns-full-grid"), getCampaigns(state.clientId));
+  renderCampaignsGrid(document.getElementById("campaigns-full-grid"), getCampaigns(state.clientId), {
+    onViewCampaign: (id) => showCampaignDetail(id),
+  });
 }
 
 function renderPlacementsView() {
@@ -235,7 +254,44 @@ function renderCurrentView() {
       return renderAnalyticsView();
     case "resources":
       return renderResourcesView();
+    case "campaign-detail":
+      return renderCampaignDetailView();
   }
+}
+
+function showCampaignDetail(id) {
+  state.selectedCampaignId = id;
+  navigate("campaign-detail");
+}
+
+function renderCampaignDetailView() {
+  const target = document.getElementById("campaign-detail-content");
+  const campaign = getCampaigns(state.clientId).find((c) => c.id === state.selectedCampaignId);
+
+  if (!campaign) {
+    target.innerHTML = `<p>Campaign not found.</p><button class="link-btn" id="campaign-detail-back">&larr; Back to My Campaigns</button>`;
+    document.getElementById("campaign-detail-back").addEventListener("click", () => navigate("campaigns"));
+    return;
+  }
+
+  const placements = getPlacements(state.clientId).filter((p) => p.campaign === campaign.name);
+
+  renderCampaignDetail(target, {
+    campaign,
+    placements,
+    notes: loadNotesForCampaign(campaign.id),
+    currentUser: { role: "pr_client", name: session ? session.name : "Client" },
+    showClient: false,
+    onBack: () => navigate("campaigns"),
+    onAddNote: (body, currentUser) => {
+      try {
+        addNote({ campaignId: campaign.id, authorRole: currentUser.role, authorName: currentUser.name, body });
+        renderCampaignDetailView();
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -248,8 +304,10 @@ function renderSidebarComponent() {
     sessionEmail: session ? session.email : null,
     currentView: state.view,
     demoState: state.demoState,
+    dataSource: state.dataSource,
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
+    onDataSourceChange: setDataSource,
     onLogout: () => {
       logout();
       window.location.href = "login.html";
@@ -284,6 +342,12 @@ function setDemoState(demoState) {
   renderCurrentView();
 }
 
+function setDataSource(dataSource) {
+  state.dataSource = dataSource;
+  renderSidebarComponent();
+  renderCurrentView();
+}
+
 function openSidebarMobile() {
   document.getElementById("client-sidebar").classList.add("open");
   document.getElementById("sidebar-overlay").classList.add("visible");
@@ -303,6 +367,11 @@ if (session) {
   const demoParam = new URLSearchParams(location.search).get("demo");
   if (["loading", "empty", "error"].includes(demoParam)) {
     state.demoState = demoParam;
+  }
+  // `?data=mock` shows the polished demo dataset instead of real placements.
+  const dataParam = new URLSearchParams(location.search).get("data");
+  if (["real", "mock"].includes(dataParam)) {
+    state.dataSource = dataParam;
   }
 
   renderSidebarComponent();

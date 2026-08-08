@@ -32,3 +32,9 @@ export function deletePlacement(id) {
   saveAll(all);
   return all;
 }
+
+export function updatePlacement(updatedPlacement) {
+  const all = loadPlacements().map((p) => (p.id === updatedPlacement.id ? updatedPlacement : p));
+  saveAll(all);
+  return all;
+}

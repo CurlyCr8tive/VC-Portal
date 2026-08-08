@@ -503,6 +503,34 @@ table.placements-table {
   border-color: #dccdec;
 }
 
+.sentiment-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+}
+
+.sentiment-badge.positive {
+  background: var(--color-teal-tint);
+  color: #1f6b64;
+  border-color: #bfe4e0;
+}
+
+.sentiment-badge.neutral {
+  background: #f0ede8;
+  color: #6b5f54;
+  border-color: #ddd5ca;
+}
+
+.sentiment-badge.negative {
+  background: var(--color-coral-tint);
+  color: #a13d2b;
+  border-color: #f3cfc9;
+}
+
 /* Card-list fallback for small screens */
 .placement-cards {
   display: none;
@@ -579,6 +607,26 @@ table.placements-table {
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.milestone-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.milestone-row:last-child {
+  border-bottom: none;
+}
+
+.milestone-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
 }
 
 .campaign-client-tag {
@@ -902,6 +950,67 @@ table.placements-table {
   text-decoration: underline;
   padding: 0;
   font-size: 0.78rem;
+}
+
+/* ---------- Entry forms (e.g. owner-side Add Placement) ---------- */
+
+.entry-form label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+}
+
+.entry-form .field-row {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-form .field-row.two-col {
+  flex-direction: row;
+  gap: 16px;
+}
+
+.entry-form .field-row.two-col > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-form input,
+.entry-form textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+}
+
+.entry-form .hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.entry-form .optional-block {
+  margin: 4px 0 14px;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+.entry-form .optional-block summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.entry-form .form-actions {
+  margin-top: 6px;
 }
 
 /* ---------- Owner-only: clients list, review queue, header extras ---------- */

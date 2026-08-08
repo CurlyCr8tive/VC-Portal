@@ -20,7 +20,7 @@ const NAV_ITEMS = [
  * means logging out and back in, same as it would with real auth.
  */
 export function renderSidebar(container, opts) {
-  const { client, sessionEmail, currentView, demoState, onNavigate, onDemoStateChange, onLogout, onClose } = opts;
+  const { client, sessionEmail, currentView, demoState, dataSource, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
 
   container.innerHTML = `
     <button class="sidebar-close" aria-label="Close menu">✕ Close</button>
@@ -49,7 +49,12 @@ export function renderSidebar(container, opts) {
       <button data-action="logout">Log Out</button>
     </div>
     <div class="demo-controls">
-      <label for="demo-state-select">Demo: data state</label>
+      <label for="data-source-select">Data source</label>
+      <select id="data-source-select">
+        <option value="real" ${dataSource === "real" ? "selected" : ""}>Real (your actual placements)</option>
+        <option value="mock" ${dataSource === "mock" ? "selected" : ""}>Mock (demo preview)</option>
+      </select>
+      <label for="demo-state-select" style="margin-top:8px;">Demo: data state</label>
       <select id="demo-state-select">
         <option value="normal" ${demoState === "normal" ? "selected" : ""}>Normal</option>
         <option value="loading" ${demoState === "loading" ? "selected" : ""}>Loading</option>
@@ -63,6 +68,7 @@ export function renderSidebar(container, opts) {
     btn.addEventListener("click", () => onNavigate(btn.dataset.nav));
   });
   container.querySelector('[data-action="logout"]').addEventListener("click", onLogout);
+  container.querySelector("#data-source-select").addEventListener("change", (e) => onDataSourceChange(e.target.value));
   container.querySelector("#demo-state-select").addEventListener("change", (e) => onDemoStateChange(e.target.value));
   const closeBtn = container.querySelector(".sidebar-close");
   if (onClose) closeBtn.addEventListener("click", onClose);

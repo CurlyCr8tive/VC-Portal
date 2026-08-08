@@ -1,0 +1,320 @@
+<title>Setting Up Your Project Database — Verified Consulting</title>
+<style>
+  :root {
+    --navy: #1f2a52;
+    --navy-light: #2e3b6e;
+    --coral: #e2735a;
+    --coral-dark: #c85a42;
+    --coral-tint: #fbe2da;
+    --teal: #3f9e97;
+    --teal-tint: #e1f2f0;
+    --cream: #fdf8f3;
+    --card: #ffffff;
+    --ink: #2b2320;
+    --ink-soft: #7a6d64;
+    --border: #efe1d8;
+    --warn-bg: #fdeceb;
+    --warn-border: #f3cfc9;
+    --warn-ink: #8a3b2c;
+  }
+
+  :root[data-theme="dark"] {
+    --cream: #171310;
+    --card: #211c18;
+    --ink: #f2ece5;
+    --ink-soft: #b7aa9f;
+    --border: #3a3129;
+    --coral-tint: #3a2620;
+    --teal-tint: #17302d;
+    --warn-bg: #3a2420;
+    --warn-border: #5c3129;
+    --warn-ink: #f0b6a8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --cream: #171310;
+      --card: #211c18;
+      --ink: #f2ece5;
+      --ink-soft: #b7aa9f;
+      --border: #3a3129;
+      --coral-tint: #3a2620;
+      --teal-tint: #17302d;
+      --warn-bg: #3a2420;
+      --warn-border: #5c3129;
+      --warn-ink: #f0b6a8;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--cream);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px 64px;
+  }
+
+  .band {
+    background: var(--navy);
+    color: #f2eee8;
+    padding: 40px 20px 32px;
+    margin-bottom: 32px;
+  }
+
+  .band-inner {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--coral);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 1.9rem;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+
+  .band p {
+    margin: 0;
+    color: #d8d3ca;
+    max-width: 54ch;
+  }
+
+  h2 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    font-size: 1.15rem;
+    color: var(--navy);
+    margin: 0 0 4px;
+  }
+
+  :root[data-theme="dark"] h2 { color: #f2eee8; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) h2 { color: #f2eee8; }
+  }
+
+  .callout {
+    background: var(--coral-tint);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+
+  .callout p { margin: 0; }
+  .callout .label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--coral-dark);
+    margin: 0 0 6px;
+  }
+
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 14px;
+    box-shadow: 0 2px 10px rgba(43, 35, 32, 0.05);
+  }
+
+  .num {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--navy);
+    color: #f2eee8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Georgia, serif;
+    font-size: 1rem;
+  }
+
+  .step p { margin: 6px 0 0; color: var(--ink-soft); font-size: 0.94rem; }
+  .step p:first-of-type { margin-top: 6px; }
+
+  .why {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--teal);
+    padding-left: 10px;
+  }
+
+  .value-box {
+    background: var(--teal-tint);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.85rem;
+    color: var(--ink);
+  }
+
+  .send-back {
+    background: var(--navy);
+    color: #f2eee8;
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 28px;
+  }
+
+  .send-back h2 { color: #f2eee8; margin-bottom: 10px; }
+  .send-back ul { margin: 10px 0 0; padding-left: 20px; }
+  .send-back li { margin-bottom: 6px; }
+  .send-back a { color: var(--coral); }
+
+  .warn {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: var(--warn-ink);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+  }
+
+  .warn .label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+
+  .warn p { margin: 0; }
+
+  footer {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    text-align: center;
+    padding-top: 8px;
+  }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--coral-tint);
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-size: 0.9em;
+  }
+</style>
+
+<div class="band">
+  <div class="band-inner">
+    <p class="eyebrow">Verified Consulting — Portal Build</p>
+    <h1>Setting up your project's database</h1>
+    <p>About 10 minutes, no technical background needed. This creates the account the dashboard's data will live in — under your name, on your card, so it's yours from day one.</p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="callout">
+    <p class="label">Before you start</p>
+    <p>This costs <strong>$25/month</strong>, billed to whatever card you use to sign up. It's a real recurring cost, not a free trial — if you haven't already okayed that number with Cherice, do that first. You can cancel any time from the same account.</p>
+  </div>
+
+  <div class="steps">
+
+    <div class="step">
+      <div class="num">1</div>
+      <div>
+        <h2>Create your account</h2>
+        <p>Go to <strong>supabase.com</strong> and sign up — your email works fine, no need for anything special. This is the account that owns everything, so use the email and password you'll remember and want tied to Verified Consulting long-term.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">2</div>
+      <div>
+        <h2>Create an organization</h2>
+        <p>It'll ask you to name an "organization" first — this is just a folder for your projects. Name it something like <code>Verified Consulting</code>.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">3</div>
+      <div>
+        <h2>Turn on the paid plan</h2>
+        <p>In that organization's billing settings, switch from the free plan to <strong>Pro ($25/month)</strong> and add a card. This is the $25/month from the top of this page.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">4</div>
+      <div>
+        <h2>Create your project</h2>
+        <p>Name it <code>verified-consulting-portal</code> (or anything recognizable). Pick the region closest to you — East Coast US is right for you and your clients.</p>
+        <p>It'll generate a <strong>database password</strong> — click to reveal it, then copy it somewhere safe (a password manager, or a note you won't lose). You likely won't need to type it yourself, but don't skip saving it.</p>
+        <p class="why">Give it a minute or two to finish setting up before moving on.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">5</div>
+      <div>
+        <h2>Add Cherice to the team</h2>
+        <p>In the organization's <strong>Team</strong> settings, invite:</p>
+        <div class="value-box">chericeheron@gmail.com</div>
+        <p class="why">This lets Cherice build inside your account without ever needing your login. You stay the owner the whole time.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="num">6</div>
+      <div>
+        <h2>Send Cherice two things</h2>
+        <p>Open your project's <strong>Settings → API</strong> page (sometimes labeled "Data API"). You'll see two values — copy both and send them to Cherice:</p>
+        <p><strong>Project URL</strong> — looks like <code>https://xxxxx.supabase.co</code></p>
+        <p><strong>anon / public key</strong> — a long string of letters and numbers</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="warn">
+    <p class="label">One thing not to send</p>
+    <p>That same API page also shows a <strong>service_role</strong> key, marked secret. Don't copy or send that one — only the <strong>anon / public</strong> key. If you're ever unsure which is which, just ask before sending anything.</p>
+  </div>
+
+  <div class="send-back">
+    <h2>Recap — send Cherice these two things when you're done</h2>
+    <ul>
+      <li>Your project's <strong>Project URL</strong></li>
+      <li>Your project's <strong>anon / public API key</strong></li>
+    </ul>
+  </div>
+
+  <footer>
+    Stuck on any step, or a screen doesn't match this? Text or email Cherice — screenshot whatever you're looking at.
+  </footer>
+
+</div>

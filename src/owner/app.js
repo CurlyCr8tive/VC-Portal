@@ -1,5 +1,20 @@
 import { CLIENTS, METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, AGGREGATE_INSIGHT, REPORTS } from "../client/mockData.js";
+import {
+  getRealClients,
+  getRealMetrics,
+  getRealCampaigns,
+  getAllRealPlacements,
+  getAllRealCampaigns,
+  getAggregateRealMetrics,
+  getAggregateRealChartSeries,
+  getAggregateRealInsight,
+  getRealReport,
+} from "../realDataSource.js";
 import { requireSession, logout } from "../auth.js";
+import { createPlacement, applyPlacementEdit } from "../schema.js";
+import { addPlacement, updatePlacement, deletePlacement } from "../storage.js";
+import { createCampaign, applyCampaignEdit, addMilestone, toggleMilestone, removeMilestone } from "../campaignSchema.js";
+import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, deleteCampaign } from "../campaignStorage.js";
 import { renderHeader } from "../client/components/DashboardHeader.js";
 import { renderMetricsGrid } from "../client/components/MetricCard.js";
 import { renderPlacementsTable } from "../client/components/PressPlacementTable.js";
@@ -12,6 +27,16 @@ import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js";
 import { renderClientsList } from "./components/ClientsListCard.js";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js";
+import { renderPlacementForm } from "./components/PlacementForm.js";
+import { renderCampaignForm } from "./components/CampaignForm.js";
+import { renderCampaignManageList } from "./components/CampaignManageList.js";
+import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js";
+import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
+import { loadNotesForCampaign, addNote } from "../notesStorage.js";
+import { loadSummary, saveSummary } from "../summaryStorage.js";
+import { escapeHtml } from "../client/utils.js";
+import { generateCanvaExport, downloadCsv } from "./canvaExport.js";
+import { seedSamplePlacements } from "./seedSampleData.js";
 
 // ---------------------------------------------------------------------------
 // The owner side. Every getter below reads across ALL clients in mockData —
@@ -28,8 +53,12 @@ const session = requireSession("owner");
 const state = {
   view: "dashboard",
   demoState: "normal", // normal | loading | empty | error
+  dataSource: "real", // real | mock — real reads storage.js placements across all clients
   chartRange: "30d",
   searchTerm: "",
+  editingPlacementId: null,
+  editingCampaignId: null,
+  selectedCampaignId: null,
   // Hand-authored candidate mentions previewing the discovery-agent review
   // queue described in the PRD. Confirm/Reject only mutate this in-memory
   // array for the current page load — nothing is persisted.
@@ -67,18 +96,21 @@ const state = {
 
 function getAllPlacements() {
   if (state.demoState === "empty") return [];
+  if (state.dataSource === "real") return getAllRealPlacements();
   return CLIENTS.flatMap((c) => (PLACEMENTS[c.id] || []).map((p) => ({ ...p, clientName: c.name })));
 }
 
 function getAllCampaigns() {
   if (state.demoState === "empty") return [];
+  if (state.dataSource === "real") return getAllRealCampaigns();
   return CLIENTS.flatMap((c) => (CAMPAIGNS[c.id] || []).map((camp) => ({ ...camp, clientName: c.name })));
 }
 
 function getAggregateMetrics() {
   if (state.demoState === "empty") {
-    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: 0, placementsDelta: 0, leadTimeDelta: 0 };
+    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
   }
+  if (state.dataSource === "real") return getAggregateRealMetrics();
   const perClient = CLIENTS.map((c) => METRICS[c.id]["1y"]);
   const totalAVE = perClient.reduce((sum, m) => sum + m.totalAVE, 0);
   const totalPlacements = perClient.reduce((sum, m) => sum + m.totalPlacements, 0);
@@ -100,6 +132,7 @@ function getAggregateMetrics() {
 
 function getAggregateChartSeries(range) {
   if (state.demoState === "empty") return [{ label: "—", ave: 0, placements: 0 }];
+  if (state.dataSource === "real") return getAggregateRealChartSeries(range);
   const perClientSeries = CLIENTS.map((c) => CHART_SERIES[c.id][range] || []);
   const length = Math.max(0, ...perClientSeries.map((s) => s.length));
   return Array.from({ length }, (_, i) => {
@@ -111,11 +144,20 @@ function getAggregateChartSeries(range) {
 }
 
 function getAggregateInsight() {
-  return state.demoState === "empty" ? null : AGGREGATE_INSIGHT;
+  if (state.demoState === "empty") return null;
+  if (state.dataSource === "real") return getAggregateRealInsight();
+  return AGGREGATE_INSIGHT;
 }
 
 function getClientsWithMetrics() {
   if (state.demoState === "empty") return [];
+  if (state.dataSource === "real") {
+    return getRealClients().map((c) => ({
+      ...c,
+      metrics: getRealMetrics(c.name),
+      campaignNames: getRealCampaigns(c.name).map((camp) => camp.name),
+    }));
+  }
   return CLIENTS.map((c) => ({
     ...c,
     metrics: METRICS[c.id]["1y"],
@@ -242,27 +284,155 @@ function renderCampaignsView() {
   const target = document.getElementById("campaigns-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+
+  const canManageCampaigns = state.dataSource === "real";
+  const editingCampaign = canManageCampaigns && state.editingCampaignId ? loadCampaigns().find((c) => c.id === state.editingCampaignId) : null;
+
   target.innerHTML = `
     <div class="section-heading"><h2>Campaigns</h2></div>
-    <div class="campaigns-grid" id="campaigns-full-grid"></div>
+    <div class="dashboard-split">
+      <section class="section" style="margin-bottom:0;">
+        <h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">Overview</h3>
+        <div class="campaigns-grid" id="campaigns-full-grid"></div>
+      </section>
+      <section class="section" style="margin-bottom:0;">
+        ${
+          canManageCampaigns
+            ? `<h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${editingCampaign ? "Edit Campaign" : "Add Campaign"}</h3>
+               <div class="card" id="campaign-form-wrap"></div>`
+            : `<p style="color:var(--text-secondary); font-size:0.85rem;">
+                 Switch the sidebar's data source to "Real" to create and manage campaigns.
+               </p>`
+        }
+      </section>
+    </div>
+    ${canManageCampaigns ? `<div class="section-heading" style="margin-top:8px;"><h2>Manage Campaigns</h2></div><div id="campaign-manage-list"></div>` : ""}
   `;
-  renderCampaignsGrid(document.getElementById("campaigns-full-grid"), getAllCampaigns());
+
+  renderCampaignsGrid(document.getElementById("campaigns-full-grid"), getAllCampaigns(), {
+    onViewCampaign: (id) => showCampaignDetail(id),
+  });
+
+  if (!canManageCampaigns) return;
+
+  renderCampaignForm(document.getElementById("campaign-form-wrap"), {
+    initialData: editingCampaign,
+    onSubmit: (rawData) => {
+      try {
+        if (editingCampaign) {
+          updateCampaignRecord(applyCampaignEdit(editingCampaign, rawData));
+          state.editingCampaignId = null;
+        } else {
+          addCampaign(createCampaign(rawData));
+        }
+        renderCampaignsView();
+        return true;
+      } catch (err) {
+        alert(err.message);
+        return false;
+      }
+    },
+    onCancel: () => {
+      state.editingCampaignId = null;
+      renderCampaignsView();
+    },
+  });
+
+  renderCampaignManageList(document.getElementById("campaign-manage-list"), loadCampaigns(), {
+    onEdit: (id) => {
+      state.editingCampaignId = id;
+      renderCampaignsView();
+    },
+    onDelete: (id) => {
+      if (confirm("Delete this campaign? This can't be undone. Placements that reference it by name are unaffected.")) {
+        deleteCampaign(id);
+        if (state.editingCampaignId === id) state.editingCampaignId = null;
+        renderCampaignsView();
+      }
+    },
+    onAddMilestone: (campaignId, text) => {
+      try {
+        updateCampaignRecord(addMilestone(loadCampaigns().find((c) => c.id === campaignId), text));
+        renderCampaignsView();
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+    onToggleMilestone: (campaignId, milestoneId) => {
+      updateCampaignRecord(toggleMilestone(loadCampaigns().find((c) => c.id === campaignId), milestoneId));
+      renderCampaignsView();
+    },
+    onRemoveMilestone: (campaignId, milestoneId) => {
+      updateCampaignRecord(removeMilestone(loadCampaigns().find((c) => c.id === campaignId), milestoneId));
+      renderCampaignsView();
+    },
+  });
 }
 
 function renderPlacementsView() {
   const target = document.getElementById("placements-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+
+  const canManagePlacements = state.dataSource === "real";
+  const editingPlacement =
+    canManagePlacements && state.editingPlacementId ? getAllRealPlacements().find((p) => p.id === state.editingPlacementId) : null;
+
   target.innerHTML = `
     <div class="section-heading"><h2>Press Placements</h2></div>
-    <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
-      To add a new placement by hand, use the <a href="index.html">placement entry tool</a> —
-      it's a separate, already-working page that isn't merged into this dashboard shell yet.
-    </p>
+    ${
+      canManagePlacements
+        ? `<div class="card" id="placement-form-wrap" style="margin-bottom:24px;"></div>`
+        : `<p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
+             Switch the sidebar's data source to "Real" to add or edit a placement — doing so while previewing
+             the mock demo dataset wouldn't show up in it, which would just be confusing.
+           </p>`
+    }
     <div class="card" id="placements-full-table"></div>
   `;
+
+  if (canManagePlacements) {
+    renderPlacementForm(document.getElementById("placement-form-wrap"), {
+      initialData: editingPlacement,
+      onSubmit: (rawData) => {
+        try {
+          if (editingPlacement) {
+            updatePlacement(applyPlacementEdit(editingPlacement, rawData));
+            state.editingPlacementId = null;
+          } else {
+            addPlacement(createPlacement(rawData));
+          }
+          renderPlacementsView();
+          return true;
+        } catch (err) {
+          alert(err.message);
+          return false;
+        }
+      },
+      onCancel: () => {
+        state.editingPlacementId = null;
+        renderPlacementsView();
+      },
+    });
+  }
+
   renderPlacementsTable(document.getElementById("placements-full-table"), filterPlacements(getAllPlacements(), state.searchTerm), {
     showClient: true,
+    onEdit: canManagePlacements
+      ? (id) => {
+          state.editingPlacementId = id;
+          renderPlacementsView();
+        }
+      : undefined,
+    onDelete: canManagePlacements
+      ? (id) => {
+          if (confirm("Delete this placement? This can't be undone.")) {
+            deletePlacement(id);
+            if (state.editingPlacementId === id) state.editingPlacementId = null;
+            renderPlacementsView();
+          }
+        }
+      : undefined,
   });
 }
 
@@ -294,6 +464,38 @@ function renderReviewQueueSection() {
   });
 }
 
+/**
+ * Executive summary draft — the "owner approves" half of the PRD's AI
+ * writing pattern, without the "AI drafts" half (no API key/model chosen
+ * yet, Phase 7 is Planned). Tenyse writes it herself for now; the field
+ * lives in the same spot a real "Generate" button will fill in later.
+ */
+function renderSummaryForm(container, clientName) {
+  const existing = loadSummary(clientName);
+  container.innerHTML = `
+    <p style="margin:0 0 8px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Executive Summary</p>
+    <p class="hint" style="margin:0 0 10px;">No AI writer is wired up yet — write this by hand for now. It shows up on ${escapeHtml(clientName)}'s report above and on their own dashboard once saved.</p>
+    <div class="entry-form">
+      <div class="field-row" style="margin-bottom:10px;">
+        <textarea id="summary-text-${cssId(clientName)}" rows="4" placeholder="e.g. This period, coverage expanded into industry-specific outlets while building toward larger national placements...">${existing ? existing.text : ""}</textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
+      </div>
+    </div>
+  `;
+
+  container.querySelector(`#summary-save-${cssId(clientName)}`).addEventListener("click", () => {
+    const text = container.querySelector(`#summary-text-${cssId(clientName)}`).value;
+    saveSummary(clientName, text);
+    renderReportsView();
+  });
+}
+
+function cssId(str) {
+  return String(str).replace(/[^a-zA-Z0-9]+/g, "-");
+}
+
 function renderReportsView() {
   const target = document.getElementById("reports-content");
   if (state.demoState === "loading") return renderLoadingState(target);
@@ -305,13 +507,49 @@ function renderReportsView() {
     return;
   }
 
+  const clients = state.dataSource === "real" ? getRealClients() : CLIENTS;
   target.innerHTML = `
     <div class="section-heading"><h2>Reports</h2></div>
-    ${CLIENTS.map((c) => `<div class="section"><h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${c.name}</h3><div id="report-${c.id}"></div></div>`).join("")}
+    <div class="section" id="canva-export-wrap"></div>
+    ${clients
+      .map(
+        (c) => `
+      <div class="section">
+        <h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${c.name}</h3>
+        ${state.dataSource === "real" ? `<div class="card" id="summary-form-${c.id}" style="margin-bottom:14px;"></div>` : ""}
+        <div id="report-${c.id}"></div>
+      </div>`
+      )
+      .join("")}
   `;
-  CLIENTS.forEach((c) => {
-    renderReportCard(document.getElementById(`report-${c.id}`), REPORTS[c.id] || null);
+  clients.forEach((c) => {
+    const report = state.dataSource === "real" ? getRealReport(c.name) : REPORTS[c.id] || null;
+    renderReportCard(document.getElementById(`report-${c.id}`), report);
+
+    if (state.dataSource === "real") {
+      renderSummaryForm(document.getElementById(`summary-form-${c.id}`), c.name);
+    }
   });
+
+  const exportWrap = document.getElementById("canva-export-wrap");
+  if (state.dataSource === "real") {
+    renderCanvaExportPanel(exportWrap, {
+      clients: getRealClients(),
+      onGenerate: ({ clientName, startDate, endDate }) => {
+        if (!clientName) return { ok: false, reason: "no_placements", message: "Choose a client first." };
+        const result = generateCanvaExport(getAllRealPlacements(), { clientName, startDate, endDate });
+        if (result.ok) downloadCsv(result.csv, result.filename);
+        return result;
+      },
+    });
+  } else {
+    exportWrap.innerHTML = `
+      <p style="color:var(--text-secondary); font-size:0.85rem;">
+        Switch the sidebar's data source to "Real" to generate a Canva export — the mock demo data isn't
+        real coverage, so exporting it wouldn't produce anything you'd actually send to a client.
+      </p>
+    `;
+  }
 }
 
 function renderAnalyticsView() {
@@ -329,7 +567,32 @@ function renderSettingsView() {
     <div class="card">
       <p>Contractor permissions, brand template defaults, and notification preferences will live here. Nothing on this page is wired up yet.</p>
     </div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Agent Error Log</h2></div>
+    <div class="card">
+      <div class="state-panel">
+        <div class="state-icon" aria-hidden="true">✅</div>
+        <h3>No agent errors — because no agents run yet</h3>
+        <p>This isn't "all clear," it's "nothing exists to fail yet." The Discovery, AVE, and Design agents are all still Planned
+          (see the PRD's Execution table). Once any of them run in Supabase, failures land in the <code>errors</code> table
+          (drafted in <code>db/schema.sql</code>) and will list here: which agent, when, and what went wrong — never silently
+          dropped.</p>
+      </div>
+    </div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Developer Tools</h2></div>
+    <div class="card">
+      <p style="margin:0 0 12px;">Not a real product feature — a shortcut for testing. Adds 5 realistic, complete placements
+        across two clients (via the same Add Placement path the form uses), so there's something real to try the
+        Press Placements table, campaigns, and Canva export against without typing them in by hand.</p>
+      <button class="btn-secondary" id="seed-sample-data-btn">Load Sample Placements</button>
+      <span id="seed-sample-data-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
+    </div>
   `;
+
+  document.getElementById("seed-sample-data-btn").addEventListener("click", () => {
+    if (!confirm("This adds 5 sample placements to your real placement data. Continue?")) return;
+    const count = seedSamplePlacements();
+    document.getElementById("seed-sample-data-result").textContent = `Added ${count} sample placements.`;
+  });
 }
 
 function renderCurrentView() {
@@ -350,7 +613,44 @@ function renderCurrentView() {
       return renderAnalyticsView();
     case "settings":
       return renderSettingsView();
+    case "campaign-detail":
+      return renderCampaignDetailView();
   }
+}
+
+function showCampaignDetail(id) {
+  state.selectedCampaignId = id;
+  navigate("campaign-detail");
+}
+
+function renderCampaignDetailView() {
+  const target = document.getElementById("campaign-detail-content");
+  const campaign = getAllCampaigns().find((c) => c.id === state.selectedCampaignId);
+
+  if (!campaign) {
+    target.innerHTML = `<p>Campaign not found.</p><button class="link-btn" id="campaign-detail-back">&larr; Back to Campaigns</button>`;
+    document.getElementById("campaign-detail-back").addEventListener("click", () => navigate("campaigns"));
+    return;
+  }
+
+  const placements = getAllPlacements().filter((p) => p.campaign === campaign.name && p.clientName === campaign.clientName);
+
+  renderCampaignDetail(target, {
+    campaign,
+    placements,
+    notes: loadNotesForCampaign(campaign.id),
+    currentUser: { role: "owner", name: "Tenyse Williams" },
+    showClient: true,
+    onBack: () => navigate("campaigns"),
+    onAddNote: (body, currentUser) => {
+      try {
+        addNote({ campaignId: campaign.id, authorRole: currentUser.role, authorName: currentUser.name, body });
+        renderCampaignDetailView();
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -363,8 +663,10 @@ function renderSidebarComponent() {
     sessionEmail: session ? session.email : null,
     currentView: state.view,
     demoState: state.demoState,
+    dataSource: state.dataSource,
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
+    onDataSourceChange: setDataSource,
     onLogout: () => {
       logout();
       window.location.href = "login.html";
@@ -406,6 +708,12 @@ function setDemoState(demoState) {
   renderCurrentView();
 }
 
+function setDataSource(dataSource) {
+  state.dataSource = dataSource;
+  renderSidebarComponent();
+  renderCurrentView();
+}
+
 function openSidebarMobile() {
   document.getElementById("owner-sidebar").classList.add("open");
   document.getElementById("sidebar-overlay").classList.add("visible");
@@ -422,6 +730,10 @@ if (session) {
   const demoParam = new URLSearchParams(location.search).get("demo");
   if (["loading", "empty", "error"].includes(demoParam)) {
     state.demoState = demoParam;
+  }
+  const dataParam = new URLSearchParams(location.search).get("data");
+  if (["real", "mock"].includes(dataParam)) {
+    state.dataSource = dataParam;
   }
 
   renderSidebarComponent();
