@@ -475,9 +475,10 @@ function renderSummaryForm(container, clientName) {
   container.innerHTML = `
     <p style="margin:0 0 8px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Executive Summary</p>
     <p class="hint" style="margin:0 0 10px;">No AI writer is wired up yet — write this by hand for now. It shows up on ${escapeHtml(clientName)}'s report above and on their own dashboard once saved.</p>
+    <p class="hint" style="margin:0 0 10px;">Tenyse's own case studies follow Problem → Solution → Results — worth keeping that shape here too.</p>
     <div class="entry-form">
       <div class="field-row" style="margin-bottom:10px;">
-        <textarea id="summary-text-${cssId(clientName)}" rows="4" placeholder="e.g. This period, coverage expanded into industry-specific outlets while building toward larger national placements...">${existing ? existing.text : ""}</textarea>
+        <textarea id="summary-text-${cssId(clientName)}" rows="4" placeholder="e.g. [Problem] Coverage was limited to local outlets. [Solution] We pitched an industry-specific angle to trade press. [Results] Landed 3 placements reaching 200K+ readers, building toward national pickup next period.">${existing ? existing.text : ""}</textarea>
       </div>
       <div class="form-actions">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
