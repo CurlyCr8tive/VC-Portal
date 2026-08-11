@@ -1,19 +1,20 @@
-// Owner API — scaffolding only.
+// Owner API — real Supabase-backed routes, gated by requireOwner().
 //
 // Per the Final PRD's "Backend structure": separate API paths per role
 // (owner, client, and a future coach path), one Express instance per path.
-// This is that owner instance. It is NOT connected to Supabase — no project
-// exists yet (must be created under Tenyse's own account/payment method
-// first, per the PRD's Account Ownership section). Every route below
-// returns 501 Not Implemented on purpose, rather than fake data, so it's
-// obvious this is scaffolding and not a working backend.
+// This is that owner instance.
 //
-// Real per-client access control does not exist here or anywhere else in
-// this repo yet. Row Level Security policies are drafted (commented out) in
-// db/schema.sql, to be applied once Supabase exists — that's Week 3
-// ("Architecture Up") scope, not this.
+// "Real" here means: every route below verifies a Supabase Auth JWT and
+// requires profiles.role = 'owner' before touching data (lib/supabaseClient.js
+// requireOwner()), and the actual row-level enforcement is backed a second,
+// independent time by the RLS policies in db/schema.sql. Until a real
+// Supabase project exists (must be created under Tenyse's own
+// account/payment method, per the PRD's Account Ownership section) and its
+// URL/service-role key are set as env vars, every route below responds
+// 503 — that's an honest "not configured yet," not fake data.
 
 import express from "express";
+import { supabase, isSupabaseConfigured, requireOwner } from "./lib/supabaseClient.js";
 
 const PORT = process.env.OWNER_API_PORT || 4001;
 
@@ -29,26 +30,68 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "owner-api", supabaseConnected: false });
+  res.json({ status: "ok", service: "owner-api", supabaseConnected: isSupabaseConfigured });
 });
 
-function notImplemented(resourceName) {
-  return (req, res) => {
-    res.status(501).json({
-      error: "not_implemented",
-      message: `${resourceName} is not wired to a real database yet — no Supabase project exists. See the PRD's Required Access status table.`,
-    });
+/** Wraps a route handler so `requireOwner` failures short-circuit before the handler body runs. */
+function ownerRoute(handler) {
+  return async (req, res) => {
+    if (!(await requireOwner(req, res))) return;
+    try {
+      await handler(req, res);
+    } catch (err) {
+      res.status(500).json({ error: "internal_error", message: err.message });
+    }
   };
 }
 
-// Resource shape matches db/schema.sql's tables — these become real queries
-// once Supabase exists, without needing to redesign the routes themselves.
-app.get("/api/clients", notImplemented("Clients"));
-app.get("/api/campaigns", notImplemented("Campaigns"));
-app.get("/api/placements", notImplemented("Placements"));
-app.get("/api/review-queue", notImplemented("Review queue"));
-app.get("/api/errors", notImplemented("Errors log"));
+// Owner sees everything — no client_id filter needed, unlike client-api.
+app.get(
+  "/api/clients",
+  ownerRoute(async (req, res) => {
+    const { data, error } = await supabase.from("clients").select("*").order("name");
+    if (error) throw error;
+    res.json(data);
+  })
+);
+
+app.get(
+  "/api/campaigns",
+  ownerRoute(async (req, res) => {
+    const { data, error } = await supabase.from("campaigns").select("*, campaign_milestones(*)").order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  })
+);
+
+app.get(
+  "/api/placements",
+  ownerRoute(async (req, res) => {
+    const { data, error } = await supabase.from("placements").select("*").order("publication_date", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  })
+);
+
+app.get(
+  "/api/review-queue",
+  ownerRoute(async (req, res) => {
+    const { data, error } = await supabase.from("review_queue").select("*").eq("status", "pending").order("discovered_at", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  })
+);
+
+app.get(
+  "/api/errors",
+  ownerRoute(async (req, res) => {
+    const { data, error } = await supabase.from("errors").select("*").order("occurred_at", { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  })
+);
 
 app.listen(PORT, () => {
-  console.log(`owner-api scaffold listening on http://localhost:${PORT} (no database connected)`);
+  const status = isSupabaseConfigured ? "connected to Supabase" : "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set — routes will 503";
+  console.log(`owner-api listening on http://localhost:${PORT} (${status})`);
 });

@@ -9,6 +9,7 @@
     "dev": "node index.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "express": "^4.19.2"
   }
 }

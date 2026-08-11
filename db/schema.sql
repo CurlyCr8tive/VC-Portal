@@ -7,10 +7,11 @@
 -- agents start writing into it," and to give Week 3 something real to run
 -- through dbdiagram.io for the ERD, per Stef's tip in the build plan.
 --
--- Row Level Security: policies are drafted at the bottom, commented out.
--- They are NOT active — RLS is explicitly Week 3 ("Architecture Up") scope,
--- not Week 2. They're included now so the schema and its access model are
--- designed together, rather than RLS being bolted on after the fact.
+-- Row Level Security: policies are at the bottom, finalized and ready to
+-- run. "Ready to run" is not the same as "active" — RLS only does anything
+-- once it's applied against a real Supabase project, and none exists yet.
+-- These stop being theoretical the moment `supabase db push` (or pasting
+-- this file into the SQL editor) runs against Tenyse's own project.
 --
 -- Field names below map directly to the Final PRD's "Press Placement Data
 -- Model" table and "Agent Architecture" section — every column has a
@@ -158,6 +159,20 @@ create table campaign_notes (
 );
 
 -- ---------------------------------------------------------------------------
+-- campaign_milestones — backs campaignSchema.js's `milestones` array
+-- (id/text/done/createdAt). A separate table rather than a jsonb column on
+-- campaigns so toggling one milestone's `done` state is a single-row
+-- update, not a read-modify-write of the whole array.
+-- ---------------------------------------------------------------------------
+create table campaign_milestones (
+  id uuid primary key default gen_random_uuid(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  text text not null,
+  done boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- errors — per the build plan's "dedicated errors table... surfaced in a
 -- simple owner-side panel." One row per agent failure; nothing writes here
 -- yet because no agent runs in production yet.
@@ -172,55 +187,137 @@ create table errors (
 );
 
 -- =============================================================================
--- DRAFT Row Level Security policies — NOT ACTIVE. Commented out on purpose.
--- Apply these in Week 3 once the Supabase project exists and profiles/roles
--- are real, not mock. Left here so access control is designed alongside the
--- schema instead of retrofitted.
+-- Row Level Security policies — full coverage, ready to run.
+--
+-- These are the actual enforcement of "a pr_client only ever sees their own
+-- data," replacing the mock client-side filtering in the current static
+-- build (src/auth.js says this outright: "do not treat requireSession()
+-- passing as proof that access control works"). The Express APIs
+-- (server/owner-api, server/client-api) check role/client_id in app code
+-- too, using the service-role key — that's a UX-friendly 403 with a message,
+-- not the actual security boundary. RLS below is what holds even if an
+-- Express route has a bug, since Supabase enforces it at the database
+-- connection level for any non-service-role key.
+--
+-- One thing RLS can't do: hide a single COLUMN (e.g. placements.notes when
+-- notes_shareable = false) while still exposing the rest of that row — RLS
+-- filters rows, not columns. If per-column visibility is still wanted once
+-- this is live, that needs a view (e.g. a `placements_for_client` view that
+-- omits/nulls the notes column) or Postgres column-level GRANTs, not RLS.
+-- Not built here — flagging so it isn't assumed to already work.
 -- =============================================================================
 
--- alter table clients enable row level security;
--- alter table campaigns enable row level security;
--- alter table placements enable row level security;
--- alter table review_queue enable row level security;
--- alter table campaign_notes enable row level security;
+alter table profiles enable row level security;
+alter table clients enable row level security;
+alter table campaigns enable row level security;
+alter table campaign_milestones enable row level security;
+alter table placements enable row level security;
+alter table outlet_rates enable row level security;
+alter table review_queue enable row level security;
+alter table campaign_notes enable row level security;
+alter table errors enable row level security;
 
--- Owners (and eventually contractors) see everything.
--- create policy "owner full access - clients" on clients
---   for all using (
---     exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
---   );
+-- profiles: everyone can read their own row (needed for the app to look up
+-- "am I owner or pr_client, and which client_id"); owners can read all
+-- profiles (needed for the owner dashboard's client list).
+create policy "read own profile" on profiles
+  for select using (id = auth.uid());
 
--- A pr_client only ever sees rows tied to their own client_id — this is the
--- actual enforcement of "scoped to their own data only," not the mock
--- client-side filtering that exists in the current static build.
--- create policy "pr_client scoped access - campaigns" on campaigns
---   for select using (
---     exists (
---       select 1 from profiles
---       where profiles.id = auth.uid()
---         and profiles.role = 'pr_client'
---         and profiles.client_id = campaigns.client_id
---     )
---   );
+create policy "owner reads all profiles" on profiles
+  for select using (
+    exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'owner')
+  );
 
--- create policy "pr_client scoped access - placements" on placements
---   for select using (
---     exists (
---       select 1 from profiles
---       where profiles.id = auth.uid()
---         and profiles.role = 'pr_client'
---         and profiles.client_id = placements.client_id
---     )
---   );
+-- clients: owner full access; a pr_client can only see their own client row.
+create policy "owner full access - clients" on clients
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
 
--- Notes on a campaign: both the owner and that campaign's own client can
+create policy "pr_client reads own client" on clients
+  for select using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid() and profiles.role = 'pr_client' and profiles.client_id = clients.id
+    )
+  );
+
+-- campaigns: owner full access; pr_client read-only, scoped to their client_id.
+create policy "owner full access - campaigns" on campaigns
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
+
+create policy "pr_client scoped access - campaigns" on campaigns
+  for select using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'pr_client'
+        and profiles.client_id = campaigns.client_id
+    )
+  );
+
+-- campaign_milestones: same scoping as campaigns, joined through campaign_id.
+create policy "owner full access - campaign_milestones" on campaign_milestones
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
+
+create policy "pr_client scoped access - campaign_milestones" on campaign_milestones
+  for select using (
+    exists (
+      select 1 from profiles p
+      join campaigns c on c.id = campaign_milestones.campaign_id
+      where p.id = auth.uid() and p.role = 'pr_client' and p.client_id = c.client_id
+    )
+  );
+
+-- placements: owner full access; pr_client read-only, scoped to their client_id.
+create policy "owner full access - placements" on placements
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
+
+create policy "pr_client scoped access - placements" on placements
+  for select using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'pr_client'
+        and profiles.client_id = placements.client_id
+    )
+  );
+
+-- outlet_rates: internal working data (Agent 2's lookup table) — owner only,
+-- no client ever needs to see or query this directly.
+create policy "owner full access - outlet_rates" on outlet_rates
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
+
+-- review_queue: internal triage queue (Agent 1's output before a human
+-- confirms it into placements) — owner only. A client should never see an
+-- unconfirmed candidate match before Tenyse has reviewed it.
+create policy "owner full access - review_queue" on review_queue
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
+
+-- campaign_notes: both the owner and that campaign's own client can
 -- read/write; no client ever sees another client's campaign_notes.
--- create policy "pr_client scoped access - campaign_notes" on campaign_notes
---   for all using (
---     exists (
---       select 1 from profiles p
---       join campaigns c on c.id = campaign_notes.campaign_id
---       where p.id = auth.uid()
---         and (p.role = 'owner' or (p.role = 'pr_client' and p.client_id = c.client_id))
---     )
---   );
+create policy "scoped access - campaign_notes" on campaign_notes
+  for all using (
+    exists (
+      select 1 from profiles p
+      join campaigns c on c.id = campaign_notes.campaign_id
+      where p.id = auth.uid()
+        and (p.role = 'owner' or (p.role = 'pr_client' and p.client_id = c.client_id))
+    )
+  );
+
+-- errors: internal ops log — owner only.
+create policy "owner full access - errors" on errors
+  for all using (
+    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
+  );
