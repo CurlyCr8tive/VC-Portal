@@ -17,6 +17,10 @@ export function renderCanvaExportPanel(container, { clients, onGenerate }) {
         this only automates the data entry that comes before that.
       </p>
 
+      <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; font-size:0.82rem;">
+        <strong>Column labels are inferred, not confirmed.</strong> They're built from Tenyse's website case studies and the PRD, not her real Canva template — she hasn't shared it yet. Expect the header row to need updating once she does.
+      </div>
+
       <div class="entry-form">
         <div class="field-row">
           <label for="canva-export-client">Client</label>
