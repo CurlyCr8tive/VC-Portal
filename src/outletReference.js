@@ -138,3 +138,38 @@ export const CAMPAIGN_BENCHMARKS = [
     note: "Cumulative total, not a single campaign — don't compare directly to the per-campaign rows above.",
   },
 ];
+
+/**
+ * Flags benchmark entries that share the exact same aveValue AND
+ * audienceReach across different clients — this is how the VeganHood
+ * CPG / Candlelit Care duplicate above was actually caught. AVE is a sum
+ * of per-outlet ad-rate equivalents, so two independently-calculated
+ * campaigns with different outlet lists landing on the identical dollar
+ * figure isn't a plausible coincidence; it means at least one is a
+ * template artifact or copy/paste error, not real data for that campaign.
+ *
+ * Intended use: run this against CAMPAIGN_BENCHMARKS now (see the test in
+ * docs/agents/ave-calculation-agent.md), and again later against real
+ * outlet_rates/placements data before the AVE agent ever treats a number
+ * as ground truth — a cheap, honest guardrail against repeating this
+ * exact mistake once real rate data starts flowing in.
+ */
+export function findSuspiciousDuplicates(benchmarks = CAMPAIGN_BENCHMARKS) {
+  const byValue = new Map();
+  for (const entry of benchmarks) {
+    if (entry.aveValue == null || entry.audienceReach == null) continue;
+    const key = `${entry.aveValue}|${entry.audienceReach}`;
+    if (!byValue.has(key)) byValue.set(key, []);
+    byValue.get(key).push(entry);
+  }
+
+  const suspicious = [];
+  for (const [key, entries] of byValue) {
+    const distinctClients = new Set(entries.map((e) => e.client));
+    if (entries.length > 1 && distinctClients.size > 1) {
+      const [aveValue, audienceReach] = key.split("|").map(Number);
+      suspicious.push({ aveValue, audienceReach, entries });
+    }
+  }
+  return suspicious;
+}

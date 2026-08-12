@@ -11,6 +11,14 @@
 // the submit button reads "Save Changes" instead of "Add Placement", and a
 // Cancel button appears (only onCancel makes sense to show there).
 
+import { OUTLET_REFERENCE, KNOWN_OUTLETS_NO_RATE_YET } from "../../outletReference.js";
+
+// Suggestions only — <datalist> never restricts input, so typing an outlet
+// that isn't in either list still works fine. Combines the ones with a real
+// reach figure and the larger known-but-unrated list from Tenyse's case
+// studies, deduped and sorted for a predictable dropdown order.
+const OUTLET_SUGGESTIONS = [...new Set([...OUTLET_REFERENCE.map((o) => o.name), ...KNOWN_OUTLETS_NO_RATE_YET])].sort();
+
 function val(initialData, field) {
   if (!initialData) return "";
   const v = initialData[field];
@@ -24,7 +32,10 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
     <form class="entry-form" id="owner-placement-form">
       <div class="field-row">
         <label for="op-publication">Publication *</label>
-        <input type="text" id="op-publication" name="publication" placeholder="e.g. Forbes" value="${val(initialData, "publication")}" required />
+        <input type="text" id="op-publication" name="publication" list="op-publication-list" placeholder="e.g. Forbes" value="${val(initialData, "publication")}" required />
+        <datalist id="op-publication-list">
+          ${OUTLET_SUGGESTIONS.map((name) => `<option value="${name.replace(/"/g, "&quot;")}"></option>`).join("")}
+        </datalist>
       </div>
 
       <div class="field-row">
