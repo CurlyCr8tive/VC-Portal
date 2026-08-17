@@ -11,11 +11,17 @@
 // it. Until a real Supabase project's URL/service-role key are set as env
 // vars, every route responds 503.
 
+// Must load before lib/supabaseClient.js — that module reads process.env at
+// import time (module-level consts), so .env has to be in process.env first.
+import "dotenv/config";
 import express from "express";
 import { supabase, isSupabaseConfigured, requireClient } from "./lib/supabaseClient.js";
 import { sendNoteNotification } from "./lib/gmailNotify.js";
 
-const PORT = process.env.CLIENT_API_PORT || 4002;
+// process.env.PORT first — same reasoning as owner-api/index.js: Render
+// assigns the port dynamically via PORT, CLIENT_API_PORT/4002 are the
+// local-dev fallback only.
+const PORT = process.env.PORT || process.env.CLIENT_API_PORT || 4002;
 
 const app = express();
 app.use(express.json());

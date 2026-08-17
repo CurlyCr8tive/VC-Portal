@@ -31,9 +31,10 @@ import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
-import { loadSummary, saveSummary } from "../summaryStorage.js";
+import { loadSummary, saveSummary, approveSummary } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js";
 import { seedSamplePlacements } from "./seedSampleData.js";
@@ -472,16 +473,24 @@ function renderReviewQueueSection() {
  */
 function renderSummaryForm(container, clientName) {
   const existing = loadSummary(clientName);
+  const statusLine = existing?.approvedAt
+    ? `<p class="hint" style="margin:0 0 10px; color:var(--color-teal); font-weight:600;">✓ Approved ${escapeHtml(existing.approvedAt.slice(0, 10))} — eligible for inclusion in a Canva export.</p>`
+    : existing
+      ? `<p class="hint" style="margin:0 0 10px;">Saved as a draft, not yet approved — won't be included in a Canva export until it is.</p>`
+      : `<p class="hint" style="margin:0 0 10px;">No draft saved yet.</p>`;
+
   container.innerHTML = `
     <p style="margin:0 0 8px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Executive Summary</p>
     <p class="hint" style="margin:0 0 10px;">No AI writer is wired up yet — write this by hand for now. It shows up on ${escapeHtml(clientName)}'s report above and on their own dashboard once saved.</p>
     <p class="hint" style="margin:0 0 10px;">Tenyse's own case studies follow Problem → Solution → Results — worth keeping that shape here too.</p>
+    ${statusLine}
     <div class="entry-form">
       <div class="field-row" style="margin-bottom:10px;">
         <textarea id="summary-text-${cssId(clientName)}" rows="4" placeholder="e.g. [Problem] Coverage was limited to local outlets. [Solution] We pitched an industry-specific angle to trade press. [Results] Landed 3 placements reaching 200K+ readers, building toward national pickup next period.">${existing ? existing.text : ""}</textarea>
       </div>
-      <div class="form-actions">
+      <div class="form-actions" style="display:flex; gap:10px;">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
+        <button type="button" class="btn-secondary" id="summary-approve-${cssId(clientName)}" ${!existing ? "disabled" : ""} title="${!existing ? "Save a draft first" : "Approves the saved draft above — not unsaved edits in the box"}">Approve</button>
       </div>
     </div>
   `;
@@ -491,6 +500,14 @@ function renderSummaryForm(container, clientName) {
     saveSummary(clientName, text);
     renderReportsView();
   });
+
+  const approveBtn = container.querySelector(`#summary-approve-${cssId(clientName)}`);
+  if (approveBtn && !approveBtn.disabled) {
+    approveBtn.addEventListener("click", () => {
+      approveSummary(clientName);
+      renderReportsView();
+    });
+  }
 }
 
 function cssId(str) {
@@ -534,11 +551,27 @@ function renderReportsView() {
 
   const exportWrap = document.getElementById("canva-export-wrap");
   if (state.dataSource === "real") {
+    // Only ever returns a summary that's actually approved — a saved-but-
+    // unapproved draft must read as "no summary" to the export panel, the
+    // same way generateCanvaExport treats it. Keeps the "never leak a
+    // draft into a client-facing export" rule enforced at every layer that
+    // touches this data, not just the one closest to the CSV itself.
+    const getApprovedSummary = (clientName) => {
+      const summary = loadSummary(clientName);
+      return summary?.approvedAt ? summary : null;
+    };
+
     renderCanvaExportPanel(exportWrap, {
       clients: getRealClients(),
+      getSummaryStatus: getApprovedSummary,
       onGenerate: ({ clientName, startDate, endDate }) => {
         if (!clientName) return { ok: false, reason: "no_placements", message: "Choose a client first." };
-        const result = generateCanvaExport(getAllRealPlacements(), { clientName, startDate, endDate });
+        const result = generateCanvaExport(getAllRealPlacements(), {
+          clientName,
+          startDate,
+          endDate,
+          approvedSummary: getApprovedSummary(clientName),
+        });
         if (result.ok) downloadCsv(result.csv, result.filename);
         return result;
       },
@@ -612,11 +645,17 @@ function renderCurrentView() {
       return renderReportsView();
     case "analytics":
       return renderAnalyticsView();
+    case "coaching":
+      return renderCoachingView();
     case "settings":
       return renderSettingsView();
     case "campaign-detail":
       return renderCampaignDetailView();
   }
+}
+
+function renderCoachingView() {
+  renderCoachingAdminView(document.getElementById("coaching-content"));
 }
 
 function showCampaignDetail(id) {

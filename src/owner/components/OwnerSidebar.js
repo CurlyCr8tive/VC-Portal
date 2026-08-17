@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: "reviewqueue", label: "Review Queue" },
   { id: "reports", label: "Reports" },
   { id: "analytics", label: "Analytics" },
+  { id: "coaching", label: "Coaching Program" },
   { id: "settings", label: "Settings" },
 ];
 

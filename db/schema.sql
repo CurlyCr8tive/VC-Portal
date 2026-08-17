@@ -1,17 +1,18 @@
--- Verified Consulting — Postgres schema draft (Supabase)
+-- Verified Consulting — Postgres schema (Supabase)
 --
--- STATUS: Not yet applied anywhere. No Supabase project exists yet — per the
--- Final PRD, that project must be created under Tenyse's own account/payment
--- method, not the builder's, before this ever gets run. This file exists to
--- satisfy the Week 1 critical-path item "lock the data schema before Week 2's
--- agents start writing into it," and to give Week 3 something real to run
--- through dbdiagram.io for the ERD, per Stef's tip in the build plan.
+-- STATUS (Aug 14): Applied and verified against a real Supabase project —
+-- all 9 tables exist, RLS is confirmed enabled on every one (checked via
+-- pg_tables.rowsecurity, not just assumed from this file). That project is
+-- TEMPORARY, though: created under the builder's own account with Stef's
+-- explicit sign-off, per the Aug 10 Slack conversation, specifically
+-- because Tenyse's own Supabase account/payment method (the PRD's Account
+-- Ownership requirement) still didn't exist by the Week 3 deadline. No real
+-- data lives in it. Once Tenyse creates her own project, this file gets
+-- re-run fresh against it (a clean re-apply, not a migration — there's
+-- nothing real to carry over) and the temporary project gets disabled.
 --
--- Row Level Security: policies are at the bottom, finalized and ready to
--- run. "Ready to run" is not the same as "active" — RLS only does anything
--- once it's applied against a real Supabase project, and none exists yet.
--- These stop being theoretical the moment `supabase db push` (or pasting
--- this file into the SQL editor) runs against Tenyse's own project.
+-- Row Level Security: policies are at the bottom and are now ACTIVE, not
+-- just drafted — confirmed live in the verification above.
 --
 -- Field names below map directly to the Final PRD's "Press Placement Data
 -- Model" table and "Agent Architecture" section — every column has a
@@ -35,7 +36,11 @@ create table profiles (
   -- when X" as a single constraint without a trigger — enforce this at the
   -- application layer (Express) for now, revisit if it becomes a real bug
   -- source.
-  client_id uuid references clients(id),
+  -- No inline `references clients(id)` here on purpose — clients doesn't
+  -- exist yet at this point in the script (profiles/clients reference each
+  -- other both ways: clients.created_by -> profiles, profiles.client_id ->
+  -- clients). The FK is added below via ALTER TABLE once clients exists.
+  client_id uuid,
   created_at timestamptz not null default now()
 );
 

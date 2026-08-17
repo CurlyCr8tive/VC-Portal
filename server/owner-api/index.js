@@ -13,10 +13,16 @@
 // URL/service-role key are set as env vars, every route below responds
 // 503 — that's an honest "not configured yet," not fake data.
 
+// Must load before lib/supabaseClient.js — that module reads process.env at
+// import time (module-level consts), so .env has to be in process.env first.
+import "dotenv/config";
 import express from "express";
 import { supabase, isSupabaseConfigured, requireOwner } from "./lib/supabaseClient.js";
 
-const PORT = process.env.OWNER_API_PORT || 4001;
+// process.env.PORT first — Render (and most PaaS hosts) assign the port
+// dynamically and expect the app to bind to whatever they inject via PORT,
+// not a fixed one. OWNER_API_PORT/4001 stay as the local-dev fallback.
+const PORT = process.env.PORT || process.env.OWNER_API_PORT || 4001;
 
 const app = express();
 app.use(express.json());

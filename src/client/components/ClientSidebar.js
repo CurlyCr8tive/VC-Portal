@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { id: "reports", label: "Reports" },
   { id: "analytics", label: "Analytics" },
   { id: "resources", label: "Resources" },
+  { id: "coaching", label: "Coaching Program" },
 ];
 
 /**

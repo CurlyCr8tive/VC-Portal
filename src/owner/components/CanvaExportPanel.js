@@ -7,7 +7,7 @@ import { escapeHtml } from "../../client/utils.js";
  * and is orchestrated by owner/app.js — this component doesn't know or care
  * how "generate" works, only how to ask for it and show the outcome.
  */
-export function renderCanvaExportPanel(container, { clients, onGenerate }) {
+export function renderCanvaExportPanel(container, { clients, onGenerate, getSummaryStatus }) {
   container.innerHTML = `
     <div class="card">
       <h3 style="color:var(--color-navy); font-size:1.05rem; margin:0 0 4px;">Canva Report Export</h3>
@@ -20,6 +20,8 @@ export function renderCanvaExportPanel(container, { clients, onGenerate }) {
       <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; font-size:0.82rem;">
         <strong>Column labels are inferred, not confirmed.</strong> They're built from Tenyse's website case studies and the PRD, not her real Canva template — she hasn't shared it yet. Expect the header row to need updating once she does.
       </div>
+
+      <div id="canva-summary-status" style="margin-bottom:14px;"></div>
 
       <div class="entry-form">
         <div class="field-row">
@@ -49,14 +51,46 @@ export function renderCanvaExportPanel(container, { clients, onGenerate }) {
   `;
 
   const resultEl = container.querySelector("#canva-export-result");
+  const clientSelect = container.querySelector("#canva-export-client");
+  const summaryStatusEl = container.querySelector("#canva-summary-status");
+
+  // Shown before generating, not after — silently exporting without an
+  // approved summary should read as a visible choice, not a surprise
+  // discovered only once the CSV is already downloaded.
+  function updateSummaryStatus() {
+    const clientName = clientSelect.value;
+    const approvedSummary = clientName && getSummaryStatus ? getSummaryStatus(clientName) : null;
+    renderSummaryStatus(summaryStatusEl, approvedSummary);
+  }
+
+  if (clients.length > 0) {
+    clientSelect.addEventListener("change", updateSummaryStatus);
+    updateSummaryStatus();
+  }
 
   container.querySelector("#canva-export-generate").addEventListener("click", () => {
-    const clientName = container.querySelector("#canva-export-client").value;
+    const clientName = clientSelect.value;
     const startDate = container.querySelector("#canva-export-start").value;
     const endDate = container.querySelector("#canva-export-end").value;
     const result = onGenerate({ clientName, startDate, endDate });
     renderResult(resultEl, result);
   });
+}
+
+function renderSummaryStatus(el, approvedSummary) {
+  if (!approvedSummary) {
+    el.innerHTML = `
+      <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; font-size:0.82rem;">
+        ⚠ No approved executive summary for this period. Export will proceed without one — generate and approve a summary first if the report should include it.
+      </div>
+    `;
+    return;
+  }
+  el.innerHTML = `
+    <div class="warn" style="background:#eafaf6; border:1px solid #bfe8dc; color:#146c56; border-radius:var(--radius-md); padding:10px 14px; font-size:0.82rem;">
+      ✓ Executive summary approved ${escapeHtml(approvedSummary.approvedAt.slice(0, 10))} — will be included on every row (repeated). This is a placeholder approach until Tenyse's real Canva template layout is confirmed.
+    </div>
+  `;
 }
 
 function renderResult(resultEl, result) {

@@ -13,6 +13,7 @@ import { renderLoadingState } from "./components/LoadingState.js";
 import { renderErrorState } from "./components/ErrorState.js";
 import { renderCampaignDetail } from "./components/CampaignDetailView.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
+import { renderCoachingProgramView } from "./components/CoachingProgramView.js";
 
 // ---------------------------------------------------------------------------
 // This is a mock, client-scoped view. `state.clientId` stands in for "the
@@ -240,6 +241,10 @@ function renderResourcesView() {
   `;
 }
 
+function renderCoachingView() {
+  renderCoachingProgramView(document.getElementById("coaching-content"));
+}
+
 function renderCurrentView() {
   switch (state.view) {
     case "dashboard":
@@ -254,6 +259,8 @@ function renderCurrentView() {
       return renderAnalyticsView();
     case "resources":
       return renderResourcesView();
+    case "coaching":
+      return renderCoachingView();
     case "campaign-detail":
       return renderCampaignDetailView();
   }
