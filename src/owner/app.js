@@ -1026,11 +1026,13 @@ function renderSettingsView() {
     <div class="section-heading" style="margin-top:24px;"><h2>Real Case Study Data</h2></div>
     <div class="card">
       <p style="margin:0 0 12px;">Not a demo/mock fixture — these are Tenyse's own real historical numbers (VeganHood, SNAP Co.,
-        Vegan Dining Month), sourced from her past case-study reporting, written into the same real data path as anything
+        Vegan Dining Month): placements, a completed Campaign record per client, and a real AI-generated executive summary
+        (already reviewed and approved as part of this same action) — written into the same real data path as anything
         entered by hand. Safe to click more than once — already-loaded rows are skipped, not duplicated.</p>
-      <p class="hint" style="margin:0 0 12px;">One honest gap, disclosed on each row's Notes field: none of the source
-        material gives an exact landing date, so the date shown is when it was recorded into this system, not a sourced
-        publish date.</p>
+      <p class="hint" style="margin:0 0 12px;">Two honest gaps, disclosed on each row's Notes field: none of the source
+        material gives an exact landing/campaign-start date, so dates shown are recording-date placeholders, not sourced
+        facts — and Audience Reach / Tone &amp; Sentiment aren't tracked in this build, called out directly in each summary
+        rather than smoothed over.</p>
       <button class="btn-secondary" id="seed-real-case-study-btn">Load Real Case Study Data</button>
       <span id="seed-real-case-study-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
     </div>
@@ -1048,9 +1050,11 @@ function renderSettingsView() {
   renderErrorLogPanel(document.getElementById("error-log-wrap"));
 
   document.getElementById("seed-real-case-study-btn").addEventListener("click", () => {
-    const count = seedRealCaseStudyData();
+    const { placementsAdded, campaignsAdded, summariesApproved } = seedRealCaseStudyData();
     document.getElementById("seed-real-case-study-result").textContent =
-      count > 0 ? `Added ${count} real case-study placement(s).` : "Already loaded — nothing new to add.";
+      placementsAdded > 0 || campaignsAdded > 0
+        ? `Added ${placementsAdded} placement(s), ${campaignsAdded} campaign(s), approved ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`
+        : `Already loaded — refreshed ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`;
   });
 
   document.getElementById("seed-sample-data-btn").addEventListener("click", () => {

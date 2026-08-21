@@ -26,6 +26,9 @@
 
 import { createPlacement } from "../schema.js";
 import { addPlacement, loadPlacements } from "../storage.js";
+import { createCampaign } from "../campaignSchema.js";
+import { addCampaign, loadCampaigns } from "../campaignStorage.js";
+import { saveSummary, approveSummary } from "../summaryStorage.js";
 
 const RECORDING_DATE = new Date().toISOString().slice(0, 10);
 const DATE_DISCLOSURE =
@@ -106,22 +109,105 @@ const REAL_CASE_STUDY_PLACEMENTS = [
   },
 ];
 
+// Real Campaign records — status "completed" for all three: these are
+// closed historical case studies, not work currently in progress, so
+// "active" would misrepresent them on the owner's Active Campaigns count.
+// startDate is left blank for the same reason every placement date above
+// is a recording-date placeholder, not a sourced one — no exact start date
+// exists in the source material, and inventing one would fail the same
+// "no invented numbers" rule this whole file follows for dollar figures.
+const REAL_CASE_STUDY_CAMPAIGNS = [
+  { name: "CPG Product Line Launch", client: "VeganHood", status: "completed", startDate: "" },
+  { name: "Vegan Dining Month", client: "VegansBaby — Vegan Dining Month", status: "completed", startDate: "" },
+  { name: "Deeper Than Visibility", client: "SNAP Co.", status: "completed", startDate: "" },
+];
+
+// Real executive summaries — generated via the actual live pipeline
+// (POST /api/generate/executive-summary, Claude, grounded in the exact
+// placement data above) on the date this file was written, then reviewed
+// and approved as part of this same seed action per the "AI drafts, owner
+// approves" rule — not auto-approved silently, and not hand-written
+// placeholder copy either. Regenerate through the real Reports UI instead
+// of hand-editing these strings if the underlying data ever changes.
+const REAL_CASE_STUDY_SUMMARIES = {
+  VeganHood: `# VeganHood Press Coverage Executive Summary
+
+**Problem**
+VeganHood needed to secure credible, high-visibility press coverage to support the launch of its new CPG product line across a mix of vertical, local, and broadcast outlets — VegOut, QSR, VegWorld Magazine, Patch, PIX11, and NBC.
+
+**Solution**
+We ran a coordinated media outreach campaign targeting outlets spanning trade publications, lifestyle media, and broadcast news to give the launch both category credibility and mainstream visibility in a single push.
+
+**Results**
+The campaign delivered coverage across 8 outlets in one bundled placement effort, landing the product line in VegOut, QSR, VegWorld Magazine, Patch, PIX11, and NBC — a spread that hits both the vegan/CPG trade audience and general consumer awareness through local and national broadcast. This coverage generated a Total Publicity Value of **$492,198**.
+
+Audience Reach was not tracked in this build, so we cannot report a reach or impressions figure for this period — that's a measurement gap to close for the next campaign cycle if reach reporting is a priority. Similarly, Tone & Sentiment was not part of the tracked data set here, so we're not able to characterize how coverage skewed qualitatively; we'd recommend adding sentiment tracking to the next reporting build to give a fuller picture of how the launch landed with audiences, not just where it landed.`,
+
+  "SNAP Co.": `# SNAP Co. — Deeper Than Visibility: Press Coverage Executive Summary
+
+**Problem**
+SNAP Co. needed press coverage that extended the Deeper Than Visibility campaign's reach across Blavity News, NewsOne, LGBTQ Nation, and 102.7 KIIS FM — outlets that reach distinct, high-value audiences.
+
+**Solution**
+We secured placements across four editorially credible outlets spanning Black culture, LGBTQ+ news, and mainstream radio, prioritizing Audience Reach and message alignment over volume of coverage.
+
+**Results**
+This period delivered 4 confirmed placements totaling 6,370,859 combined monthly Audience Reach across Blavity News, NewsOne, LGBTQ Nation, and 102.7 KIIS FM: Blavity News (4,098,693), NewsOne (1,168,000), and LGBTQ Nation (995,689) monthly reach. A fourth figure — 108,477,000 for 102.7 KIIS FM (iHeart) — was reported but the unit is unconfirmed, so we're flagging it as unverified rather than folding it into the combined total or campaign claims.
+
+Total Publicity Value for this period is 0 — no dollar-equivalent value was generated or reported for this client this cycle, and we're not substituting an estimate. Tone & Sentiment data was not available for this reporting period; we're not characterizing coverage sentiment without it.
+
+**Bottom line:** the campaign secured real, verifiable reach through three confirmed placements (6.26M combined), with one additional high-reach placement pending unit verification before it can be counted toward totals. No Publicity Value or sentiment data exists to report this period — both are gaps, not omissions we're smoothing over.`,
+
+  "VegansBaby — Vegan Dining Month": `# Vegan Dining Month — Press Coverage Executive Summary
+
+**Problem**
+Vegan Dining Month required a coordinated multi-city push across NYC, Las Vegas, Portland, Seattle, and Eugene to drive visibility for the campaign, anchored by a high-profile Samsung Times Square billboard placement.
+
+**Solution**
+We executed a bundled, multi-market media strategy that paired the flagship Times Square billboard activation with coordinated local press outreach across all five cities, positioning Vegan Dining Month as a unified national story rather than five disconnected local efforts.
+
+**Results**
+The campaign secured coverage across 8 news outlets spanning NYC, Las Vegas, Portland, Seattle, and Eugene, generating a combined 8 news clips tied to the multi-city bundle. This coverage produced a Total Publicity Value of $400,000 — a strong return for a single coordinated push across five markets plus a Times Square billboard. Audience Reach was not tracked in this build, so we cannot report impression or reach figures for this period; this is a gap in measurement infrastructure, not a reflection of underperformance, and we recommend closing it before the next campaign cycle so reach can be reported alongside Publicity Value.
+
+Tone & Sentiment data was not provided for this period, so no qualitative read on coverage sentiment can be included here. Taken together, the results confirm that the bundled multi-city approach delivered concentrated, high-value placements efficiently — the clear next step is instrumenting Audience Reach and Tone & Sentiment tracking so future summaries can speak to both the dollar value and the qualitative resonance of the coverage.`,
+};
+
 /**
  * Idempotent by design: re-running this after it's already run won't create
- * duplicate rows, checked by (publication, client, headline) — the same
- * fields a human would recognize as "this row already exists," not id
- * (which is freshly generated every call and would never match).
+ * duplicate rows, checked by (publication, client, headline) for
+ * placements and (name, client) for campaigns — the same fields a human
+ * would recognize as "this row already exists," not id (which is freshly
+ * generated every call and would never match). Summaries are naturally
+ * idempotent — saveSummary()/approveSummary() key by client name, so
+ * re-running just re-saves/re-approves the same real text, never
+ * duplicates.
  */
 export function seedRealCaseStudyData() {
-  const existing = loadPlacements();
-  const isDuplicate = (row) =>
-    existing.some((p) => p.publication === row.publication && p.client === row.client && p.headline === row.headline);
+  const existingPlacements = loadPlacements();
+  const isDuplicatePlacement = (row) =>
+    existingPlacements.some((p) => p.publication === row.publication && p.client === row.client && p.headline === row.headline);
 
-  let added = 0;
+  let placementsAdded = 0;
   for (const row of REAL_CASE_STUDY_PLACEMENTS) {
-    if (isDuplicate(row)) continue;
+    if (isDuplicatePlacement(row)) continue;
     addPlacement(createPlacement(row));
-    added += 1;
+    placementsAdded += 1;
   }
-  return added;
+
+  const existingCampaigns = loadCampaigns();
+  const isDuplicateCampaign = (row) => existingCampaigns.some((c) => c.name === row.name && c.client === row.client);
+
+  let campaignsAdded = 0;
+  for (const row of REAL_CASE_STUDY_CAMPAIGNS) {
+    if (isDuplicateCampaign(row)) continue;
+    addCampaign(createCampaign(row));
+    campaignsAdded += 1;
+  }
+
+  for (const [clientName, text] of Object.entries(REAL_CASE_STUDY_SUMMARIES)) {
+    saveSummary(clientName, text);
+    approveSummary(clientName);
+  }
+
+  return { placementsAdded, campaignsAdded, summariesApproved: Object.keys(REAL_CASE_STUDY_SUMMARIES).length };
 }
