@@ -30,14 +30,20 @@
         <button type="submit" class="btn-primary">Log In</button>
       </form>
 
+      <div class="demo-accounts" id="real-accounts-wrap" style="display:none;">
+        <p>Real accounts (actual Supabase Auth — needs the real password, ask for it):</p>
+        <ul id="real-account-list"></ul>
+      </div>
+
       <div class="demo-accounts">
-        <p>Demo accounts (any password):</p>
+        <p>Mock demo accounts (any password):</p>
         <ul id="demo-account-list"></ul>
-        <p style="margin-top:10px; font-weight:400;">This is a mock login for demo purposes — no real authentication is enforced.</p>
+        <p style="margin-top:10px; font-weight:400;">These are a mock login for demo purposes — no real authentication is enforced. Tried automatically only after a real-account attempt (if configured) doesn't match.</p>
       </div>
     </div>
   </div>
 
+  <script src="src/supabaseConfig.js"></script>
   <script type="module" src="src/loginApp.js"></script>
 </body>
 </html>

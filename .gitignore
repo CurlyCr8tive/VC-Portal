@@ -4,3 +4,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Runtime search-usage log (server/owner-api/lib/searchUsageLog.js) — local
+# cost-tracking data, not source. See its own header for why it exists.
+server/owner-api/data/

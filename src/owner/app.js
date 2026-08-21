@@ -2,6 +2,7 @@ import { CLIENTS, METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, AGGREGATE_INSIGH
 import {
   getRealClients,
   getRealMetrics,
+  getRealPlacements,
   getRealCampaigns,
   getAllRealPlacements,
   getAllRealCampaigns,
@@ -10,7 +11,9 @@ import {
   getAggregateRealInsight,
   getRealReport,
 } from "../realDataSource.js";
+import { computeLeadTimeDays } from "../calculations.js";
 import { requireSession, logout } from "../auth.js";
+import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
 import { addPlacement, updatePlacement, deletePlacement } from "../storage.js";
 import { createCampaign, applyCampaignEdit, addMilestone, toggleMilestone, removeMilestone } from "../campaignSchema.js";
@@ -32,12 +35,15 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js";
 import { renderCoachingAdminView } from "./components/CoachingAdminView.js";
+import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
+import { renderOutletRatesView } from "./components/OutletRatesView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js";
 import { seedSamplePlacements } from "./seedSampleData.js";
+import { seedRealCaseStudyData } from "./seedRealCaseStudyData.js";
 
 // ---------------------------------------------------------------------------
 // The owner side. Every getter below reads across ALL clients in mockData —
@@ -51,12 +57,31 @@ import { seedSamplePlacements } from "./seedSampleData.js";
 
 const session = requireSession("owner");
 
+// Local-dev fallback for owner-api's actual listen port (server/owner-api/index.js).
+// Becomes a real build-time/env-driven value once real hosting exists — same
+// "honest placeholder, not a fake success" posture as everything else here.
+// No Authorization header is attached below: this app's session (src/auth.js)
+// is still mock auth, not a real Supabase Auth JWT, so calls here will 401
+// once Supabase is configured but before real login exists — that's the
+// correct honest failure, not a bug to paper over.
+const OWNER_API_BASE = window.OWNER_API_BASE_URL || "http://localhost:4001";
+
 const state = {
   view: "dashboard",
   demoState: "normal", // normal | loading | empty | error
   dataSource: "real", // real | mock — real reads storage.js placements across all clients
   chartRange: "30d",
   searchTerm: "",
+  // Dashboard-only filter: null client = every client aggregated (the
+  // original behavior); either date blank = unbounded on that side. Every
+  // dashboard section (metrics, recent placements, campaigns, chart) reads
+  // through this same filter — see getDashboardPlacements() below — so
+  // there's one source of truth for "what does the dashboard mean by
+  // 'the data' right now," not five separately-filtered pieces that could
+  // drift out of sync with each other.
+  dashboardClientFilter: "",
+  dashboardDateFrom: "",
+  dashboardDateTo: "",
   editingPlacementId: null,
   editingCampaignId: null,
   selectedCampaignId: null,
@@ -113,17 +138,25 @@ function getAggregateMetrics() {
   }
   if (state.dataSource === "real") return getAggregateRealMetrics();
   const perClient = CLIENTS.map((c) => METRICS[c.id]["1y"]);
-  const totalAVE = perClient.reduce((sum, m) => sum + m.totalAVE, 0);
-  const totalPlacements = perClient.reduce((sum, m) => sum + m.totalPlacements, 0);
+  const totalAVE = perClient.reduce((sum, m) => sum + (m.totalAVE || 0), 0);
+  const totalPlacements = perClient.reduce((sum, m) => sum + (m.totalPlacements || 0), 0);
   const activeCampaigns = perClient.reduce((sum, m) => sum + m.activeCampaigns, 0);
-  const weightedLeadTime = totalPlacements
-    ? perClient.reduce((sum, m) => sum + m.avgLeadTime * m.totalPlacements, 0) / totalPlacements
-    : 0;
+  // Real case-study source material (see mockData.js) doesn't report a lead
+  // time for several clients — `avgLeadTime: null` there means "unknown,"
+  // not "zero days." Weighting null as 0 here would fabricate a false
+  // signal (dragging the aggregate toward "0 days" in proportion to real
+  // placement counts), so those clients are excluded from this average
+  // entirely rather than silently counted as instant turnaround.
+  const clientsWithLeadTime = perClient.filter((m) => m.avgLeadTime != null);
+  const leadTimeWeight = clientsWithLeadTime.reduce((sum, m) => sum + m.totalPlacements, 0);
+  const weightedLeadTime = leadTimeWeight
+    ? clientsWithLeadTime.reduce((sum, m) => sum + m.avgLeadTime * m.totalPlacements, 0) / leadTimeWeight
+    : null;
   const avg = (key) => perClient.reduce((sum, m) => sum + m[key], 0) / perClient.length;
   return {
     totalAVE,
     totalPlacements,
-    avgLeadTime: Math.round(weightedLeadTime),
+    avgLeadTime: weightedLeadTime != null ? Math.round(weightedLeadTime) : null,
     activeCampaigns,
     aveDelta: Math.round(avg("aveDelta")),
     placementsDelta: Math.round(avg("placementsDelta")),
@@ -179,13 +212,95 @@ function filterPlacements(placements, term) {
 }
 
 // ---------------------------------------------------------------------------
+// Dashboard client/date filter — single source of truth for every
+// dashboard section (metrics, recent placements, campaigns, chart). Date
+// bounds match Canva export's own withinRange() semantics exactly (string
+// comparison on ISO dates, inclusive, unbounded when blank) — same
+// definition of "within a date range" everywhere in this app, not a
+// second slightly-different one invented for this screen.
+// ---------------------------------------------------------------------------
+
+function isDashboardFilterActive() {
+  return Boolean(state.dashboardClientFilter || state.dashboardDateFrom || state.dashboardDateTo);
+}
+
+function withinDashboardDateRange(dateStr) {
+  const { dashboardDateFrom, dashboardDateTo } = state;
+  if (!dashboardDateFrom && !dashboardDateTo) return true;
+  if (!dateStr) return false;
+  if (dashboardDateFrom && dateStr < dashboardDateFrom) return false;
+  if (dashboardDateTo && dateStr > dashboardDateTo) return false;
+  return true;
+}
+
+/** Every placement matching the current dashboard client/date filter — the one filtered set every section below reads from. */
+function getDashboardPlacements() {
+  return getAllPlacements().filter((p) => {
+    if (state.dashboardClientFilter && p.clientName !== state.dashboardClientFilter) return false;
+    return withinDashboardDateRange(p.publicationDate);
+  });
+}
+
+/**
+ * Computes the same four metrics as getRealMetrics()/getAggregateMetrics()
+ * — confirmed-only AVE, raw placement count, null-safe avg lead time — but
+ * from an arbitrary already-filtered placement list instead of one
+ * client's full history or a fixed 30d/90d/1y bucket. Kept as a separate
+ * function rather than bolting date-range support onto those two: they're
+ * real/mock-data-source-aware and bucket-shaped for other call sites
+ * (client dashboards, owner aggregate cards elsewhere) that this filter
+ * shouldn't change the behavior of.
+ */
+function computeFilteredMetrics(placements) {
+  const confirmed = placements.filter((p) => Boolean(p.landedDate));
+  const totalAVE = confirmed.reduce((sum, p) => sum + (p.aveValue || 0), 0);
+  const leadTimes = placements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
+  const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : null;
+
+  const activeCampaigns = getAllCampaigns().filter((c) => {
+    if (state.dashboardClientFilter && c.clientName !== state.dashboardClientFilter) return false;
+    return c.status === "active";
+  }).length;
+
+  return {
+    totalAVE,
+    totalPlacements: placements.length,
+    avgLeadTime,
+    activeCampaigns,
+    // No meaningful "vs last period" comparison exists for an arbitrary,
+    // owner-chosen date range — there's no fixed prior period to diff
+    // against, so these stay null (MetricCard already skips the delta
+    // line when null) rather than comparing against something arbitrary.
+    aveDelta: null,
+    placementsDelta: null,
+    leadTimeDelta: null,
+  };
+}
+
+/** Real placements grouped by publication month — no invented weekly/quarterly buckets, just what actually happened. */
+function groupPlacementsByMonth(placements) {
+  const byMonth = new Map();
+  for (const p of placements) {
+    if (!p.publicationDate) continue;
+    const label = p.publicationDate.slice(0, 7); // YYYY-MM
+    if (!byMonth.has(label)) byMonth.set(label, { label, ave: 0, placements: 0 });
+    const bucket = byMonth.get(label);
+    bucket.ave += p.landedDate ? p.aveValue || 0 : 0;
+    bucket.placements += 1;
+  }
+  return [...byMonth.values()].sort((a, b) => (a.label < b.label ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard (overview) view
 // ---------------------------------------------------------------------------
 
 function dashboardSkeletonHTML() {
   return `
     <section class="section">
+      <div class="card" id="dashboard-filter-bar" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;"></div>
       <div class="metrics-grid" id="dashboard-metrics"></div>
+      <p id="dashboard-filter-summary" class="hint" style="margin:8px 0 0;"></p>
     </section>
     <section class="section">
       <div class="section-heading">
@@ -217,6 +332,58 @@ function dashboardSkeletonHTML() {
   `;
 }
 
+/**
+ * Client dropdown + date-range inputs that drive getDashboardPlacements()
+ * above. Every control re-renders the whole dashboard on change rather
+ * than trying to patch individual sections — this view has five sections
+ * reading the same filtered set, and keeping them in sync piecemeal is a
+ * worse bet than one cheap full re-render.
+ */
+function renderDashboardFilterBar(container) {
+  const clientNames = [...new Set(getAllPlacements().map((p) => p.clientName).filter(Boolean))].sort();
+
+  container.innerHTML = `
+    <div class="field-row" style="margin:0;">
+      <label for="dashboard-filter-client">Client</label>
+      <select id="dashboard-filter-client">
+        <option value="">All clients</option>
+        ${clientNames.map((name) => `<option value="${escapeHtml(name)}" ${state.dashboardClientFilter === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="field-row" style="margin:0;">
+      <label for="dashboard-filter-from">From</label>
+      <input type="date" id="dashboard-filter-from" value="${escapeHtml(state.dashboardDateFrom)}" />
+    </div>
+    <div class="field-row" style="margin:0;">
+      <label for="dashboard-filter-to">To</label>
+      <input type="date" id="dashboard-filter-to" value="${escapeHtml(state.dashboardDateTo)}" />
+    </div>
+    ${isDashboardFilterActive() ? `<button type="button" class="btn-secondary" id="dashboard-filter-clear">Clear filter</button>` : ""}
+  `;
+
+  container.querySelector("#dashboard-filter-client").addEventListener("change", (e) => {
+    state.dashboardClientFilter = e.target.value;
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-filter-from").addEventListener("change", (e) => {
+    state.dashboardDateFrom = e.target.value;
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-filter-to").addEventListener("change", (e) => {
+    state.dashboardDateTo = e.target.value;
+    renderDashboard();
+  });
+  const clearBtn = container.querySelector("#dashboard-filter-clear");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      state.dashboardClientFilter = "";
+      state.dashboardDateFrom = "";
+      state.dashboardDateTo = "";
+      renderDashboard();
+    });
+  }
+}
+
 function renderDashboard() {
   const target = document.getElementById("dashboard-content");
   if (state.demoState === "loading") return renderLoadingState(target);
@@ -229,30 +396,70 @@ function renderDashboard() {
 
   target.innerHTML = dashboardSkeletonHTML();
 
-  renderMetricsGrid(document.getElementById("dashboard-metrics"), getAggregateMetrics());
+  renderDashboardFilterBar(document.getElementById("dashboard-filter-bar"));
 
-  const recentPlacements = filterPlacements(getAllPlacements(), state.searchTerm)
+  const filterActive = isDashboardFilterActive();
+  const filteredPlacements = getDashboardPlacements();
+
+  renderMetricsGrid(document.getElementById("dashboard-metrics"), filterActive ? computeFilteredMetrics(filteredPlacements) : getAggregateMetrics());
+
+  const filterSummaryEl = document.getElementById("dashboard-filter-summary");
+  filterSummaryEl.textContent = filterActive
+    ? `Showing ${state.dashboardClientFilter || "all clients"}${state.dashboardDateFrom || state.dashboardDateTo ? `, ${state.dashboardDateFrom || "any date"} to ${state.dashboardDateTo || "any date"}` : ""} — ${filteredPlacements.length} placement${filteredPlacements.length === 1 ? "" : "s"} match.`
+    : "";
+
+  const basePlacements = filterActive ? filteredPlacements : getAllPlacements();
+  const recentPlacements = filterPlacements(basePlacements, state.searchTerm)
     .slice()
     .sort((a, b) => (a.publicationDate < b.publicationDate ? 1 : -1))
     .slice(0, 5);
   renderPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements, { showClient: true });
 
-  renderCampaignsGrid(document.getElementById("dashboard-campaigns"), getAllCampaigns(), {
+  const filteredCampaigns = state.dashboardClientFilter
+    ? getAllCampaigns().filter((c) => c.clientName === state.dashboardClientFilter)
+    : getAllCampaigns();
+  renderCampaignsGrid(document.getElementById("dashboard-campaigns"), filteredCampaigns, {
     onViewCampaign: () => navigate("campaigns"),
   });
 
-  renderPerformanceChart(document.getElementById("dashboard-chart"), {
-    series: getAggregateChartSeries(state.chartRange),
-    range: state.chartRange,
-    onRangeChange: (range) => {
-      state.chartRange = range;
-      renderDashboard();
-    },
-  });
+  // A client/date filter replaces the 30d/90d/1y preset chart entirely
+  // with an honest month-by-month breakdown of exactly what's in the
+  // filtered set — those presets are aggregate-shaped and don't have a
+  // meaningful reading once the underlying data is a client- or
+  // date-bounded subset.
+  if (filterActive) {
+    renderPerformanceChart(document.getElementById("dashboard-chart"), {
+      series: groupPlacementsByMonth(filteredPlacements).length ? groupPlacementsByMonth(filteredPlacements) : [{ label: "No dates in range", ave: 0, placements: 0 }],
+      range: null,
+      onRangeChange: () => {},
+      rangeLabel: "By month (filtered)",
+    });
+  } else {
+    renderPerformanceChart(document.getElementById("dashboard-chart"), {
+      series: getAggregateChartSeries(state.chartRange),
+      range: state.chartRange,
+      onRangeChange: (range) => {
+        state.chartRange = range;
+        renderDashboard();
+      },
+    });
+  }
 
-  renderInsightCard(document.getElementById("dashboard-insight-wrap"), getAggregateInsight());
+  // The aggregate insight text is written for "across all clients" and
+  // doesn't have a meaningful equivalent for an arbitrary filtered slice —
+  // hide it rather than show real narrative copy next to data it wasn't
+  // describing, per the same "never let a real-sounding label attach to
+  // data it doesn't actually match" rule this build applies everywhere.
+  if (filterActive) {
+    document.getElementById("dashboard-insight-wrap").innerHTML = "";
+  } else {
+    renderInsightCard(document.getElementById("dashboard-insight-wrap"), getAggregateInsight());
+  }
 
-  const reportCount = state.demoState === "empty" ? 0 : CLIENTS.length;
+  // Was hardcoded to the mock CLIENTS array's length regardless of data
+  // source — harmless-looking in mock mode (matches by coincidence) but
+  // wrong the moment real client count differs, which it always will.
+  const reportCount = state.demoState === "empty" ? 0 : state.dataSource === "real" ? getRealClients().length : CLIENTS.length;
   document.getElementById("dashboard-reports-summary").innerHTML = `
     <div class="card">
       <p style="margin:0;">${reportCount} client report${reportCount === 1 ? "" : "s"} available.
@@ -270,6 +477,100 @@ function renderDashboard() {
 // Other views
 // ---------------------------------------------------------------------------
 
+/**
+ * POSTs to owner-api's invite route. Real clients only — mock demo clients
+ * have no Supabase-side row to invite, so ClientsListCard is told to hide
+ * the button entirely in that mode (see renderClientsView below) rather
+ * than let this get called with a fake id.
+ */
+/**
+ * Content-Type plus a real Authorization: Bearer header when a real
+ * Supabase session exists (see src/supabaseAuthClient.js) — owner-api's
+ * requireOwner() needs a real JWT, not this app's mock localStorage
+ * session, to ever return anything other than 401. Omitting the header
+ * entirely (rather than sending a fake/empty one) when no real session
+ * exists is the honest failure mode: a normal 401, not a confusing 400.
+ */
+async function authedJsonHeaders() {
+  const token = await getAccessToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function inviteClient({ clientId, email }) {
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(clientId)}/invite`, {
+      method: "POST",
+      headers: await authedJsonHeaders(),
+      body: JSON.stringify({ email }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, message: body.message || `Invite failed (${res.status}).` };
+    }
+    return { ok: true, invitedEmail: body.invitedEmail };
+  } catch (err) {
+    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+  }
+}
+
+/**
+ * POSTs to owner-api's Perplexity-backed research route. Same honest
+ * failure posture as inviteClient() above — a network/config failure comes
+ * back as { available: false }, never a fabricated suggestion.
+ */
+/**
+ * Calls owner-api's shared /api/generate/:type route (see server/owner-api/
+ * index.js's PROMPT_BUILDERS) — one entry point for all five AI writing
+ * functions. Always a SUGGESTION: nothing here saves anything, every
+ * caller below is responsible for putting the result somewhere the owner
+ * still has to explicitly save/approve, matching the locked "AI drafts,
+ * owner approves" rule this whole build follows.
+ */
+async function generateAIText(type, data) {
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/generate/${type}`, {
+      method: "POST",
+      headers: await authedJsonHeaders(),
+      body: JSON.stringify(data),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, message: body.message || `Request failed (${res.status}).` };
+    }
+    return { ok: true, text: body.text, providerUsed: body.providerUsed };
+  } catch (err) {
+    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+  }
+}
+
+async function suggestHeadline(headline) {
+  return generateAIText("language-suggestions", { mode: "headline", headline });
+}
+
+async function analyzeSentiment({ publication, headline }) {
+  return generateAIText("sentiment-analysis", { publication, headline });
+}
+
+async function researchOutletRate(outletName) {
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/research-outlet-rate`, {
+      method: "POST",
+      headers: await authedJsonHeaders(),
+      body: JSON.stringify({ outletName }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { available: false, error: body.message || `Request failed (${res.status}).` };
+    }
+    return body;
+  } catch (err) {
+    return { available: false, error: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+  }
+}
+
 function renderClientsView() {
   const target = document.getElementById("clients-content");
   if (state.demoState === "loading") return renderLoadingState(target);
@@ -278,7 +579,15 @@ function renderClientsView() {
     <div class="section-heading"><h2>Clients</h2></div>
     <div class="clients-grid" id="clients-full-grid"></div>
   `;
-  renderClientsList(document.getElementById("clients-full-grid"), getClientsWithMetrics());
+  renderClientsList(document.getElementById("clients-full-grid"), getClientsWithMetrics(), {
+    onInvite: state.dataSource === "real" ? inviteClient : undefined,
+    onViewDashboard: (clientName) => {
+      state.dashboardClientFilter = clientName;
+      state.dashboardDateFrom = "";
+      state.dashboardDateTo = "";
+      navigate("dashboard");
+    },
+  });
 }
 
 function renderCampaignsView() {
@@ -395,6 +704,9 @@ function renderPlacementsView() {
   if (canManagePlacements) {
     renderPlacementForm(document.getElementById("placement-form-wrap"), {
       initialData: editingPlacement,
+      onResearchRate: researchOutletRate,
+      onSuggestHeadline: suggestHeadline,
+      onAnalyzeSentiment: analyzeSentiment,
       onSubmit: (rawData) => {
         try {
           if (editingPlacement) {
@@ -471,6 +783,27 @@ function renderReviewQueueSection() {
  * yet, Phase 7 is Planned). Tenyse writes it herself for now; the field
  * lives in the same spot a real "Generate" button will fill in later.
  */
+/**
+ * Real data for a client's writing-function prompts — confirmed
+ * (landed) placements only, matching the same "confirmed" definition
+ * getRealMetrics() uses for Total Publicity Value, plus that client's
+ * real active campaign names as context. No invented figures reach the
+ * prompt: an unconfirmed placement or a client with zero real campaigns
+ * just means a shorter/emptier input, never a guessed stand-in.
+ */
+function realWritingContextFor(clientName) {
+  const placements = getRealPlacements(clientName).filter((p) => Boolean(p.landedDate));
+  const totalAVE = getRealMetrics(clientName).totalAVE;
+  const activeCampaignNames = loadCampaigns()
+    .filter((c) => c.client === clientName && c.status === "active")
+    .map((c) => c.name);
+  return {
+    placements,
+    totalAVE,
+    campaignContext: activeCampaignNames.length ? activeCampaignNames.join(", ") : "no active campaign on file for this client",
+  };
+}
+
 function renderSummaryForm(container, clientName) {
   const existing = loadSummary(clientName);
   const statusLine = existing?.approvedAt
@@ -481,16 +814,18 @@ function renderSummaryForm(container, clientName) {
 
   container.innerHTML = `
     <p style="margin:0 0 8px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Executive Summary</p>
-    <p class="hint" style="margin:0 0 10px;">No AI writer is wired up yet — write this by hand for now. It shows up on ${escapeHtml(clientName)}'s report above and on their own dashboard once saved.</p>
+    <p class="hint" style="margin:0 0 10px;">"Generate" drafts from ${escapeHtml(clientName)}'s real confirmed placements below — always a starting point to edit, never saved automatically. It shows up on ${escapeHtml(clientName)}'s report above and on their own dashboard once you save it.</p>
     <p class="hint" style="margin:0 0 10px;">Tenyse's own case studies follow Problem → Solution → Results — worth keeping that shape here too.</p>
     ${statusLine}
     <div class="entry-form">
       <div class="field-row" style="margin-bottom:10px;">
         <textarea id="summary-text-${cssId(clientName)}" rows="4" placeholder="e.g. [Problem] Coverage was limited to local outlets. [Solution] We pitched an industry-specific angle to trade press. [Results] Landed 3 placements reaching 200K+ readers, building toward national pickup next period.">${existing ? existing.text : ""}</textarea>
       </div>
-      <div class="form-actions" style="display:flex; gap:10px;">
+      <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
         <button type="button" class="btn-secondary" id="summary-approve-${cssId(clientName)}" ${!existing ? "disabled" : ""} title="${!existing ? "Save a draft first" : "Approves the saved draft above — not unsaved edits in the box"}">Approve</button>
+        <button type="button" class="btn-secondary" id="summary-generate-${cssId(clientName)}">✨ Generate with AI</button>
+        <span id="summary-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>
   `;
@@ -508,6 +843,78 @@ function renderSummaryForm(container, clientName) {
       renderReportsView();
     });
   }
+
+  const generateBtn = container.querySelector(`#summary-generate-${cssId(clientName)}`);
+  const generateStatus = container.querySelector(`#summary-generate-status-${cssId(clientName)}`);
+  generateBtn.addEventListener("click", async () => {
+    generateBtn.disabled = true;
+    generateStatus.textContent = "Generating…";
+    const { placements, totalAVE, campaignContext } = realWritingContextFor(clientName);
+    const result = await generateAIText("executive-summary", {
+      client: clientName,
+      periodLabel: "the current reporting period",
+      placements,
+      totalAVE,
+      totalReach: "not tracked in this build",
+      campaignContext,
+    });
+    generateBtn.disabled = false;
+    if (result.ok) {
+      container.querySelector(`#summary-text-${cssId(clientName)}`).value = result.text;
+      generateStatus.textContent = `Drafted via ${result.providerUsed} — review, then Save Draft.`;
+    } else {
+      generateStatus.textContent = `⚠ ${result.message}`;
+    }
+  });
+}
+
+/**
+ * Report narrative — the fuller campaign-story writing function
+ * (docs/reportNarrativePrompt.js), distinct from the short executive
+ * summary card above. No storage exists for this one: it's meant to be
+ * generated, reviewed, and copied into the actual report document/Canva
+ * hand-off by hand, not saved/approved in this app — there's nowhere in
+ * the data model for a "report narrative" to live yet, and inventing one
+ * just to hold AI output would be exactly the kind of unreviewed
+ * auto-final path this build avoids everywhere else.
+ */
+function renderReportNarrativeForm(container, clientName) {
+  container.innerHTML = `
+    <p style="margin:0 0 8px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Report Narrative</p>
+    <p class="hint" style="margin:0 0 10px;">The fuller campaign story for the actual report document — longer and more scene-setting than the Executive Summary card above. Generated fresh each time, nothing here is saved; copy it into the report by hand once it reads right.</p>
+    <div class="entry-form">
+      <div class="field-row" style="margin-bottom:10px;">
+        <textarea id="narrative-text-${cssId(clientName)}" rows="4" placeholder="Click Generate to draft this from ${escapeHtml(clientName)}'s real confirmed placements." readonly></textarea>
+      </div>
+      <div class="form-actions" style="display:flex; gap:10px; align-items:center;">
+        <button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">✨ Generate</button>
+        <span id="narrative-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
+      </div>
+    </div>
+  `;
+
+  const generateBtn = container.querySelector(`#narrative-generate-${cssId(clientName)}`);
+  const statusEl = container.querySelector(`#narrative-generate-status-${cssId(clientName)}`);
+  generateBtn.addEventListener("click", async () => {
+    generateBtn.disabled = true;
+    statusEl.textContent = "Generating…";
+    const { placements, campaignContext } = realWritingContextFor(clientName);
+    const result = await generateAIText("report-narrative", {
+      client: clientName,
+      periodLabel: "the current reporting period",
+      placements,
+      campaignContext,
+      notableDetails: [],
+    });
+    generateBtn.disabled = false;
+    const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
+    if (result.ok) {
+      textarea.value = result.text;
+      statusEl.textContent = `Drafted via ${result.providerUsed} — copy into the report once reviewed.`;
+    } else {
+      statusEl.textContent = `⚠ ${result.message}`;
+    }
+  });
 }
 
 function cssId(str) {
@@ -535,6 +942,7 @@ function renderReportsView() {
       <div class="section">
         <h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${c.name}</h3>
         ${state.dataSource === "real" ? `<div class="card" id="summary-form-${c.id}" style="margin-bottom:14px;"></div>` : ""}
+        ${state.dataSource === "real" ? `<div class="card" id="report-narrative-${c.id}" style="margin-bottom:14px;"></div>` : ""}
         <div id="report-${c.id}"></div>
       </div>`
       )
@@ -546,6 +954,7 @@ function renderReportsView() {
 
     if (state.dataSource === "real") {
       renderSummaryForm(document.getElementById(`summary-form-${c.id}`), c.name);
+      renderReportNarrativeForm(document.getElementById(`report-narrative-${c.id}`), c.name);
     }
   });
 
@@ -601,26 +1010,48 @@ function renderSettingsView() {
     <div class="card">
       <p>Contractor permissions, brand template defaults, and notification preferences will live here. Nothing on this page is wired up yet.</p>
     </div>
-    <div class="section-heading" style="margin-top:24px;"><h2>Agent Error Log</h2></div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Outlet Rates</h2></div>
     <div class="card">
-      <div class="state-panel">
-        <div class="state-icon" aria-hidden="true">✅</div>
-        <h3>No agent errors — because no agents run yet</h3>
-        <p>This isn't "all clear," it's "nothing exists to fail yet." The Discovery, AVE, and Design agents are all still Planned
-          (see the PRD's Execution table). Once any of them run in Supabase, failures land in the <code>errors</code> table
-          (drafted in <code>db/schema.sql</code>) and will list here: which agent, when, and what went wrong — never silently
-          dropped.</p>
-      </div>
+      <div id="outlet-rates-wrap"></div>
+    </div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Error Log</h2></div>
+    <div class="card">
+      <p class="hint" style="margin:0 0 12px;">
+        Client-side failures (corrupted local data, a failed calculation) land here today. Once Supabase is live, the
+        <code>errors</code> table (in <code>db/schema.sql</code>) becomes the production version of this same log —
+        same relationship every other real/localStorage pair in this app already has.
+      </p>
+      <div id="error-log-wrap"></div>
+    </div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Real Case Study Data</h2></div>
+    <div class="card">
+      <p style="margin:0 0 12px;">Not a demo/mock fixture — these are Tenyse's own real historical numbers (VeganHood, SNAP Co.,
+        Vegan Dining Month), sourced from her past case-study reporting, written into the same real data path as anything
+        entered by hand. Safe to click more than once — already-loaded rows are skipped, not duplicated.</p>
+      <p class="hint" style="margin:0 0 12px;">One honest gap, disclosed on each row's Notes field: none of the source
+        material gives an exact landing date, so the date shown is when it was recorded into this system, not a sourced
+        publish date.</p>
+      <button class="btn-secondary" id="seed-real-case-study-btn">Load Real Case Study Data</button>
+      <span id="seed-real-case-study-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
     </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Developer Tools</h2></div>
     <div class="card">
-      <p style="margin:0 0 12px;">Not a real product feature — a shortcut for testing. Adds 5 realistic, complete placements
-        across two clients (via the same Add Placement path the form uses), so there's something real to try the
+      <p style="margin:0 0 12px;">Not a real product feature — a shortcut for testing. Adds 5 fictional but complete placements
+        across two clients (via the same Add Placement path the form uses), so there's something to try the
         Press Placements table, campaigns, and Canva export against without typing them in by hand.</p>
       <button class="btn-secondary" id="seed-sample-data-btn">Load Sample Placements</button>
       <span id="seed-sample-data-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
     </div>
   `;
+
+  renderOutletRatesView(document.getElementById("outlet-rates-wrap"));
+  renderErrorLogPanel(document.getElementById("error-log-wrap"));
+
+  document.getElementById("seed-real-case-study-btn").addEventListener("click", () => {
+    const count = seedRealCaseStudyData();
+    document.getElementById("seed-real-case-study-result").textContent =
+      count > 0 ? `Added ${count} real case-study placement(s).` : "Already loaded — nothing new to add.";
+  });
 
   document.getElementById("seed-sample-data-btn").addEventListener("click", () => {
     if (!confirm("This adds 5 sample placements to your real placement data. Continue?")) return;
@@ -690,6 +1121,30 @@ function renderCampaignDetailView() {
         alert(err.message);
       }
     },
+    onGenerateActivitySummary: ({ campaign: camp, placements: campPlacements, notes }) => {
+      // "Since" the campaign's own start date if known, otherwise a
+      // rolling 7 days — either way, real placements/notes are filtered
+      // by an actual date, never just "everything ever," matching the
+      // prompt's own "near-real-time check-in" framing.
+      const sinceDate = camp.startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const newPlacements = campPlacements.filter((p) => p.landedDate && p.landedDate >= sinceDate);
+      return generateAIText("campaign-activity-summary", {
+        client: camp.clientName,
+        campaignName: camp.name,
+        sinceDate,
+        newPlacements,
+        milestonesUpdated: [], // no per-milestone timestamp exists yet to say which changed "since" a date
+        recentNotes: notes,
+      });
+    },
+    onGeneratePitchSuggestions: ({ campaign: camp, placements: campPlacements, targetOutlet }) =>
+      generateAIText("language-suggestions", {
+        mode: "pitch",
+        client: camp.clientName,
+        targetOutlet,
+        campaignAngle: camp.name,
+        existingCoverage: campPlacements.filter((p) => p.landedDate),
+      }),
   });
 }
 
@@ -707,7 +1162,8 @@ function renderSidebarComponent() {
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
     onDataSourceChange: setDataSource,
-    onLogout: () => {
+    onLogout: async () => {
+      await signOutReal();
       logout();
       window.location.href = "login.html";
     },
@@ -718,6 +1174,7 @@ function renderSidebarComponent() {
 function renderHeaderComponent() {
   renderHeader(document.getElementById("owner-header"), {
     client: { name: "Tenyse Williams", avatarInitials: "T" },
+    dataSource: state.dataSource,
     greeting: "Welcome back, Tenyse!",
     subtitle: "Here's what's happening across all clients.",
     searchPlaceholder: "Search clients, campaigns, placements…",
@@ -751,6 +1208,7 @@ function setDemoState(demoState) {
 function setDataSource(dataSource) {
   state.dataSource = dataSource;
   renderSidebarComponent();
+  renderHeaderComponent();
   renderCurrentView();
 }
 

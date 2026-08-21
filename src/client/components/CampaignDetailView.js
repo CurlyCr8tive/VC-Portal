@@ -8,8 +8,18 @@ import { renderPlacementsTable } from "./PressPlacementTable.js";
  * whether the client tag/column appears (owner: yes, client: no, since a
  * client is always looking at their own campaign already).
  */
-export function renderCampaignDetail(container, { campaign, placements, notes, currentUser, onAddNote, onBack, showClient = false }) {
+export function renderCampaignDetail(
+  container,
+  { campaign, placements, notes, currentUser, onAddNote, onBack, showClient = false, onGenerateActivitySummary, onGeneratePitchSuggestions }
+) {
   const milestones = campaign.milestones || [];
+  // Owner-only tools: onGenerateActivitySummary/onGeneratePitchSuggestions
+  // are only ever passed from the owner dashboard (src/owner/app.js) —
+  // client.html's call site doesn't pass them, so a client viewing their
+  // own campaign never sees this section at all, same optional-callback
+  // pattern the rest of this build uses (DashboardHeader's extraAction,
+  // ClientsListCard's onInvite, etc.).
+  const showAiTools = currentUser.role === "owner" && (onGenerateActivitySummary || onGeneratePitchSuggestions);
 
   container.innerHTML = `
     <button class="link-btn" id="campaign-detail-back" style="margin-bottom:10px;">&larr; Back to Campaigns</button>
@@ -37,6 +47,34 @@ export function renderCampaignDetail(container, { campaign, placements, notes, c
 
     <div class="section-heading"><h2>Placements</h2></div>
     <div class="card" id="campaign-detail-placements" style="margin-bottom:24px;"></div>
+
+    ${
+      showAiTools
+        ? `<div class="section-heading"><h2>AI Tools</h2></div>
+    <div class="card" style="margin-bottom:24px;">
+      ${
+        onGenerateActivitySummary
+          ? `<p style="margin:0 0 6px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Activity Summary</p>
+      <p class="hint" style="margin:0 0 8px;">A brief, honest check-in drafted from real placements/notes on this campaign — not the period-end executive summary. Nothing here is saved.</p>
+      <button type="button" class="btn-secondary" id="campaign-activity-generate">✨ Generate Activity Summary</button>
+      <div id="campaign-activity-result" style="margin:8px 0 16px; font-size:0.85rem;"></div>`
+          : ""
+      }
+      ${
+        onGeneratePitchSuggestions
+          ? `<p style="margin:0 0 6px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Pitch Language Suggestions</p>
+      <p class="hint" style="margin:0 0 8px;">Suggested opening lines for outreach on this campaign — grounded in real coverage already secured, never inventing a placement.</p>
+      <div class="field-row" style="margin-bottom:8px;">
+        <label for="campaign-pitch-outlet">Target outlet (optional)</label>
+        <input type="text" id="campaign-pitch-outlet" placeholder="e.g. Eater NY" />
+      </div>
+      <button type="button" class="btn-secondary" id="campaign-pitch-generate">✨ Suggest Pitch Language</button>
+      <div id="campaign-pitch-result" style="margin-top:8px; font-size:0.85rem;"></div>`
+          : ""
+      }
+    </div>`
+        : ""
+    }
 
     <div class="section-heading"><h2>Notes</h2></div>
     <div class="card">
@@ -70,6 +108,35 @@ export function renderCampaignDetail(container, { campaign, placements, notes, c
   renderPlacementsTable(document.getElementById("campaign-detail-placements"), placements, { showClient });
 
   container.querySelector("#campaign-detail-back").addEventListener("click", onBack);
+
+  if (onGenerateActivitySummary) {
+    const btn = container.querySelector("#campaign-activity-generate");
+    const resultEl = container.querySelector("#campaign-activity-result");
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      resultEl.textContent = "Generating…";
+      const result = await onGenerateActivitySummary({ campaign, placements, notes });
+      btn.disabled = false;
+      resultEl.innerHTML = result.ok
+        ? `<em>Via ${escapeHtml(result.providerUsed)}:</em> ${escapeHtml(result.text)}`
+        : `⚠ ${escapeHtml(result.message)}`;
+    });
+  }
+
+  if (onGeneratePitchSuggestions) {
+    const btn = container.querySelector("#campaign-pitch-generate");
+    const resultEl = container.querySelector("#campaign-pitch-result");
+    btn.addEventListener("click", async () => {
+      const targetOutlet = container.querySelector("#campaign-pitch-outlet").value.trim();
+      btn.disabled = true;
+      resultEl.textContent = "Generating…";
+      const result = await onGeneratePitchSuggestions({ campaign, placements, targetOutlet });
+      btn.disabled = false;
+      resultEl.innerHTML = result.ok
+        ? `<em>Via ${escapeHtml(result.providerUsed)}:</em><br>${escapeHtml(result.text).replace(/\n/g, "<br>")}`
+        : `⚠ ${escapeHtml(result.message)}`;
+    });
+  }
 
   const form = container.querySelector("#campaign-note-form");
   form.addEventListener("submit", (e) => {

@@ -7,13 +7,23 @@ import { escapeHtml } from "../utils.js";
  * needing to know about it.
  */
 export function renderHeader(container, opts) {
-  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction } = opts;
+  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource } = opts;
+
+  // Visible regardless of which view is scrolled to, since the header
+  // renders on every page — the point is a viewer can never lose track of
+  // being in mock/demo mode partway through a scroll. See mockData.js's
+  // own header for what "real case study numbers, clearly labeled" means
+  // here: real sourced figures, presented as example data, never live.
+  const demoBadge =
+    dataSource === "mock"
+      ? `<span style="display:inline-flex; align-items:center; gap:5px; margin-left:10px; padding:3px 10px; border-radius:999px; background:#fff3d6; border:1px solid #f0d789; color:#8a6d1a; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; vertical-align:middle;">🔶 Demo Data</span>`
+      : "";
 
   container.innerHTML = `
     <div style="display:flex; align-items:center; gap:12px;">
       <button class="hamburger" aria-label="Open menu">☰</button>
       <div>
-        <h1>${escapeHtml(greeting || `Welcome, ${client.name}!`)}</h1>
+        <h1>${escapeHtml(greeting || `Welcome, ${client.name}!`)}${demoBadge}</h1>
         <p class="header-sub">${escapeHtml(subtitle || "Here's an overview of your campaign progress and results.")}</p>
       </div>
     </div>

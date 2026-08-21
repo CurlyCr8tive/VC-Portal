@@ -65,10 +65,23 @@ export function getRealPlacements(clientName) {
 
 export function getRealMetrics(clientName) {
   const items = placementsForClient(clientName);
-  const totalAVE = items.reduce((sum, p) => sum + (p.aveValue || 0), 0);
+  // "Confirmed" = landed (has a landedDate, same definition deriveStatus()
+  // uses for "Published") — an AVE entered on a placement that's only been
+  // pitched, not landed, shouldn't count toward publicity value yet. Total
+  // Press Placements below deliberately does NOT apply this filter — that
+  // card counts every placement record regardless of status.
+  const confirmed = items.filter((p) => Boolean(p.landedDate));
+  const totalAVE = confirmed.reduce((sum, p) => sum + (p.aveValue || 0), 0);
   const leadTimes = items.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
-  const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : 0;
-  const activeCampaigns = new Set(items.map((p) => p.campaign).filter(Boolean)).size;
+  // null (not 0) when no placement has both dates yet — 0 would silently
+  // claim "same-day turnaround," which isn't what "no data" means. See
+  // getAggregateRealMetrics below for why this distinction also has to
+  // hold through the weighted aggregate, not just here.
+  const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : null;
+  // Real Campaign records (campaignStorage.js), not placement.campaign
+  // name-strings — a placement tagged with a campaign name says nothing
+  // about whether that campaign's actual status is active/completed/paused.
+  const activeCampaigns = loadCampaigns().filter((c) => c.client === clientName && c.status === "active").length;
   return {
     totalAVE,
     totalPlacements: items.length,
@@ -202,16 +215,24 @@ export function getAllRealCampaigns() {
 export function getAggregateRealMetrics() {
   const clients = getRealClients();
   if (clients.length === 0) {
-    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
+    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: null, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
   }
   const perClient = clients.map((c) => getRealMetrics(c.name));
   const totalAVE = perClient.reduce((sum, m) => sum + m.totalAVE, 0);
   const totalPlacements = perClient.reduce((sum, m) => sum + m.totalPlacements, 0);
   const activeCampaigns = perClient.reduce((sum, m) => sum + m.activeCampaigns, 0);
-  const withLeadTime = perClient.filter((m) => m.totalPlacements > 0);
-  const avgLeadTime = totalPlacements
-    ? Math.round(withLeadTime.reduce((sum, m) => sum + m.avgLeadTime * m.totalPlacements, 0) / totalPlacements)
-    : 0;
+  // Only clients with an actual computed lead time (getRealMetrics returns
+  // null, not 0, when none of their placements have both dates) count
+  // toward this average. Weighting by totalPlacements alone — the previous
+  // version of this line — would fold a client with real placements but no
+  // lead-time data in as if their turnaround were 0 days, dragging the
+  // whole aggregate toward a fabricated fast number in direct proportion
+  // to how much real (but lead-time-less) volume they have.
+  const withLeadTime = perClient.filter((m) => m.avgLeadTime != null);
+  const leadTimeWeight = withLeadTime.reduce((sum, m) => sum + m.totalPlacements, 0);
+  const avgLeadTime = leadTimeWeight
+    ? Math.round(withLeadTime.reduce((sum, m) => sum + m.avgLeadTime * m.totalPlacements, 0) / leadTimeWeight)
+    : null;
   return { totalAVE, totalPlacements, avgLeadTime, activeCampaigns, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
 }
 

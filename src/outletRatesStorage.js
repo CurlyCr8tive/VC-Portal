@@ -17,6 +17,8 @@
 // violate the same no-fabrication rule this whole build has held to
 // everywhere else.
 
+import { logError } from "./errorLog.js";
+
 const STORAGE_KEY = "vc_outlet_rates_v1";
 
 function loadAll() {
@@ -26,7 +28,9 @@ function loadAll() {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    console.warn("Corrupt outlet rate data in localStorage — starting fresh.");
+    const message = "Corrupt outlet rate data in localStorage — starting fresh.";
+    console.warn(message);
+    logError({ source: "Outlet rates storage", message });
     return {};
   }
 }

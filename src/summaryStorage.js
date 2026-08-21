@@ -7,6 +7,8 @@
 // generate call later doesn't change where this data lives or how it's
 // displayed.
 
+import { logError } from "./errorLog.js";
+
 const STORAGE_KEY = "vc_exec_summaries_v1";
 
 function loadAll() {
@@ -16,7 +18,9 @@ function loadAll() {
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    console.warn("Corrupt summary data in localStorage — starting fresh.");
+    const message = "Corrupt summary data in localStorage — starting fresh.";
+    console.warn(message);
+    logError({ source: "Executive summary storage", message });
     return {};
   }
 }

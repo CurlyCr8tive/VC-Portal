@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verified Consulting — Set Up Your Account</title>
+  <link rel="stylesheet" href="portal-styles.css" />
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="sidebar-brand">
+        <span class="logo-mark" aria-hidden="true">V</span>
+        <span class="brand-name">Verified Consulting</span>
+      </div>
+      <h1>Set up your account</h1>
+      <p class="header-sub" id="setup-sub">Choose a password to finish setting up your client portal login.</p>
+
+      <div class="auth-error" id="setup-error" role="alert"></div>
+
+      <form class="auth-form" id="setup-form">
+        <div class="field-row">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="At least 8 characters" minlength="8" required />
+        </div>
+        <div class="field-row">
+          <label for="password-confirm">Confirm password</label>
+          <input type="password" id="password-confirm" name="password-confirm" placeholder="Re-enter your password" minlength="8" required />
+        </div>
+        <button type="submit" class="btn-primary" id="setup-submit">Set Password &amp; Continue</button>
+      </form>
+
+      <div class="state-panel" id="setup-success" style="display:none;">
+        <div class="state-icon" aria-hidden="true">✅</div>
+        <h3>You're all set</h3>
+        <p>Your password is saved. Head to the login page to sign in.</p>
+        <p style="margin-top:14px;"><a class="btn-primary" href="login.html" style="text-decoration:none; display:inline-block;">Go to Login</a></p>
+      </div>
+
+      <p style="margin-top:18px; font-size:0.78rem; color:var(--text-secondary);">
+        The owner who invited you never sees or sets this password — this page talks
+        directly to Supabase, and only you ever type it in.
+      </p>
+    </div>
+  </div>
+
+  <script src="src/supabaseConfig.js"></script>
+  <script type="module" src="src/setUpAccountApp.js"></script>
+</body>
+</html>

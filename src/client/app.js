@@ -1,6 +1,7 @@
 import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getClientById } from "./mockData.js";
 import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport } from "../realDataSource.js";
 import { requireSession, logout, landingPageFor } from "../auth.js";
+import { signOutReal } from "../supabaseAuthClient.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
 import { renderHeader } from "./components/DashboardHeader.js";
 import { renderMetricsGrid } from "./components/MetricCard.js";
@@ -315,7 +316,8 @@ function renderSidebarComponent() {
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
     onDataSourceChange: setDataSource,
-    onLogout: () => {
+    onLogout: async () => {
+      await signOutReal();
       logout();
       window.location.href = "login.html";
     },
@@ -326,6 +328,7 @@ function renderSidebarComponent() {
 function renderHeaderComponent() {
   renderHeader(document.getElementById("client-header"), {
     client: getClientById(state.clientId),
+    dataSource: state.dataSource,
     onSearch: (term) => {
       state.searchTerm = term;
       if (state.view === "dashboard" || state.view === "placements") renderCurrentView();
@@ -352,6 +355,7 @@ function setDemoState(demoState) {
 function setDataSource(dataSource) {
   state.dataSource = dataSource;
   renderSidebarComponent();
+  renderHeaderComponent();
   renderCurrentView();
 }
 

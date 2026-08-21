@@ -44,14 +44,14 @@ export function renderMetricsGrid(container, metrics) {
     })}
     ${card({
       label: "Total Press Placements",
-      value: metrics.totalPlacements,
+      value: metrics.totalPlacements != null ? metrics.totalPlacements : "—",
       icon: "📰",
       iconBg: "#e1f2f0",
       delta: metrics.placementsDelta,
     })}
     ${card({
       label: "Avg. Lead Time",
-      value: `${metrics.avgLeadTime} days`,
+      value: metrics.avgLeadTime != null ? `${metrics.avgLeadTime} days` : "—",
       icon: "⏱",
       iconBg: "#fdf0d8",
       delta: metrics.leadTimeDelta,

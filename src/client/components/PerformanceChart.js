@@ -13,7 +13,7 @@ const RANGE_LABELS = {
  * A "view as table" toggle exists specifically so the same data is available
  * to anyone who can't read the chart visually.
  */
-export function renderPerformanceChart(container, { series, range, onRangeChange }) {
+export function renderPerformanceChart(container, { series, range, onRangeChange, rangeLabel }) {
   const width = 600;
   const height = 220;
   const padding = { top: 10, right: 10, bottom: 30, left: 46 };
@@ -69,11 +69,15 @@ export function renderPerformanceChart(container, { series, range, onRangeChange
   container.innerHTML = `
     <div class="section-heading">
       <h2>Placement &amp; Value Overview</h2>
-      <select class="chart-range-select" aria-label="Select date range for chart">
+      ${
+        rangeLabel
+          ? `<span class="hint" style="margin:0;">${escapeHtml(rangeLabel)}</span>`
+          : `<select class="chart-range-select" aria-label="Select date range for chart">
         ${Object.entries(RANGE_LABELS)
           .map(([value, label]) => `<option value="${value}" ${value === range ? "selected" : ""}>${label}</option>`)
           .join("")}
-      </select>
+      </select>`
+      }
     </div>
     <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Publicity value and placement count over time. ${escapeHtml(summary)}" style="width:100%; height:auto;">
       ${bars}
@@ -92,7 +96,8 @@ export function renderPerformanceChart(container, { series, range, onRangeChange
     </table>
   `;
 
-  container.querySelector(".chart-range-select").addEventListener("change", (e) => onRangeChange(e.target.value));
+  const rangeSelect = container.querySelector(".chart-range-select");
+  if (rangeSelect) rangeSelect.addEventListener("change", (e) => onRangeChange(e.target.value));
 
   const toggleBtn = container.querySelector(".chart-table-toggle");
   const dataTable = container.querySelector(".chart-data-table");

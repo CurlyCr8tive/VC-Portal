@@ -8,6 +8,8 @@
 // The thread itself works without it — the owner just has to open the
 // dashboard to see a new note instead of getting pinged.
 
+import { logError } from "./errorLog.js";
+
 const STORAGE_KEY = "vc_campaign_notes_v1";
 
 function loadAll() {
@@ -17,7 +19,9 @@ function loadAll() {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
-    console.warn("Corrupt notes data in localStorage — starting fresh.");
+    const message = "Corrupt notes data in localStorage — starting fresh.";
+    console.warn(message);
+    logError({ source: "Notes storage", message });
     return [];
   }
 }

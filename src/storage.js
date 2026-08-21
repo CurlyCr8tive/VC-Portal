@@ -2,6 +2,8 @@
 // Swap this module out for a real backend/API later without touching
 // schema.js, calculations.js, or table.js — they only deal with plain objects.
 
+import { logError } from "./errorLog.js";
+
 const STORAGE_KEY = "vc_placements_v1";
 
 export function loadPlacements() {
@@ -11,7 +13,9 @@ export function loadPlacements() {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
-    console.warn("Corrupt placement data in localStorage — starting fresh.");
+    const message = "Corrupt placement data in localStorage — starting fresh.";
+    console.warn(message);
+    logError({ source: "Placements storage", message });
     return [];
   }
 }

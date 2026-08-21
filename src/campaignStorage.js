@@ -2,6 +2,8 @@
 // a separate localStorage key since campaigns and placements are distinct
 // entities now, not one derived from the other.
 
+import { logError } from "./errorLog.js";
+
 const STORAGE_KEY = "vc_campaigns_v1";
 
 export function loadCampaigns() {
@@ -11,7 +13,9 @@ export function loadCampaigns() {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
-    console.warn("Corrupt campaign data in localStorage — starting fresh.");
+    const message = "Corrupt campaign data in localStorage — starting fresh.";
+    console.warn(message);
+    logError({ source: "Campaigns storage", message });
     return [];
   }
 }
