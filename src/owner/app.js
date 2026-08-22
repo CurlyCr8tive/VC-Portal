@@ -47,6 +47,7 @@ import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js";
 import { seedSamplePlacements } from "./seedSampleData.js";
 import { seedRealCaseStudyData } from "./seedRealCaseStudyData.js";
+import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js";
 
 // ---------------------------------------------------------------------------
 // The owner side. Every getter below reads across ALL clients in mockData —
@@ -1082,6 +1083,15 @@ function renderSettingsView() {
       <button class="btn-secondary" id="seed-real-case-study-btn">Load Real Case Study Data</button>
       <span id="seed-real-case-study-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
     </div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Greyz Bistro Coaching Program Data</h2></div>
+    <div class="card">
+      <p style="margin:0 0 12px;">Chef Garth's real program: 6 phases (status inferred from what's confirmed built — flagged per phase,
+        not presented as exact), the LinkedIn Audit &amp; Fix Plan resource, and both active partnerships (WIADCA Carnival, Brooklyn
+        Roasting Co.) as real Opportunity Evaluator entries. Opportunity scores and the missing-assets checklist item are clearly
+        marked mock/placeholder — swap for Tenyse's real evaluation once she gives it. Safe to click more than once.</p>
+      <button class="btn-secondary" id="seed-greyz-coaching-btn">Load Greyz Bistro Coaching Data</button>
+      <span id="seed-greyz-coaching-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
+    </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Developer Tools</h2></div>
     <div class="card">
       <p style="margin:0 0 12px;">Not a real product feature — a shortcut for testing. Adds 5 fictional but complete placements
@@ -1101,6 +1111,18 @@ function renderSettingsView() {
       placementsAdded > 0 || campaignsAdded > 0 || clientsAdded > 0
         ? `Added ${placementsAdded} placement(s), ${campaignsAdded} campaign(s), ${clientsAdded} client profile(s), approved ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`
         : `Already loaded — refreshed ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`;
+  });
+
+  document.getElementById("seed-greyz-coaching-btn").addEventListener("click", () => {
+    if (!findClientByName("Greyz Bistro")) {
+      alert('Load "Real Case Study Data" first (adds Greyz Bistro as a client) before loading its coaching program data.');
+      return;
+    }
+    const { phasesAdded, opportunitiesAdded, resourcesAdded } = seedGreyzBistroCoachingData();
+    document.getElementById("seed-greyz-coaching-result").textContent =
+      phasesAdded > 0 || opportunitiesAdded > 0 || resourcesAdded > 0
+        ? `Added ${phasesAdded} phase(s), ${opportunitiesAdded} opportunit${opportunitiesAdded === 1 ? "y" : "ies"}, ${resourcesAdded} resource/checklist item(s).`
+        : "Already loaded — nothing new to add.";
   });
 
   document.getElementById("seed-sample-data-btn").addEventListener("click", () => {

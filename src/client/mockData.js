@@ -48,6 +48,7 @@ export const CLIENTS = [
   { id: "vegan-dining-month", name: "VegansBaby — Vegan Dining Month", avatarInitials: "VB" },
   { id: "snap-co", name: "SNAP Co.", avatarInitials: "SC" },
   { id: "sunny-sparkling", name: "Sunny Sparkling Co.", avatarInitials: "SS" },
+  { id: "greyz-bistro", name: "Greyz Bistro", avatarInitials: "GB" },
 ];
 
 export const METRICS = {

@@ -243,7 +243,7 @@ function renderResourcesView() {
 }
 
 function renderCoachingView() {
-  renderCoachingProgramView(document.getElementById("coaching-content"));
+  renderCoachingProgramView(document.getElementById("coaching-content"), clientName);
 }
 
 function renderCurrentView() {

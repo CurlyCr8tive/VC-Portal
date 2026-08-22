@@ -22,6 +22,7 @@ export const MOCK_ACCOUNTS = [
   { email: "hello@vegandiningmonth.com", role: "pr_client", clientId: "vegan-dining-month", name: "VegansBaby — Vegan Dining Month" },
   { email: "hello@snapco.com", role: "pr_client", clientId: "snap-co", name: "SNAP Co." },
   { email: "hello@sunnysparkling.com", role: "pr_client", clientId: "sunny-sparkling", name: "Sunny Sparkling Co." },
+  { email: "hello@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
 ];
 
 export function login(email) {
