@@ -48,7 +48,7 @@ function val(initialData, field) {
   return v == null ? "" : v;
 }
 
-export function renderPlacementForm(container, { onSubmit, onCancel, initialData = null, onResearchRate, onSuggestHeadline, onAnalyzeSentiment }) {
+export function renderPlacementForm(container, { onSubmit, onCancel, initialData = null, onResearchRate, onSuggestHeadline, onAnalyzeSentiment, knownClients = [] }) {
   const isEdit = Boolean(initialData);
 
   container.innerHTML = `
@@ -82,7 +82,10 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
 
       <div class="field-row">
         <label for="op-client">Client *</label>
-        <input type="text" id="op-client" name="client" placeholder="Client name" value="${val(initialData, "client")}" required />
+        <input type="text" id="op-client" name="client" list="op-client-list" placeholder="Client name" value="${val(initialData, "client")}" required />
+        <datalist id="op-client-list">
+          ${knownClients.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("")}
+        </datalist>
       </div>
 
       <div class="field-row two-col">

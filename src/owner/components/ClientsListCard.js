@@ -19,8 +19,19 @@ import { renderEmptyState } from "../../client/components/EmptyState.js";
  * a "View on Dashboard →" link that's expected to filter the owner
  * Dashboard view down to just this client (see src/owner/app.js's
  * dashboardClientFilter).
+ *
+ * `onEditInfo(clientName)` is optional — when provided, each card gets an
+ * "Edit Info" button for the client's profile (status/engagement
+ * type/contact/industry — see src/clientSchema.js). Every client is
+ * expected to carry a `profile` object (realDataSource.js's
+ * getClientProfile) — "unconfirmed" status is the honest default for one
+ * that's never had its info filled in, not a bug.
  */
-export function renderClientsList(container, clients, { onInvite, onViewDashboard } = {}) {
+const STATUS_BADGE_CLASS = { active: "published", past: "client-past", unconfirmed: "in-progress" };
+const STATUS_LABEL = { active: "Active", past: "Past / Portfolio", unconfirmed: "Status Unconfirmed" };
+const ENGAGEMENT_LABEL = { pr: "PR", coaching: "Coaching", pr_and_coaching: "PR + Coaching" };
+
+export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo } = {}) {
   if (!clients || clients.length === 0) {
     renderEmptyState(container, {
       icon: "🗂️",
@@ -31,10 +42,15 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
   }
 
   container.innerHTML = clients
-    .map(
-      (c) => `
+    .map((c) => {
+      const profile = c.profile || { status: "unconfirmed", engagementType: "pr" };
+      return `
     <div class="card client-list-card">
-      <h3>${escapeHtml(c.name)}</h3>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <h3 style="margin:0;">${escapeHtml(c.name)}</h3>
+        <span class="status-badge ${STATUS_BADGE_CLASS[profile.status] || "in-progress"}">${escapeHtml(STATUS_LABEL[profile.status] || "Status Unconfirmed")}</span>
+      </div>
+      <p style="font-size:0.78rem; color:var(--text-secondary); margin:2px 0 10px;">${escapeHtml(ENGAGEMENT_LABEL[profile.engagementType] || "PR")}${profile.industry ? ` · ${escapeHtml(profile.industry)}` : ""}</p>
       <div class="client-mini-metrics">
         <div><strong>${formatCurrency(c.metrics.totalAVE)}</strong>AVE</div>
         <div><strong>${c.metrics.totalPlacements}</strong>Placements</div>
@@ -43,7 +59,10 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
       <p style="font-size:0.82rem; color:var(--text-secondary); margin:0;">
         ${c.campaignNames.length ? escapeHtml(c.campaignNames.join(", ")) : "No active campaigns"}
       </p>
-      ${onViewDashboard ? `<button type="button" class="link-btn" data-view-dashboard="${escapeHtml(c.name)}" style="margin-top:8px;">View on Dashboard →</button>` : ""}
+      <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        ${onViewDashboard ? `<button type="button" class="link-btn" data-view-dashboard="${escapeHtml(c.name)}">View on Dashboard →</button>` : ""}
+        ${onEditInfo ? `<button type="button" class="btn-secondary" data-edit-info="${escapeHtml(c.name)}">Edit Info</button>` : ""}
+      </div>
       ${
         onInvite
           ? `<div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -52,13 +71,19 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
       </div>`
           : ""
       }
-    </div>`
-    )
+    </div>`;
+    })
     .join("");
 
   if (onViewDashboard) {
     container.querySelectorAll("[data-view-dashboard]").forEach((btn) => {
       btn.addEventListener("click", () => onViewDashboard(btn.dataset.viewDashboard));
+    });
+  }
+
+  if (onEditInfo) {
+    container.querySelectorAll("[data-edit-info]").forEach((btn) => {
+      btn.addEventListener("click", () => onEditInfo(btn.dataset.editInfo));
     });
   }
 

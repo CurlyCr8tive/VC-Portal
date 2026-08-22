@@ -19,6 +19,7 @@
 import { loadPlacements } from "./storage.js";
 import { loadCampaigns } from "./campaignStorage.js";
 import { loadSummary } from "./summaryStorage.js";
+import { loadClients, findClientByName } from "./clientStorage.js";
 import { computeLeadTimeDays } from "./calculations.js";
 
 const CAMPAIGN_STATUS_LABELS = { active: "Active", completed: "Completed", paused: "Paused" };
@@ -54,9 +55,40 @@ function placementsForClient(clientName) {
 // Per-client
 // ---------------------------------------------------------------------------
 
+/**
+ * Union of two sources, not placements alone: a coaching client like Chef
+ * Garth may have zero press placements and would never appear in this list
+ * if it only derived from placement.client strings — which is exactly how
+ * this function worked before real Client records existed. Placement-only
+ * clients still show up too (an unconfirmed-status client is honest, not
+ * a bug — see getClientProfile below).
+ */
 export function getRealClients() {
-  const names = [...new Set(loadPlacements().map((p) => p.client).filter(Boolean))].sort();
-  return names.map((name) => ({ id: slugify(name), name, avatarInitials: avatarInitials(name) }));
+  const fromPlacements = loadPlacements().map((p) => p.client).filter(Boolean);
+  const fromRecords = loadClients().map((c) => c.name);
+  const names = [...new Set([...fromPlacements, ...fromRecords])].sort();
+  return names.map((name) => ({ id: slugify(name), name, avatarInitials: avatarInitials(name), profile: getClientProfile(name) }));
+}
+
+/**
+ * A client's profile info (status/engagement type/contact/industry) if a
+ * real Client record exists, or an honest "unconfirmed" default if it
+ * doesn't — never guesses active vs. past for a client nobody's told us
+ * about yet.
+ */
+export function getClientProfile(clientName) {
+  const record = findClientByName(clientName);
+  if (record) return record;
+  return {
+    id: null,
+    name: clientName,
+    status: "unconfirmed",
+    engagementType: "pr",
+    contactEmail: "",
+    industry: "",
+    engagementStartDate: "",
+    notes: "",
+  };
 }
 
 export function getRealPlacements(clientName) {

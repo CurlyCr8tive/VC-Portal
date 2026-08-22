@@ -29,6 +29,8 @@ import { addPlacement, loadPlacements } from "../storage.js";
 import { createCampaign } from "../campaignSchema.js";
 import { addCampaign, loadCampaigns } from "../campaignStorage.js";
 import { saveSummary, approveSummary } from "../summaryStorage.js";
+import { createClient } from "../clientSchema.js";
+import { addClient, findClientByName } from "../clientStorage.js";
 
 const RECORDING_DATE = new Date().toISOString().slice(0, 10);
 const DATE_DISCLOSURE =
@@ -172,15 +174,59 @@ The campaign secured coverage across 8 news outlets spanning NYC, Las Vegas, Por
 Tone & Sentiment data was not provided for this period, so no qualitative read on coverage sentiment can be included here. Taken together, the results confirm that the bundled multi-city approach delivered concentrated, high-value placements efficiently — the clear next step is instrumenting Audience Reach and Tone & Sentiment tracking so future summaries can speak to both the dollar value and the qualitative resonance of the coverage.`,
 };
 
+// Real Client profiles (src/clientSchema.js). Status is only ever set to
+// "active" or "past" when Tenyse has directly said so — everything else
+// stays "unconfirmed" with the reasoning written into notes, rather than
+// assumed either way just because a client has real case-study placements.
+const REAL_CLIENT_PROFILES = [
+  {
+    name: "VeganHood",
+    status: "past",
+    engagementType: "pr",
+    industry: "Food & Beverage (vegan/plant-based CPG)",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes: "Confirmed closed/portfolio-only by Tenyse directly (email correspondence). Never treat as an active engagement in the dashboard or a demo going forward.",
+  },
+  {
+    name: "SNAP Co.",
+    status: "unconfirmed",
+    engagementType: "pr",
+    industry: "",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes: 'Tenyse\'s email explicitly named YAMAAS!, VeganHood, El Pastor Cheese, and Candlelit Care as past/portfolio-only clients — SNAP Co. was not mentioned either way, so status is left honestly unconfirmed rather than assumed active or past.',
+  },
+  {
+    name: "VegansBaby — Vegan Dining Month",
+    status: "unconfirmed",
+    engagementType: "pr",
+    industry: "",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes: "Same reasoning as SNAP Co. above — not named in Tenyse's past-clients list, but never explicitly confirmed current either.",
+  },
+  {
+    name: "Greyz Bistro",
+    status: "active",
+    engagementType: "coaching",
+    industry: "Culinary / Hospitality — Crown Heights restaurant; concept currently repositioning away from its original Caribbean-Asian framing",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes:
+      "Founder/contact: Chef Garth D. Cheese. Confirmed by Tenyse directly as her first genuine active client (email correspondence) — in the Visibility to Revenue coaching program, 90-day cycle, monthly payment, currently heading into the final month, ~10 hrs/month from Tenyse. Built so far: proposal, contract, media kit, kickoff deck, LinkedIn audit and fix plan. Standing coaching rule: Chef Garth brings all incoming opportunities to Tenyse before responding to anyone. Active partnership work in flight: WIADCA Carnival (VIP Breakfast + Stage Premium Tasting Partner, Aug 20 and Sept 7 activations) and a Brooklyn Roasting Company collaboration. Positioning angles under consideration: Chef Founder, Culinary Educator, Cultural Voice. Full 6-phase VAAM program structure (Visibility/Authority/Alignment/Monetization), homework tracking, and the partnership-opportunity evaluator are scoped but not yet built — this record exists so Greyz Bistro shows up as a real client ahead of that work.",
+  },
+];
+
 /**
  * Idempotent by design: re-running this after it's already run won't create
  * duplicate rows, checked by (publication, client, headline) for
- * placements and (name, client) for campaigns — the same fields a human
- * would recognize as "this row already exists," not id (which is freshly
- * generated every call and would never match). Summaries are naturally
- * idempotent — saveSummary()/approveSummary() key by client name, so
- * re-running just re-saves/re-approves the same real text, never
- * duplicates.
+ * placements, (name, client) for campaigns, and name for client profiles —
+ * the same fields a human would recognize as "this row already exists,"
+ * not id (which is freshly generated every call and would never match).
+ * Summaries are naturally idempotent — saveSummary()/approveSummary() key
+ * by client name, so re-running just re-saves/re-approves the same real
+ * text, never duplicates.
  */
 export function seedRealCaseStudyData() {
   const existingPlacements = loadPlacements();
@@ -209,5 +255,17 @@ export function seedRealCaseStudyData() {
     approveSummary(clientName);
   }
 
-  return { placementsAdded, campaignsAdded, summariesApproved: Object.keys(REAL_CASE_STUDY_SUMMARIES).length };
+  let clientsAdded = 0;
+  for (const profile of REAL_CLIENT_PROFILES) {
+    if (findClientByName(profile.name)) continue;
+    addClient(createClient(profile));
+    clientsAdded += 1;
+  }
+
+  return {
+    placementsAdded,
+    campaignsAdded,
+    summariesApproved: Object.keys(REAL_CASE_STUDY_SUMMARIES).length,
+    clientsAdded,
+  };
 }

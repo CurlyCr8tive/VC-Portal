@@ -18,6 +18,8 @@ import { createPlacement, applyPlacementEdit } from "../schema.js";
 import { addPlacement, updatePlacement, deletePlacement } from "../storage.js";
 import { createCampaign, applyCampaignEdit, addMilestone, toggleMilestone, removeMilestone } from "../campaignSchema.js";
 import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, deleteCampaign } from "../campaignStorage.js";
+import { createClient, applyClientEdit } from "../clientSchema.js";
+import { addClient, updateClient, findClientByName } from "../clientStorage.js";
 import { renderHeader } from "../client/components/DashboardHeader.js";
 import { renderMetricsGrid } from "../client/components/MetricCard.js";
 import { renderPlacementsTable } from "../client/components/PressPlacementTable.js";
@@ -34,6 +36,7 @@ import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js";
+import { renderClientDetailForm } from "./components/ClientDetailForm.js";
 import { renderCoachingAdminView } from "./components/CoachingAdminView.js";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js";
@@ -84,6 +87,9 @@ const state = {
   dashboardDateTo: "",
   editingPlacementId: null,
   editingCampaignId: null,
+  // Client info form: null = not showing, true = "add new client," or a
+  // client name string = editing that client's existing profile.
+  editingClient: null,
   selectedCampaignId: null,
   // Hand-authored candidate mentions previewing the discovery-agent review
   // queue described in the PRD. Confirm/Reject only mutate this in-memory
@@ -575,10 +581,40 @@ function renderClientsView() {
   const target = document.getElementById("clients-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+
+  const canManageClients = state.dataSource === "real";
+  const isEditing = canManageClients && state.editingClient;
+  const editingRecord = isEditing && state.editingClient !== true ? findClientByName(state.editingClient) : null;
+
   target.innerHTML = `
     <div class="section-heading"><h2>Clients</h2></div>
+    ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
     <div class="clients-grid" id="clients-full-grid"></div>
   `;
+
+  if (isEditing) {
+    renderClientDetailForm(document.getElementById("client-detail-form-wrap"), {
+      initialData: editingRecord || (state.editingClient !== true ? { name: state.editingClient } : null),
+      onSubmit: (raw) => {
+        try {
+          if (editingRecord) {
+            updateClient(applyClientEdit(editingRecord, raw));
+          } else {
+            addClient(createClient(raw));
+          }
+          state.editingClient = null;
+          renderClientsView();
+        } catch (err) {
+          alert(err.message);
+        }
+      },
+      onCancel: () => {
+        state.editingClient = null;
+        renderClientsView();
+      },
+    });
+  }
+
   renderClientsList(document.getElementById("clients-full-grid"), getClientsWithMetrics(), {
     onInvite: state.dataSource === "real" ? inviteClient : undefined,
     onViewDashboard: (clientName) => {
@@ -587,6 +623,12 @@ function renderClientsView() {
       state.dashboardDateTo = "";
       navigate("dashboard");
     },
+    onEditInfo: canManageClients
+      ? (clientName) => {
+          state.editingClient = clientName;
+          renderClientsView();
+        }
+      : undefined,
   });
 }
 
@@ -707,6 +749,7 @@ function renderPlacementsView() {
       onResearchRate: researchOutletRate,
       onSuggestHeadline: suggestHeadline,
       onAnalyzeSentiment: analyzeSentiment,
+      knownClients: getRealClients().map((c) => c.name),
       onSubmit: (rawData) => {
         try {
           if (editingPlacement) {
@@ -1025,10 +1068,13 @@ function renderSettingsView() {
     </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Real Case Study Data</h2></div>
     <div class="card">
-      <p style="margin:0 0 12px;">Not a demo/mock fixture — these are Tenyse's own real historical numbers (VeganHood, SNAP Co.,
-        Vegan Dining Month): placements, a completed Campaign record per client, and a real AI-generated executive summary
-        (already reviewed and approved as part of this same action) — written into the same real data path as anything
-        entered by hand. Safe to click more than once — already-loaded rows are skipped, not duplicated.</p>
+      <p style="margin:0 0 12px;">Not a demo/mock fixture — these are Tenyse's own real numbers, sent directly by her: PR
+        clients VeganHood, SNAP Co., and Vegan Dining Month (placements, a completed Campaign record, and a reviewed +
+        approved AI-generated executive summary each), plus a real Client profile for every one of them — status,
+        engagement type, contact, industry. VeganHood is marked <strong>Past / Portfolio</strong> (confirmed closed by
+        Tenyse directly); SNAP Co. and Vegan Dining Month are marked <strong>Unconfirmed</strong> rather than guessed
+        either way, since she named other past clients but not these two specifically. Also adds <strong>Greyz Bistro</strong>
+        (Chef Garth) as a real Active coaching client — her first genuine active engagement.</p>
       <p class="hint" style="margin:0 0 12px;">Two honest gaps, disclosed on each row's Notes field: none of the source
         material gives an exact landing/campaign-start date, so dates shown are recording-date placeholders, not sourced
         facts — and Audience Reach / Tone &amp; Sentiment aren't tracked in this build, called out directly in each summary
@@ -1050,10 +1096,10 @@ function renderSettingsView() {
   renderErrorLogPanel(document.getElementById("error-log-wrap"));
 
   document.getElementById("seed-real-case-study-btn").addEventListener("click", () => {
-    const { placementsAdded, campaignsAdded, summariesApproved } = seedRealCaseStudyData();
+    const { placementsAdded, campaignsAdded, summariesApproved, clientsAdded } = seedRealCaseStudyData();
     document.getElementById("seed-real-case-study-result").textContent =
-      placementsAdded > 0 || campaignsAdded > 0
-        ? `Added ${placementsAdded} placement(s), ${campaignsAdded} campaign(s), approved ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`
+      placementsAdded > 0 || campaignsAdded > 0 || clientsAdded > 0
+        ? `Added ${placementsAdded} placement(s), ${campaignsAdded} campaign(s), ${clientsAdded} client profile(s), approved ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`
         : `Already loaded — refreshed ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`;
   });
 
@@ -1090,7 +1136,13 @@ function renderCurrentView() {
 }
 
 function renderCoachingView() {
-  renderCoachingAdminView(document.getElementById("coaching-content"));
+  const coachingClients =
+    state.dataSource === "real"
+      ? getClientsWithMetrics()
+          .map((c) => c.profile)
+          .filter((profile) => profile && (profile.engagementType === "coaching" || profile.engagementType === "pr_and_coaching"))
+      : [];
+  renderCoachingAdminView(document.getElementById("coaching-content"), { coachingClients });
 }
 
 function showCampaignDetail(id) {
@@ -1184,7 +1236,14 @@ function renderHeaderComponent() {
     searchPlaceholder: "Search clients, campaigns, placements…",
     extraAction: {
       label: "+ New Client",
-      onClick: () => alert("This is a demo — adding a new client isn't wired up yet."),
+      onClick: () => {
+        if (state.dataSource !== "real") {
+          alert('Switch the sidebar\'s Data source to "Real" to add a client — adding one while previewing demo data wouldn\'t show up in it.');
+          return;
+        }
+        state.editingClient = true;
+        navigate("clients");
+      },
     },
     onSearch: (term) => {
       state.searchTerm = term;

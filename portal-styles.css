@@ -503,6 +503,15 @@ table.placements-table {
   border-color: #dccdec;
 }
 
+/* Client status (active/past/unconfirmed) reuses .status-badge's shape —
+   "published"/"in-progress" already read right for active/unconfirmed;
+   "past" is the one genuinely new state. */
+.status-badge.client-past {
+  background: #eee9e4;
+  color: #6b5f56;
+  border-color: #ddd2c7;
+}
+
 .sentiment-badge {
   display: inline-block;
   padding: 4px 10px;
