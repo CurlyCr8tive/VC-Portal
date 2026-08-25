@@ -143,7 +143,7 @@ We ran a coordinated media outreach campaign targeting outlets spanning trade pu
 **Results**
 The campaign delivered coverage across 8 outlets in one bundled placement effort, landing the product line in VegOut, QSR, VegWorld Magazine, Patch, PIX11, and NBC — a spread that hits both the vegan/CPG trade audience and general consumer awareness through local and national broadcast. This coverage generated a Total Publicity Value of **$492,198**.
 
-Audience Reach was not tracked in this build, so we cannot report a reach or impressions figure for this period — that's a measurement gap to close for the next campaign cycle if reach reporting is a priority. Similarly, Tone & Sentiment was not part of the tracked data set here, so we're not able to characterize how coverage skewed qualitatively; we'd recommend adding sentiment tracking to the next reporting build to give a fuller picture of how the launch landed with audiences, not just where it landed.`,
+Audience Reach and Tone & Sentiment both have a real per-placement field in this build, but the source material for this campaign only gives one bundled Total Publicity Value figure, not a per-outlet reach number or a sentiment read — so neither is entered here rather than guessed. Worth asking Tenyse whether a per-outlet breakdown exists anywhere before assuming it doesn't.`,
 
   "SNAP Co.": `# SNAP Co. — Deeper Than Visibility: Press Coverage Executive Summary
 
@@ -169,9 +169,9 @@ Vegan Dining Month required a coordinated multi-city push across NYC, Las Vegas,
 We executed a bundled, multi-market media strategy that paired the flagship Times Square billboard activation with coordinated local press outreach across all five cities, positioning Vegan Dining Month as a unified national story rather than five disconnected local efforts.
 
 **Results**
-The campaign secured coverage across 8 news outlets spanning NYC, Las Vegas, Portland, Seattle, and Eugene, generating a combined 8 news clips tied to the multi-city bundle. This coverage produced a Total Publicity Value of $400,000 — a strong return for a single coordinated push across five markets plus a Times Square billboard. Audience Reach was not tracked in this build, so we cannot report impression or reach figures for this period; this is a gap in measurement infrastructure, not a reflection of underperformance, and we recommend closing it before the next campaign cycle so reach can be reported alongside Publicity Value.
+The campaign secured coverage across 8 news outlets spanning NYC, Las Vegas, Portland, Seattle, and Eugene, generating a combined 8 news clips tied to the multi-city bundle. This coverage produced a Total Publicity Value of $400,000 — a strong return for a single coordinated push across five markets plus a Times Square billboard. Audience Reach has a real per-placement field in this build, but the source material only gives this one bundled Total Publicity Value figure, not a per-outlet or per-clip reach number — so none is entered here rather than guessed.
 
-Tone & Sentiment data was not provided for this period, so no qualitative read on coverage sentiment can be included here. Taken together, the results confirm that the bundled multi-city approach delivered concentrated, high-value placements efficiently — the clear next step is instrumenting Audience Reach and Tone & Sentiment tracking so future summaries can speak to both the dollar value and the qualitative resonance of the coverage.`,
+Tone & Sentiment data was not provided for this period, so no qualitative read on coverage sentiment can be included here. Taken together, the results confirm that the bundled multi-city approach delivered concentrated, high-value placements efficiently — the clear next step is asking Tenyse whether a per-outlet reach breakdown exists anywhere for this campaign, so future summaries can speak to both the dollar value and the qualitative resonance of the coverage.`,
 };
 
 // Real Client profiles (src/clientSchema.js). Status is only ever set to

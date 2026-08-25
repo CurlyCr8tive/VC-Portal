@@ -32,12 +32,20 @@ import { renderEmptyState } from "../../client/components/EmptyState.js";
  * Campaign form with this client's name already locked in (see
  * src/owner/app.js's state.addCampaignForClient), so a new campaign never
  * has to be typed/matched by hand against this client.
+ *
+ * `onDiscoveryScan({ clientId, clientName })` is optional — when provided,
+ * each card gets a "Scan for Mentions" button that triggers the Discovery
+ * Agent (owner-api's POST /api/clients/:clientId/discovery-scan) for this
+ * client and reports the result (scanned/matched/inserted, or an honest
+ * error) inline, same pattern as onInvite below. Like onInvite, this only
+ * actually reaches Supabase once real Auth is configured — until then it
+ * surfaces the real "not configured"/401 response rather than faking one.
  */
 const STATUS_BADGE_CLASS = { active: "published", past: "client-past", unconfirmed: "in-progress" };
 const STATUS_LABEL = { active: "Active", past: "Past / Portfolio", unconfirmed: "Status Unconfirmed" };
 const ENGAGEMENT_LABEL = { pr: "PR", coaching: "Coaching", pr_and_coaching: "PR + Coaching" };
 
-export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo, onAddCampaign } = {}) {
+export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan } = {}) {
   if (!clients || clients.length === 0) {
     renderEmptyState(container, {
       icon: "🗂️",
@@ -78,6 +86,14 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
       </div>`
           : ""
       }
+      ${
+        onDiscoveryScan
+          ? `<div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" data-discovery-scan="${escapeHtml(c.id)}">Scan for Mentions</button>
+        <span data-discovery-status="${escapeHtml(c.id)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
+      </div>`
+          : ""
+      }
     </div>`;
     })
     .join("");
@@ -100,29 +116,52 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
     });
   }
 
-  if (!onInvite) return;
+  if (onInvite) {
+    container.querySelectorAll("[data-invite-client]").forEach((btn) => {
+      const clientId = btn.dataset.inviteClient;
+      const client = clients.find((c) => c.id === clientId);
+      const statusEl = container.querySelector(`[data-invite-status="${CSS.escape(clientId)}"]`);
 
-  container.querySelectorAll("[data-invite-client]").forEach((btn) => {
-    const clientId = btn.dataset.inviteClient;
-    const client = clients.find((c) => c.id === clientId);
-    const statusEl = container.querySelector(`[data-invite-status="${CSS.escape(clientId)}"]`);
+      btn.addEventListener("click", async () => {
+        const email = window.prompt(`Email address to send ${client?.name || "this client"}'s invite to:`);
+        if (!email || !email.trim()) return;
 
-    btn.addEventListener("click", async () => {
-      const email = window.prompt(`Email address to send ${client?.name || "this client"}'s invite to:`);
-      if (!email || !email.trim()) return;
-
-      btn.disabled = true;
-      statusEl.textContent = "Sending invite…";
-      try {
-        const result = await onInvite({ clientId, clientName: client?.name, email: email.trim() });
-        statusEl.textContent = result.ok
-          ? `✓ Invite sent to ${result.invitedEmail || email.trim()}`
-          : `⚠ ${result.message || "Invite failed."}`;
-      } catch (err) {
-        statusEl.textContent = `⚠ ${err.message || "Invite failed."}`;
-      } finally {
-        btn.disabled = false;
-      }
+        btn.disabled = true;
+        statusEl.textContent = "Sending invite…";
+        try {
+          const result = await onInvite({ clientId, clientName: client?.name, email: email.trim() });
+          statusEl.textContent = result.ok
+            ? `✓ Invite sent to ${result.invitedEmail || email.trim()}`
+            : `⚠ ${result.message || "Invite failed."}`;
+        } catch (err) {
+          statusEl.textContent = `⚠ ${err.message || "Invite failed."}`;
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
-  });
+  }
+
+  if (onDiscoveryScan) {
+    container.querySelectorAll("[data-discovery-scan]").forEach((btn) => {
+      const clientId = btn.dataset.discoveryScan;
+      const client = clients.find((c) => c.id === clientId);
+      const statusEl = container.querySelector(`[data-discovery-status="${CSS.escape(clientId)}"]`);
+
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        statusEl.textContent = "Scanning…";
+        try {
+          const result = await onDiscoveryScan({ clientId, clientName: client?.name });
+          statusEl.textContent = result.ok
+            ? `✓ Scanned ${result.scanned ?? 0}, matched ${result.matched ?? 0}, added ${result.inserted ?? 0} to Review Queue.`
+            : `⚠ ${result.message || "Scan failed."}`;
+        } catch (err) {
+          statusEl.textContent = `⚠ ${err.message || "Scan failed."}`;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
 }

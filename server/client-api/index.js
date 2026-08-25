@@ -26,9 +26,14 @@ const PORT = process.env.PORT || process.env.CLIENT_API_PORT || 4002;
 const app = express();
 app.use(express.json());
 
-// Dev-only convenience, not a production CORS policy.
+// Dev-only convenience, not a production CORS policy. See owner-api/index.js's
+// matching comment — Allow-Headers/Methods and the OPTIONS short-circuit are
+// required for any browser call that sends a Content-Type header, not optional.
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
@@ -64,12 +69,11 @@ app.get(
 app.get(
   "/api/placements",
   clientRoute(async (req, res) => {
-    // notes/notes_shareable are intentionally still returned here — RLS and
-    // this filter scope by ROW (which client), not by column. Hiding the
-    // notes column when notes_shareable is false needs a view or
-    // column-level GRANT, not built yet (see db/schema.sql's RLS comment).
+    // Reads through placements_for_client (db/schema.sql), not the base
+    // table — that view nulls out `notes` itself when notes_shareable is
+    // false, since RLS only scopes by ROW (which client), not by column.
     const { data, error } = await supabase
-      .from("placements")
+      .from("placements_for_client")
       .select("*")
       .eq("client_id", req.profile.client_id)
       .order("publication_date", { ascending: false });

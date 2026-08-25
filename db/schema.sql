@@ -127,6 +127,12 @@ create table placements (
   sentiment_tag text check (sentiment_tag in ('positive', 'neutral', 'negative')),
   sentiment_confirmed_by_owner boolean not null default false,
 
+  -- Per-placement audience reach — real in her case studies, but those
+  -- report a campaign-level rollup, not a per-article number. This is a
+  -- real place to enter one for a specific placement when she has it;
+  -- null (not 0) when unknown. See src/owner/canvaColumnMapping.js.
+  audience_reach bigint,
+
   notes text, -- owner-only by default; not shown to a client unless notes_shareable is true
   notes_shareable boolean not null default false,
 
@@ -135,6 +141,24 @@ create table placements (
   created_at timestamptz not null default now(),
   created_by uuid references profiles(id)
 );
+
+-- ---------------------------------------------------------------------------
+-- placements_for_client — closes the column-level privacy gap RLS can't:
+-- RLS filters ROWS (which client), not columns, so a plain SELECT on
+-- placements always includes `notes` regardless of notes_shareable. This
+-- view nulls it out itself when notes_shareable is false. server/client-api
+-- (and any other pr_client-facing read) should query this view, not the
+-- base table, for placements. Owner-side reads still use the base table
+-- directly — this restriction is client-facing only.
+-- ---------------------------------------------------------------------------
+create view placements_for_client as
+select
+  id, client_id, campaign_id, publication, headline, article_url, publication_date,
+  ave_value, ave_auto_calculated, pitch_sent_date, landed_date,
+  sentiment_tag, sentiment_confirmed_by_owner, audience_reach,
+  case when notes_shareable then notes else null end as notes,
+  notes_shareable, source, created_at, created_by
+from placements;
 
 -- ---------------------------------------------------------------------------
 -- outlet_rates — Agent 2's (AVE Calculation) seed/lookup table.

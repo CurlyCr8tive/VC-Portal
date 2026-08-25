@@ -120,11 +120,16 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
         <textarea id="op-notes" name="notes" rows="3" placeholder="Owner-only notes (e.g. journalist wants a follow-up, syndicated nationally)">${val(initialData, "notes")}</textarea>
       </div>
 
-      <details class="optional-block" ${val(initialData, "campaign") || val(initialData, "sentiment") ? "open" : ""}>
+      <details class="optional-block" ${val(initialData, "campaign") || val(initialData, "sentiment") || val(initialData, "audienceReach") ? "open" : ""}>
         <summary>Additional (optional)</summary>
         <div class="field-row" style="margin-top:10px;">
           <label for="op-campaign">Campaign</label>
           <input type="text" id="op-campaign" name="campaign" placeholder="e.g. Techstars Launch" value="${val(initialData, "campaign")}" />
+        </div>
+        <div class="field-row">
+          <label for="op-audienceReach">Audience Reach</label>
+          <input type="number" id="op-audienceReach" name="audienceReach" min="0" step="1" placeholder="e.g. 1500000" value="${val(initialData, "audienceReach")}" />
+          <p class="hint" style="margin-top:6px;">Leave blank unless you have a real reach figure for this specific placement — an unknown reach shouldn't be entered as 0.</p>
         </div>
         <div class="field-row" style="margin-bottom:0;">
           <label for="op-sentiment">Sentiment</label>

@@ -18,15 +18,17 @@
 //     and the MEDIUM "campaign"/"sentiment" fields match a real column on
 //     the actual Placement record (src/schema.js, PlacementForm.js) —
 //     nothing new to add there.
-//   - GAP FOUND: "audienceReach" (MEDIUM) has no real place to be entered —
-//     reach numbers in her case studies (VeganHood, Candlelit Care, Vegan
-//     Dining Month) are campaign-level rollups, not a field on any
-//     individual placement (see agent-notes.md "What this is not"). This
-//     column will correctly never appear in a real export (canvaExport.js's
-//     activeOptionalColumns already excludes anything with no real data),
-//     but it can't be *populated* until/unless a per-placement reach field
-//     is added to the Placement schema — flagging, not building, since
-//     that's a schema change beyond this mapping file.
+//   - GAP CLOSED (Aug 25): "audienceReach" (MEDIUM) had no real place to be
+//     entered — reach numbers in her case studies (VeganHood, Candlelit
+//     Care, Vegan Dining Month) are campaign-level rollups, not a field on
+//     any individual placement (see agent-notes.md "What this is not").
+//     Added an optional audienceReach field to the real Placement record
+//     (src/schema.js, PlacementForm.js's "Additional" section, and
+//     db/schema.sql's placements.audience_reach) so a real per-placement
+//     figure has somewhere to live when Tenyse has one — still null (never
+//     0) when unknown, and canvaExport.js's activeOptionalColumns still
+//     only includes this column in an export where at least one placement
+//     actually has a real value.
 //   - The four LOW_CONFIDENCE social metrics (likes/saves/shares/views) and
 //     clipsCount have ZERO supporting evidence anywhere in the cross-
 //     referenced material — no case study, benchmark, or PRD pass mentions

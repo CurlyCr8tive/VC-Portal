@@ -41,8 +41,22 @@ app.use(express.json());
 // Dev-only convenience so the static frontend (served separately on 8420)
 // can eventually call this without a proxy. Not a production CORS policy —
 // revisit this once real hosting/domains exist.
+//
+// Access-Control-Allow-Headers/Methods and the explicit OPTIONS short-
+// circuit are not decoration — every real call this app makes sends a
+// Content-Type header (fetch's JSON.stringify body, or authedJsonHeaders()
+// even on a plain GET), which makes the browser send a CORS preflight
+// OPTIONS request first. Without an Allow-Headers response naming
+// Content-Type/Authorization, the browser silently blocks the real
+// request after the preflight — found live via Playwright while
+// verifying the Discovery Agent frontend: every owner-api call failed
+// with a CORS console error, invisible to curl-based testing since CORS
+// is a browser-enforced restriction, not a server one.
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 

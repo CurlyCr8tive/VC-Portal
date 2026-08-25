@@ -511,9 +511,39 @@ async function authedJsonHeaders() {
   };
 }
 
-async function inviteClient({ clientId, email }) {
+/**
+ * Every "real" client the owner UI knows about (getClientsWithMetrics(),
+ * getRealClients()) is keyed by a slug generated from placement.client text
+ * — localStorage never had a reason to know Supabase's real clients.id
+ * (uuid). Any route that takes a clientId owner-api can actually look up
+ * (invite, discovery-scan) needs that real uuid, not the local slug — this
+ * resolves one by name against owner-api's real clients table. Returns
+ * `{ ok: false }` with an honest message rather than guessing when there's
+ * no matching row yet (e.g. Supabase not configured, or this client was
+ * never created there).
+ */
+async function resolveRealClientId(clientName) {
   try {
-    const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(clientId)}/invite`, {
+    const res = await fetch(`${OWNER_API_BASE}/api/clients`, { headers: await authedJsonHeaders() });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, message: body.message || `Couldn't look up clients in Supabase (${res.status}).` };
+    }
+    const match = (Array.isArray(body) ? body : []).find((c) => c.name === clientName);
+    if (!match) {
+      return { ok: false, message: `${clientName} doesn't have a matching row in Supabase yet — add it there first.` };
+    }
+    return { ok: true, id: match.id };
+  } catch (err) {
+    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+  }
+}
+
+async function inviteClient({ clientName, email }) {
+  const resolved = await resolveRealClientId(clientName);
+  if (!resolved.ok) return resolved;
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(resolved.id)}/invite`, {
       method: "POST",
       headers: await authedJsonHeaders(),
       body: JSON.stringify({ email }),
@@ -523,6 +553,24 @@ async function inviteClient({ clientId, email }) {
       return { ok: false, message: body.message || `Invite failed (${res.status}).` };
     }
     return { ok: true, invitedEmail: body.invitedEmail };
+  } catch (err) {
+    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+  }
+}
+
+async function discoveryScanClient({ clientName }) {
+  const resolved = await resolveRealClientId(clientName);
+  if (!resolved.ok) return resolved;
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(resolved.id)}/discovery-scan`, {
+      method: "POST",
+      headers: await authedJsonHeaders(),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, message: body.message || `Scan failed (${res.status}).` };
+    }
+    return { ok: true, ...body };
   } catch (err) {
     return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
   }
@@ -643,6 +691,7 @@ function renderClientsView() {
             navigate("campaigns");
           }
         : undefined,
+    onDiscoveryScan: state.dataSource === "real" ? discoveryScanClient : undefined,
   });
 }
 
@@ -818,28 +867,105 @@ function renderReviewQueueView() {
   const target = document.getElementById("reviewqueue-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+
+  if (state.dataSource !== "real") {
+    target.innerHTML = `
+      <div class="section-heading"><h2>Review Queue</h2></div>
+      <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
+        Preview only — these rows are hand-authored to show the confirm/reject workflow described in the
+        PRD, including a same-name false positive to reject. Switch the sidebar's data source to "Real"
+        to see (and trigger) the actual Discovery Agent.
+      </p>
+      <div class="card" id="review-queue-list"></div>
+    `;
+    renderMockReviewQueueSection();
+    return;
+  }
+
   target.innerHTML = `
     <div class="section-heading"><h2>Review Queue</h2></div>
     <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
-      Preview only — there is no discovery agent behind this yet. These rows are hand-authored to show
-      the confirm/reject workflow described in the PRD, including a same-name false positive to reject.
+      Real candidate mentions found by the Discovery Agent (Clients → Scan for Mentions), waiting for you
+      to confirm or reject. Confirming here only marks a candidate resolved — it does not automatically
+      create a Placement; add it via Press Placements once you've confirmed it's real coverage.
     </p>
-    <div class="card" id="review-queue-list"></div>
+    <div class="card" id="review-queue-list"><p class="hint">Loading…</p></div>
   `;
-  renderReviewQueueSection();
+  loadRealReviewQueue();
 }
 
-function renderReviewQueueSection() {
+function renderMockReviewQueueSection() {
   renderReviewQueue(document.getElementById("review-queue-list"), state.reviewQueue, {
     onConfirm: (id) => {
       state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
-      renderReviewQueueSection();
+      renderMockReviewQueueSection();
     },
     onReject: (id) => {
       state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
-      renderReviewQueueSection();
+      renderMockReviewQueueSection();
     },
   });
+}
+
+/**
+ * Fetches the real review_queue rows plus owner-api's real clients list (to
+ * resolve client_id -> a display name — see resolveRealClientId's comment
+ * on why localStorage's client ids can't do this) and renders them through
+ * the same ReviewQueueCard component the mock preview uses. Any failure
+ * (Supabase not configured, no real auth session yet, network) renders as
+ * an honest inline message, never a silently empty "all caught up" state.
+ */
+async function loadRealReviewQueue() {
+  const listEl = document.getElementById("review-queue-list");
+  const headers = await authedJsonHeaders();
+  try {
+    const [queueRes, clientsRes] = await Promise.all([
+      fetch(`${OWNER_API_BASE}/api/review-queue`, { headers }),
+      fetch(`${OWNER_API_BASE}/api/clients`, { headers }),
+    ]);
+    const queueBody = await queueRes.json().catch(() => ({}));
+    if (!queueRes.ok) {
+      listEl.innerHTML = `<p class="hint">⚠ ${escapeHtml(queueBody.message || `Couldn't load the review queue (${queueRes.status}).`)}</p>`;
+      return;
+    }
+    const clientsBody = clientsRes.ok ? await clientsRes.json().catch(() => []) : [];
+    const clientNameById = new Map((Array.isArray(clientsBody) ? clientsBody : []).map((c) => [c.id, c.name]));
+
+    const items = (Array.isArray(queueBody) ? queueBody : []).map((row) => ({
+      id: row.id,
+      headline: row.headline || "(no headline)",
+      publication: row.publication || "Unknown",
+      client: clientNameById.get(row.client_id) || "Unknown client",
+      matchedOn: row.matched_on || "",
+      discoveredDate: row.discovered_at ? row.discovered_at.slice(0, 10) : "",
+    }));
+
+    renderReviewQueue(listEl, items, {
+      onConfirm: (id) => resolveRealReviewQueueItem(id, "confirmed"),
+      onReject: (id) => resolveRealReviewQueueItem(id, "rejected"),
+    });
+  } catch (err) {
+    listEl.innerHTML = `<p class="hint">⚠ Couldn't reach owner-api at ${escapeHtml(OWNER_API_BASE)} — ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+async function resolveRealReviewQueueItem(id, status) {
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/review-queue/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: await authedJsonHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      alert(body.message || `Couldn't update this item (${res.status}).`);
+      return;
+    }
+  } catch (err) {
+    alert(`Couldn't reach owner-api — ${err.message}`);
+    return;
+  }
+  loadRealReviewQueue();
 }
 
 /**
@@ -1099,8 +1225,9 @@ function renderSettingsView() {
         (Chef Garth) as a real Active coaching client — her first genuine active engagement.</p>
       <p class="hint" style="margin:0 0 12px;">Two honest gaps, disclosed on each row's Notes field: none of the source
         material gives an exact landing/campaign-start date, so dates shown are recording-date placeholders, not sourced
-        facts — and Audience Reach / Tone &amp; Sentiment aren't tracked in this build, called out directly in each summary
-        rather than smoothed over.</p>
+        facts — and while Audience Reach now has a real per-placement field (Sentiment always did), none of this source
+        material gives a per-article figure for either, only campaign-level totals, so nothing is entered here rather
+        than guessed. Called out directly in each summary rather than smoothed over.</p>
       <button class="btn-secondary" id="seed-real-case-study-btn">Load Real Case Study Data</button>
       <span id="seed-real-case-study-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
     </div>

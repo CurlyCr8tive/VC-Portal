@@ -14,6 +14,7 @@ export const PLACEMENT_FIELDS = [
   "notes",
   "campaign",
   "sentiment",
+  "audienceReach",
 ];
 
 export const SENTIMENT_OPTIONS = ["positive", "neutral", "negative"];
@@ -43,6 +44,15 @@ function normalizeFields(raw) {
     // a manual, owner-set value for now, defaulting to "not set" rather than
     // guessing a tone with no analysis behind it.
     sentiment: SENTIMENT_OPTIONS.includes(raw.sentiment) ? raw.sentiment : null,
+    // Per-placement audience reach — real in her case studies (VeganHood,
+    // Candlelit Care, Vegan Dining Month all report a reach figure), but
+    // those are campaign-level rollups, not per-article numbers; this field
+    // just gives a real place to enter one when Tenyse has it for a
+    // specific placement. Null (not 0) when not entered — an unknown reach
+    // is not the same claim as zero reach.
+    audienceReach: raw.audienceReach !== "" && raw.audienceReach != null && Number.isFinite(Number(raw.audienceReach))
+      ? Number(raw.audienceReach)
+      : null,
   };
 }
 
