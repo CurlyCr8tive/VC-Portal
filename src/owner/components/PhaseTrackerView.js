@@ -8,7 +8,7 @@
 
 import { escapeHtml } from "../../client/utils.js";
 import {
-  PROGRAM_TEMPLATE,
+  PROGRAM_TEMPLATES,
   VAAM_PILLARS,
   PHASE_STATUSES,
   HOMEWORK_TYPES,
@@ -37,16 +37,26 @@ export function renderPhaseTrackerView(container, clientName) {
     const phases = loadPhasesForClient(clientName);
 
     if (phases.length === 0) {
+      const templateKeys = Object.keys(PROGRAM_TEMPLATES);
       container.innerHTML = `
         <div class="state-panel">
           <div class="state-icon" aria-hidden="true">🗺️</div>
           <h3>No phases loaded yet for ${escapeHtml(clientName)}</h3>
-          <p>Start from the standard 6-phase Visibility to Revenue template — weeks and VAAM tags match every engagement; goal and homework are left blank for you to fill in per client.</p>
-          <button type="button" class="btn-primary" id="pt-load-template" style="margin-top:10px;">Load Standard 6-Phase Template</button>
+          <p>Choose which program structure this client is starting from — weeks (and VAAM tags, where the program actually uses VAAM) match the template; goal and homework are left blank for you to fill in per client.</p>
+          <div class="field-row" style="max-width:420px; margin:12px 0;">
+            <label for="pt-template-select">Program structure</label>
+            <select id="pt-template-select">
+              ${templateKeys.map((key) => `<option value="${escapeHtml(key)}">${escapeHtml(PROGRAM_TEMPLATES[key].label)}</option>`).join("")}
+            </select>
+          </div>
+          <button type="button" class="btn-primary" id="pt-load-template">Load Selected Program</button>
         </div>
       `;
       container.querySelector("#pt-load-template").addEventListener("click", () => {
-        for (const p of PROGRAM_TEMPLATE) {
+        const key = container.querySelector("#pt-template-select").value;
+        const template = PROGRAM_TEMPLATES[key];
+        if (!template) return;
+        for (const p of template.phases) {
           addPhase(
             createPhase({
               client: clientName,
@@ -55,6 +65,7 @@ export function renderPhaseTrackerView(container, clientName) {
               weeks: p.weeks,
               vaam: p.vaam,
               deliverables: p.defaultDeliverables,
+              goal: template.placeholderGoal || "",
             })
           );
         }

@@ -233,7 +233,10 @@ create table coaching_phases (
   phase_number integer not null,
   name text not null,
   weeks text,
-  vaam text not null check (vaam in ('V', 'A_AUTHORITY', 'A_ALIGNMENT', 'M')),
+  -- NOT_APPLICABLE covers a program that isn't VAAM-based at all (e.g. a
+  -- future Raise Local structure) — see src/coachingPhaseSchema.js's
+  -- VAAM_PILLARS comment for why that's a real tag, not a fallback hack.
+  vaam text not null check (vaam in ('V', 'A_AUTHORITY', 'A_ALIGNMENT', 'M', 'NOT_APPLICABLE')),
   status text not null default 'not_started' check (status in ('not_started', 'in_progress', 'complete')),
   goal text,
   deliverables jsonb not null default '[]'::jsonb,
