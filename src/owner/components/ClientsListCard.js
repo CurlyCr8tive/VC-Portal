@@ -40,12 +40,21 @@ import { renderEmptyState } from "../../client/components/EmptyState.js";
  * error) inline, same pattern as onInvite below. Like onInvite, this only
  * actually reaches Supabase once real Auth is configured — until then it
  * surfaces the real "not configured"/401 response rather than faking one.
+ *
+ * `onViewCoaching(clientName)` is optional — when provided, a client whose
+ * profile.engagementType is "coaching" or "pr_and_coaching" gets a "View
+ * Coaching Program →" link that's expected to jump straight to the
+ * Coaching Program admin view with this client pre-selected (see
+ * src/owner/app.js's state.coachingSelectedClient) — the PR-side mirror of
+ * the client-facing PR/Coaching toggle in ClientSidebar.js. A pr-only
+ * client never gets this link, same reasoning as the client-side nav: no
+ * program to switch to.
  */
 const STATUS_BADGE_CLASS = { active: "published", past: "client-past", unconfirmed: "in-progress" };
 const STATUS_LABEL = { active: "Active", past: "Past / Portfolio", unconfirmed: "Status Unconfirmed" };
 const ENGAGEMENT_LABEL = { pr: "PR", coaching: "Coaching", pr_and_coaching: "PR + Coaching" };
 
-export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan } = {}) {
+export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan, onViewCoaching } = {}) {
   if (!clients || clients.length === 0) {
     renderEmptyState(container, {
       icon: "🗂️",
@@ -75,6 +84,11 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
       </p>
       <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${onViewDashboard ? `<button type="button" class="link-btn" data-view-dashboard="${escapeHtml(c.name)}">View on Dashboard →</button>` : ""}
+        ${
+          onViewCoaching && (profile.engagementType === "coaching" || profile.engagementType === "pr_and_coaching")
+            ? `<button type="button" class="link-btn" data-view-coaching="${escapeHtml(c.name)}">View Coaching Program →</button>`
+            : ""
+        }
         ${onEditInfo ? `<button type="button" class="btn-secondary" data-edit-info="${escapeHtml(c.name)}">Edit Info</button>` : ""}
         ${onAddCampaign ? `<button type="button" class="btn-secondary" data-add-campaign="${escapeHtml(c.name)}">Add Campaign</button>` : ""}
       </div>
@@ -113,6 +127,12 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
   if (onAddCampaign) {
     container.querySelectorAll("[data-add-campaign]").forEach((btn) => {
       btn.addEventListener("click", () => onAddCampaign(btn.dataset.addCampaign));
+    });
+  }
+
+  if (onViewCoaching) {
+    container.querySelectorAll("[data-view-coaching]").forEach((btn) => {
+      btn.addEventListener("click", () => onViewCoaching(btn.dataset.viewCoaching));
     });
   }
 

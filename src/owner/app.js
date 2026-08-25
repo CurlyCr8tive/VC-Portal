@@ -93,6 +93,13 @@ const state = {
   // hand and risks not matching the client it was launched from. Cleared
   // once that Add Campaign form is submitted or cancelled.
   addCampaignForClient: "",
+  // Set by "View Coaching Program" links (ClientsListCard.js, the
+  // Dashboard's master Coaching Program button) — pre-selects that client
+  // in the Coaching Program admin view instead of defaulting to whichever
+  // enrolled client happens to be first. Read once by renderCoachingView()
+  // then cleared, so navigating to Coaching Program normally afterward
+  // doesn't keep forcing the selection back.
+  coachingSelectedClient: "",
   // Client info form: null = not showing, true = "add new client," or a
   // client name string = editing that client's existing profile.
   editingClient: null,
@@ -309,6 +316,7 @@ function groupPlacementsByMonth(placements) {
 
 function dashboardSkeletonHTML() {
   return `
+    <section class="section" id="dashboard-coaching-banner"></section>
     <section class="section">
       <div class="card" id="dashboard-filter-bar" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;"></div>
       <div class="metrics-grid" id="dashboard-metrics"></div>
@@ -342,6 +350,43 @@ function dashboardSkeletonHTML() {
       <div id="dashboard-reports-summary"></div>
     </section>
   `;
+}
+
+/**
+ * Master shortcut into the Coaching Program admin view, front and center
+ * on the Dashboard rather than only reachable via the sidebar — same idea
+ * as the client-side PR/Coaching toggle, mirrored for the owner: a fast
+ * way to jump into "the whole coaching side of the business" without
+ * hunting for a specific client first. Mock dataSource has no coaching
+ * concept (see ClientSidebar.js's matching comment) so this hides itself
+ * entirely rather than pointing at data that isn't real.
+ */
+function renderCoachingBanner(container) {
+  if (state.dataSource !== "real") {
+    container.innerHTML = "";
+    return;
+  }
+  const coachingClients = getClientsWithMetrics()
+    .map((c) => c.profile)
+    .filter((profile) => profile && (profile.engagementType === "coaching" || profile.engagementType === "pr_and_coaching"));
+
+  container.innerHTML = `
+    <div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; border-color:var(--color-teal);">
+      <div>
+        <p style="margin:0 0 2px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-teal);">Coaching Program</p>
+        <p style="margin:0; font-size:0.92rem;">
+          ${
+            coachingClients.length === 0
+              ? "No clients enrolled yet — set a client's Engagement Type to Coaching under Clients → Edit Info to enroll them."
+              : `${coachingClients.length} client${coachingClients.length === 1 ? "" : "s"} enrolled — Phase Tracker, Opportunity Evaluator, and Resource Library.`
+          }
+        </p>
+      </div>
+      <button type="button" class="btn-primary" id="dashboard-open-coaching" style="background:var(--color-teal); flex-shrink:0;">Open Coaching Program →</button>
+    </div>
+  `;
+
+  document.getElementById("dashboard-open-coaching").addEventListener("click", () => navigate("coaching"));
 }
 
 /**
@@ -408,6 +453,7 @@ function renderDashboard() {
 
   target.innerHTML = dashboardSkeletonHTML();
 
+  renderCoachingBanner(document.getElementById("dashboard-coaching-banner"));
   renderDashboardFilterBar(document.getElementById("dashboard-filter-bar"));
 
   const filterActive = isDashboardFilterActive();
@@ -692,6 +738,10 @@ function renderClientsView() {
           }
         : undefined,
     onDiscoveryScan: state.dataSource === "real" ? discoveryScanClient : undefined,
+    onViewCoaching: (clientName) => {
+      state.coachingSelectedClient = clientName;
+      navigate("coaching");
+    },
   });
 }
 
@@ -1312,7 +1362,9 @@ function renderCoachingView() {
           .map((c) => c.profile)
           .filter((profile) => profile && (profile.engagementType === "coaching" || profile.engagementType === "pr_and_coaching"))
       : [];
-  renderCoachingAdminView(document.getElementById("coaching-content"), { coachingClients });
+  const initialClient = state.coachingSelectedClient || null;
+  state.coachingSelectedClient = "";
+  renderCoachingAdminView(document.getElementById("coaching-content"), { coachingClients, initialClient });
 }
 
 function showCampaignDetail(id) {

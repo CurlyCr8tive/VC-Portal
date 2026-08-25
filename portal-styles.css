@@ -132,6 +132,36 @@ button {
   font-size: 0.95rem;
 }
 
+.program-toggle {
+  display: flex;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  margin: 0 0 18px;
+}
+
+.program-toggle button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-on-navy);
+  opacity: 0.75;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.program-toggle button:hover {
+  opacity: 1;
+}
+
+.program-toggle button.active {
+  background: var(--color-coral);
+  opacity: 1;
+}
+
 .sidebar-nav {
   list-style: none;
   margin: 0;

@@ -19,8 +19,13 @@ const TABS = [
   { id: "resources", label: "Resources & Checklist" },
 ];
 
-export function renderCoachingAdminView(container, { coachingClients = [] } = {}) {
-  let selectedClient = coachingClients[0]?.name || null;
+export function renderCoachingAdminView(container, { coachingClients = [], initialClient = null } = {}) {
+  // Prefer initialClient (set when arriving here via a "View Coaching
+  // Program" link from a specific client, e.g. ClientsListCard.js or the
+  // Dashboard's master button) over just defaulting to the first enrolled
+  // client — but only if it's actually a real enrolled client, not
+  // whatever string happened to be passed in.
+  let selectedClient = (initialClient && coachingClients.some((c) => c.name === initialClient) ? initialClient : coachingClients[0]?.name) || null;
   let activeTab = "phases";
 
   render();

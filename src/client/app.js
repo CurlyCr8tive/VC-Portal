@@ -1,5 +1,5 @@
 import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getClientById } from "./mockData.js";
-import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport } from "../realDataSource.js";
+import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js";
 import { requireSession, logout, landingPageFor } from "../auth.js";
 import { signOutReal } from "../supabaseAuthClient.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
@@ -50,6 +50,17 @@ const state = {
 // mock clientId slugs (e.g. "veganhood") only exist for the mock accounts,
 // not for real placements.
 const clientName = session ? session.name : "";
+
+/**
+ * Mock dataSource has no coaching concept at all (it's a fixed PR demo
+ * dataset) — always reads as "pr" regardless of what any real profile
+ * says, so the mock preview never shows a Coaching Program link/toggle
+ * that has nothing real behind it.
+ */
+function getEngagementType() {
+  if (state.dataSource !== "real") return "pr";
+  return getClientProfile(clientName).engagementType;
+}
 
 function getMetrics(clientId) {
   if (state.demoState === "empty") {
@@ -313,6 +324,7 @@ function renderSidebarComponent() {
     currentView: state.view,
     demoState: state.demoState,
     dataSource: state.dataSource,
+    engagementType: getEngagementType(),
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
     onDataSourceChange: setDataSource,
@@ -337,10 +349,14 @@ function renderHeaderComponent() {
   });
 }
 
-function navigate(view) {
-  state.view = view;
+function showActiveViewElement(view) {
   document.querySelectorAll(".client-view").forEach((el) => el.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
+}
+
+function navigate(view) {
+  state.view = view;
+  showActiveViewElement(view);
   renderSidebarComponent();
   renderCurrentView();
   closeSidebarMobile();
@@ -352,8 +368,26 @@ function setDemoState(demoState) {
   renderCurrentView();
 }
 
+/**
+ * Called after anything that can change which nav items even exist
+ * (switching data source, or on initial load) — if the current view isn't
+ * one this client's engagement type shows anymore (e.g. a coaching-only
+ * client's session was on "coaching" and data source flips to mock, which
+ * has no coaching concept), land on that mode's actual home view instead
+ * of leaving state.view pointed at a view with no nav item to reach it.
+ */
+function ensureValidView() {
+  const engagementType = getEngagementType();
+  const isCoachingOnly = engagementType === "coaching";
+  const showsCoaching = engagementType === "coaching" || engagementType === "pr_and_coaching";
+  if (state.view === "coaching" && !showsCoaching) state.view = "dashboard";
+  else if (isCoachingOnly && state.view !== "coaching") state.view = "coaching";
+}
+
 function setDataSource(dataSource) {
   state.dataSource = dataSource;
+  ensureValidView();
+  showActiveViewElement(state.view);
   renderSidebarComponent();
   renderHeaderComponent();
   renderCurrentView();
@@ -384,6 +418,12 @@ if (session) {
   if (["real", "mock"].includes(dataParam)) {
     state.dataSource = dataParam;
   }
+
+  // A coaching-only client (e.g. Greyz Bistro) has no PR data worth
+  // landing on — send them straight to their actual program instead of an
+  // empty PR Dashboard they'd just have to navigate away from.
+  ensureValidView();
+  showActiveViewElement(state.view);
 
   renderSidebarComponent();
   renderHeaderComponent();
