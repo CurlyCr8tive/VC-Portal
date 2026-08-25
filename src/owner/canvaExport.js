@@ -129,7 +129,20 @@ function serializeRowsToCsv(rows, columnLabels) {
   return [header, ...csvRows].join("\r\n");
 }
 
+/**
+ * No startDate/endDate given at all means "no date filter requested" — pass
+ * everything through regardless of whether publicationDate is known. This
+ * matters because several real seeded case-study placements (see
+ * seedRealCaseStudyData.js) legitimately have no publicationDate — the
+ * source material only gives a period/lifetime total, not a dated article
+ * — while still being real, landed, exportable coverage. Requiring
+ * publicationDate unconditionally would silently exclude every one of them
+ * from Bulk Create even when the owner never asked to filter by date at
+ * all. Once an actual bound IS given, a placement with no publicationDate
+ * can't be proven to fall inside it, so it's excluded only in that case.
+ */
 function withinRange(dateStr, startDate, endDate) {
+  if (!startDate && !endDate) return true;
   if (!dateStr) return false;
   if (startDate && dateStr < startDate) return false;
   if (endDate && dateStr > endDate) return false;

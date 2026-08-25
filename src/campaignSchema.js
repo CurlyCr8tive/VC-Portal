@@ -19,6 +19,16 @@ function normalizeFields(raw) {
     name: raw.name.trim(),
     client: raw.client.trim(),
     startDate: raw.startDate || "",
+    // Free text ("6 weeks", "Q4", "ongoing") rather than a computed end
+    // date — Tenyse describes campaign length loosely, not always as a
+    // fixed date range.
+    duration: raw.duration?.trim() || "",
+    // Advertising/media spend tied to the campaign, distinct from AVE
+    // (which values placements earned, not spent). Stored as a number or
+    // null — never a fabricated 0 for "not entered yet."
+    budget: raw.budget !== undefined && raw.budget !== null && String(raw.budget).trim() !== "" && Number.isFinite(Number(raw.budget))
+      ? Number(raw.budget)
+      : null,
     status: CAMPAIGN_STATUSES.includes(raw.status) ? raw.status : "active",
   };
 }

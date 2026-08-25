@@ -88,6 +88,11 @@ const state = {
   dashboardDateTo: "",
   editingPlacementId: null,
   editingCampaignId: null,
+  // Set by ClientsListCard's "Add Campaign" button — pre-fills/locks the
+  // Add Campaign form's Client field so a new campaign is never typed by
+  // hand and risks not matching the client it was launched from. Cleared
+  // once that Add Campaign form is submitted or cancelled.
+  addCampaignForClient: "",
   // Client info form: null = not showing, true = "add new client," or a
   // client name string = editing that client's existing profile.
   editingClient: null,
@@ -630,6 +635,14 @@ function renderClientsView() {
           renderClientsView();
         }
       : undefined,
+    onAddCampaign:
+      state.dataSource === "real"
+        ? (clientName) => {
+            state.addCampaignForClient = clientName;
+            state.editingCampaignId = null;
+            navigate("campaigns");
+          }
+        : undefined,
   });
 }
 
@@ -640,6 +653,7 @@ function renderCampaignsView() {
 
   const canManageCampaigns = state.dataSource === "real";
   const editingCampaign = canManageCampaigns && state.editingCampaignId ? loadCampaigns().find((c) => c.id === state.editingCampaignId) : null;
+  const lockClient = !editingCampaign ? state.addCampaignForClient : "";
 
   target.innerHTML = `
     <div class="section-heading"><h2>Campaigns</h2></div>
@@ -651,7 +665,9 @@ function renderCampaignsView() {
       <section class="section" style="margin-bottom:0;">
         ${
           canManageCampaigns
-            ? `<h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${editingCampaign ? "Edit Campaign" : "Add Campaign"}</h3>
+            ? `<h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${
+                editingCampaign ? "Edit Campaign" : lockClient ? `Add Campaign for ${escapeHtml(lockClient)}` : "Add Campaign"
+              }</h3>
                <div class="card" id="campaign-form-wrap"></div>`
             : `<p style="color:var(--text-secondary); font-size:0.85rem;">
                  Switch the sidebar's data source to "Real" to create and manage campaigns.
@@ -670,6 +686,7 @@ function renderCampaignsView() {
 
   renderCampaignForm(document.getElementById("campaign-form-wrap"), {
     initialData: editingCampaign,
+    lockClient,
     onSubmit: (rawData) => {
       try {
         if (editingCampaign) {
@@ -678,6 +695,7 @@ function renderCampaignsView() {
         } else {
           addCampaign(createCampaign(rawData));
         }
+        state.addCampaignForClient = "";
         renderCampaignsView();
         return true;
       } catch (err) {
@@ -685,10 +703,13 @@ function renderCampaignsView() {
         return false;
       }
     },
-    onCancel: () => {
-      state.editingCampaignId = null;
-      renderCampaignsView();
-    },
+    onCancel: editingCampaign || lockClient
+      ? () => {
+          state.editingCampaignId = null;
+          state.addCampaignForClient = "";
+          renderCampaignsView();
+        }
+      : undefined,
   });
 
   renderCampaignManageList(document.getElementById("campaign-manage-list"), loadCampaigns(), {

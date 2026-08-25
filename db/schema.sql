@@ -61,6 +61,18 @@ create table clients (
 alter table profiles add constraint profiles_client_id_fkey
   foreign key (client_id) references clients(id);
 
+-- Client profile fields — status/engagement type/contact/industry/notes.
+-- Added to match src/clientSchema.js (localStorage), which already had all
+-- of these; the real table was missing them entirely until now.
+alter table clients add column status text not null default 'unconfirmed'
+  check (status in ('active', 'past', 'unconfirmed'));
+alter table clients add column engagement_type text not null default 'pr'
+  check (engagement_type in ('pr', 'coaching', 'pr_and_coaching'));
+alter table clients add column contact_email text;
+alter table clients add column industry text;
+alter table clients add column engagement_start_date date;
+alter table clients add column notes text;
+
 -- ---------------------------------------------------------------------------
 -- campaigns — confirmed 7/31 as core to Tenyse's actual mental model.
 -- AVE, progress, and notes all live at this level, not at the client level.
@@ -70,6 +82,14 @@ create table campaigns (
   client_id uuid not null references clients(id) on delete cascade,
   name text not null,
   start_date date,
+  -- Free text ("6 weeks", "Q4", "ongoing") rather than a computed end_date —
+  -- Tenyse describes campaign length loosely, not always as a fixed date
+  -- range; forcing an end_date would mean fabricating one for anything
+  -- open-ended.
+  duration text,
+  -- Advertising/media spend tied to the campaign, distinct from AVE (which
+  -- values placements *earned*, not spent).
+  budget numeric(12, 2),
   status text not null default 'active' check (status in ('active', 'completed', 'paused')),
   created_at timestamptz not null default now()
 );
@@ -178,6 +198,81 @@ create table campaign_milestones (
 );
 
 -- ---------------------------------------------------------------------------
+-- coaching_phases — backs src/coachingPhaseSchema.js. One row per phase per
+-- client (not templated at the DB level — see that file's PROGRAM_TEMPLATE
+-- comment: weeks/VAAM/deliverables match the standard 6-phase shape, but
+-- goal is real per-client content Tenyse writes herself, never hardcoded).
+-- ---------------------------------------------------------------------------
+create table coaching_phases (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  phase_number integer not null,
+  name text not null,
+  weeks text,
+  vaam text not null check (vaam in ('V', 'A_AUTHORITY', 'A_ALIGNMENT', 'M')),
+  status text not null default 'not_started' check (status in ('not_started', 'in_progress', 'complete')),
+  goal text,
+  deliverables jsonb not null default '[]'::jsonb,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- coaching_homework — a separate table (not a jsonb column on
+-- coaching_phases) for the same reason as campaign_milestones: marking one
+-- item complete, or a client submitting a reflection response, should be a
+-- single-row update, not a read-modify-write of the whole phase.
+-- ---------------------------------------------------------------------------
+create table coaching_homework (
+  id uuid primary key default gen_random_uuid(),
+  phase_id uuid not null references coaching_phases(id) on delete cascade,
+  type text not null check (type in ('action', 'reflection', 'standing')),
+  text text not null,
+  due_date date, -- always null for type = 'standing' — a standing instruction has no due date, it's always active
+  status text not null default 'not_started' check (status in ('not_started', 'in_progress', 'complete')),
+  response text, -- the client's answer to a reflection prompt; unused for action/standing items
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- opportunities — backs src/opportunitySchema.js. Standalone, linked to a
+-- client but deliberately not nested under a phase (see that file's header
+-- comment: an opportunity can land at any point across the 90 days, not
+-- just during the Partnership Roadmap phase).
+-- ---------------------------------------------------------------------------
+create table opportunities (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  title text not null,
+  description text,
+  -- 1–5 per criterion (audienceFit/brandValues/credibility/revenuePotential/
+  -- visibilityValue), or null if not yet scored — jsonb rather than five
+  -- columns since scoring is done incrementally, not all at once.
+  scores jsonb not null default '{}'::jsonb,
+  decision_status text not null default 'pressure_testing' check (decision_status in ('pursuing', 'pressure_testing', 'declined')),
+  write_up text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- coaching_resources — backs src/coachingResourceSchema.js. One shape for
+-- both the resource library and the missing-assets checklist, distinguished
+-- by `kind` — see that file's header comment for why they're one table.
+-- ---------------------------------------------------------------------------
+create table coaching_resources (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references clients(id) on delete cascade,
+  kind text not null check (kind in ('resource', 'checklist')),
+  title text not null,
+  content text,
+  priority text not null default 'medium' check (priority in ('high', 'medium', 'low')),
+  -- Null (not false) for kind = 'resource' — "not done" would misrepresent
+  -- something that was never a task in the first place.
+  completed boolean,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- errors — per the build plan's "dedicated errors table... surfaced in a
 -- simple owner-side panel." One row per agent failure; nothing writes here
 -- yet because no agent runs in production yet.
@@ -212,6 +307,28 @@ create table errors (
 -- Not built here — flagging so it isn't assumed to already work.
 -- =============================================================================
 
+-- is_owner() — SECURITY DEFINER helper, fixes the RLS recursion bug found
+-- while testing an UPDATE on `clients`: a policy on `profiles` that queries
+-- `profiles` again inside its own USING clause (the "owner reads all
+-- profiles" policy below, checking role via a self-join) triggers Postgres
+-- to re-evaluate RLS on that inner query too, which re-triggers the same
+-- policy, infinitely — "infinite recursion detected in policy for relation
+-- profiles". SECURITY DEFINER runs this function as its owner (bypassing
+-- RLS internally, deliberately, for this one narrow lookup) instead of as
+-- the calling user, so the inner lookup never re-enters RLS and the cycle
+-- can't start. Every "owner full access" / "owner reads all" policy below
+-- now calls this instead of repeating the recursive exists(...) inline —
+-- was 8 separate copies of the same bug, so fixing it once here.
+create or replace function is_owner()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (select 1 from profiles where id = auth.uid() and role = 'owner');
+$$;
+
 alter table profiles enable row level security;
 alter table clients enable row level security;
 alter table campaigns enable row level security;
@@ -220,6 +337,10 @@ alter table placements enable row level security;
 alter table outlet_rates enable row level security;
 alter table review_queue enable row level security;
 alter table campaign_notes enable row level security;
+alter table coaching_phases enable row level security;
+alter table coaching_homework enable row level security;
+alter table opportunities enable row level security;
+alter table coaching_resources enable row level security;
 alter table errors enable row level security;
 
 -- profiles: everyone can read their own row (needed for the app to look up
@@ -229,15 +350,11 @@ create policy "read own profile" on profiles
   for select using (id = auth.uid());
 
 create policy "owner reads all profiles" on profiles
-  for select using (
-    exists (select 1 from profiles p where p.id = auth.uid() and p.role = 'owner')
-  );
+  for select using (is_owner());
 
 -- clients: owner full access; a pr_client can only see their own client row.
 create policy "owner full access - clients" on clients
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());
 
 create policy "pr_client reads own client" on clients
   for select using (
@@ -249,9 +366,7 @@ create policy "pr_client reads own client" on clients
 
 -- campaigns: owner full access; pr_client read-only, scoped to their client_id.
 create policy "owner full access - campaigns" on campaigns
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());
 
 create policy "pr_client scoped access - campaigns" on campaigns
   for select using (
@@ -265,9 +380,7 @@ create policy "pr_client scoped access - campaigns" on campaigns
 
 -- campaign_milestones: same scoping as campaigns, joined through campaign_id.
 create policy "owner full access - campaign_milestones" on campaign_milestones
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());
 
 create policy "pr_client scoped access - campaign_milestones" on campaign_milestones
   for select using (
@@ -280,9 +393,7 @@ create policy "pr_client scoped access - campaign_milestones" on campaign_milest
 
 -- placements: owner full access; pr_client read-only, scoped to their client_id.
 create policy "owner full access - placements" on placements
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());
 
 create policy "pr_client scoped access - placements" on placements
   for select using (
@@ -297,17 +408,13 @@ create policy "pr_client scoped access - placements" on placements
 -- outlet_rates: internal working data (Agent 2's lookup table) — owner only,
 -- no client ever needs to see or query this directly.
 create policy "owner full access - outlet_rates" on outlet_rates
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());
 
 -- review_queue: internal triage queue (Agent 1's output before a human
 -- confirms it into placements) — owner only. A client should never see an
 -- unconfirmed candidate match before Tenyse has reviewed it.
 create policy "owner full access - review_queue" on review_queue
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());
 
 -- campaign_notes: both the owner and that campaign's own client can
 -- read/write; no client ever sees another client's campaign_notes.
@@ -321,8 +428,72 @@ create policy "scoped access - campaign_notes" on campaign_notes
     )
   );
 
+-- coaching_phases: owner full access; pr_client read-only, scoped to their
+-- own client_id — a client sees their own program's phases, not another
+-- client's.
+create policy "owner full access - coaching_phases" on coaching_phases
+  for all using (is_owner());
+
+create policy "pr_client scoped access - coaching_phases" on coaching_phases
+  for select using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'pr_client'
+        and profiles.client_id = coaching_phases.client_id
+    )
+  );
+
+-- coaching_homework: owner full access; pr_client can read AND update their
+-- own homework (checking off an action item, answering a reflection) —
+-- unlike most client-facing tables this needs `for all`, not read-only, per
+-- src/client/components/CoachingProgramView.js already letting a client
+-- mark homework complete / submit a reflection response themselves.
+create policy "owner full access - coaching_homework" on coaching_homework
+  for all using (is_owner());
+
+create policy "pr_client scoped access - coaching_homework" on coaching_homework
+  for all using (
+    exists (
+      select 1 from profiles p
+      join coaching_phases ph on ph.id = coaching_homework.phase_id
+      where p.id = auth.uid() and p.role = 'pr_client' and p.client_id = ph.client_id
+    )
+  );
+
+-- opportunities: owner full access; pr_client can read their own AND create
+-- new ones (the "Send to Tenyse" flow in CoachingProgramView.js), but
+-- scoring/decision_status stays effectively owner-controlled at the app
+-- layer — RLS can't restrict which columns a role writes, only which rows.
+create policy "owner full access - opportunities" on opportunities
+  for all using (is_owner());
+
+create policy "pr_client scoped access - opportunities" on opportunities
+  for all using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'pr_client'
+        and profiles.client_id = opportunities.client_id
+    )
+  );
+
+-- coaching_resources: owner full access; pr_client read-only — the resource
+-- library and asset checklist are Tenyse's content for the client to read,
+-- not something the client edits.
+create policy "owner full access - coaching_resources" on coaching_resources
+  for all using (is_owner());
+
+create policy "pr_client scoped access - coaching_resources" on coaching_resources
+  for select using (
+    exists (
+      select 1 from profiles
+      where profiles.id = auth.uid()
+        and profiles.role = 'pr_client'
+        and profiles.client_id = coaching_resources.client_id
+    )
+  );
+
 -- errors: internal ops log — owner only.
 create policy "owner full access - errors" on errors
-  for all using (
-    exists (select 1 from profiles where profiles.id = auth.uid() and profiles.role = 'owner')
-  );
+  for all using (is_owner());

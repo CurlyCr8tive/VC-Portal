@@ -1,4 +1,5 @@
 import { escapeHtml } from "../../client/utils.js";
+import { formatCurrency } from "../../calculations.js";
 import { renderEmptyState } from "../../client/components/EmptyState.js";
 
 const STATUS_LABELS = { active: "Active", paused: "Paused", completed: "Completed" };
@@ -28,6 +29,8 @@ export function renderCampaignManageList(container, campaigns, { onEdit, onDelet
       <h3>${escapeHtml(c.name)}</h3>
       <div class="campaign-meta" style="margin-bottom:10px;">
         <span>Started ${c.startDate ? escapeHtml(c.startDate) : "—"}</span>
+        ${c.duration ? `<span>${escapeHtml(c.duration)}</span>` : ""}
+        <span>Budget: ${formatCurrency(c.budget)}</span>
         <span>Status: ${escapeHtml(STATUS_LABELS[c.status] || "Active")}</span>
       </div>
 

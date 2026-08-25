@@ -8,8 +8,9 @@ function val(initialData, field, fallback = "") {
   return v == null ? fallback : v;
 }
 
-export function renderCampaignForm(container, { onSubmit, onCancel, initialData = null }) {
+export function renderCampaignForm(container, { onSubmit, onCancel, initialData = null, lockClient = "" }) {
   const isEdit = Boolean(initialData);
+  const clientValue = lockClient || val(initialData, "client");
 
   container.innerHTML = `
     <form class="entry-form" id="owner-campaign-form">
@@ -20,13 +21,23 @@ export function renderCampaignForm(container, { onSubmit, onCancel, initialData 
         </div>
         <div>
           <label for="oc-client">Client *</label>
-          <input type="text" id="oc-client" name="client" placeholder="Client name" value="${val(initialData, "client")}" required />
+          <input type="text" id="oc-client" name="client" placeholder="Client name" value="${clientValue}" ${lockClient ? "readonly" : ""} required />
         </div>
       </div>
       <div class="field-row two-col">
         <div>
           <label for="oc-startDate">Start Date</label>
           <input type="date" id="oc-startDate" name="startDate" value="${val(initialData, "startDate")}" />
+        </div>
+        <div>
+          <label for="oc-duration">Duration</label>
+          <input type="text" id="oc-duration" name="duration" placeholder="e.g. 6 weeks, Q4, ongoing" value="${val(initialData, "duration")}" />
+        </div>
+      </div>
+      <div class="field-row two-col">
+        <div>
+          <label for="oc-budget">Budget / Ad Spend ($)</label>
+          <input type="number" id="oc-budget" name="budget" min="0" step="0.01" placeholder="e.g. 5000" value="${val(initialData, "budget")}" />
         </div>
         <div>
           <label for="oc-status">Status</label>
@@ -40,7 +51,7 @@ export function renderCampaignForm(container, { onSubmit, onCancel, initialData 
       <p class="hint">Use the same Client name you use on placements — that's how a campaign gets matched to its coverage.</p>
       <div class="form-actions" style="display:flex; gap:10px;">
         <button type="submit" class="btn-primary">${isEdit ? "Save Changes" : "Add Campaign"}</button>
-        ${isEdit ? `<button type="button" class="btn-secondary" id="oc-cancel">Cancel</button>` : ""}
+        ${isEdit || onCancel ? `<button type="button" class="btn-secondary" id="oc-cancel">Cancel</button>` : ""}
       </div>
     </form>
   `;
@@ -53,7 +64,8 @@ export function renderCampaignForm(container, { onSubmit, onCancel, initialData 
     if (succeeded && !isEdit) form.reset();
   });
 
-  if (isEdit && onCancel) {
-    container.querySelector("#oc-cancel").addEventListener("click", onCancel);
+  if (onCancel) {
+    const cancelBtn = container.querySelector("#oc-cancel");
+    if (cancelBtn) cancelBtn.addEventListener("click", onCancel);
   }
 }

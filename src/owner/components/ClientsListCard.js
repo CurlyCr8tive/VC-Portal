@@ -26,12 +26,18 @@ import { renderEmptyState } from "../../client/components/EmptyState.js";
  * expected to carry a `profile` object (realDataSource.js's
  * getClientProfile) — "unconfirmed" status is the honest default for one
  * that's never had its info filled in, not a bug.
+ *
+ * `onAddCampaign(clientName)` is optional — when provided, each card gets
+ * an "Add Campaign" button that's expected to open the Campaigns view's Add
+ * Campaign form with this client's name already locked in (see
+ * src/owner/app.js's state.addCampaignForClient), so a new campaign never
+ * has to be typed/matched by hand against this client.
  */
 const STATUS_BADGE_CLASS = { active: "published", past: "client-past", unconfirmed: "in-progress" };
 const STATUS_LABEL = { active: "Active", past: "Past / Portfolio", unconfirmed: "Status Unconfirmed" };
 const ENGAGEMENT_LABEL = { pr: "PR", coaching: "Coaching", pr_and_coaching: "PR + Coaching" };
 
-export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo } = {}) {
+export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo, onAddCampaign } = {}) {
   if (!clients || clients.length === 0) {
     renderEmptyState(container, {
       icon: "🗂️",
@@ -62,6 +68,7 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
       <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${onViewDashboard ? `<button type="button" class="link-btn" data-view-dashboard="${escapeHtml(c.name)}">View on Dashboard →</button>` : ""}
         ${onEditInfo ? `<button type="button" class="btn-secondary" data-edit-info="${escapeHtml(c.name)}">Edit Info</button>` : ""}
+        ${onAddCampaign ? `<button type="button" class="btn-secondary" data-add-campaign="${escapeHtml(c.name)}">Add Campaign</button>` : ""}
       </div>
       ${
         onInvite
@@ -84,6 +91,12 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
   if (onEditInfo) {
     container.querySelectorAll("[data-edit-info]").forEach((btn) => {
       btn.addEventListener("click", () => onEditInfo(btn.dataset.editInfo));
+    });
+  }
+
+  if (onAddCampaign) {
+    container.querySelectorAll("[data-add-campaign]").forEach((btn) => {
+      btn.addEventListener("click", () => onAddCampaign(btn.dataset.addCampaign));
     });
   }
 
