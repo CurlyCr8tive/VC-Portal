@@ -38,6 +38,16 @@
 //     real numbers live in their Client profile's notes field instead,
 //     the only field that fits that shape.
 //
+// UPDATED Aug 25 (second batch, same day) with a more detailed deck for
+// Houston Housing Authority — this one has real per-article press
+// placements (7 added, with real headline/date/URL/sentiment), so it's no
+// longer social-media-only for this client. Two things flagged, not
+// resolved: this second deck is branded "Etched," not "Verified
+// Consulting," throughout — attribution unconfirmed; and its Terminology
+// Guide defines "Clips" as mentioning "HHFH," not "HHA" — a second
+// possible instance of the same reused-template issue found in the first
+// batch. See REAL_CLIENT_PROFILES' Houston Housing Authority notes.
+//
 // ONE HONEST COMPROMISE, still true for placements that never got a real
 // date confirmed: none of the source material gives an exact landing date
 // for those campaigns (they're reported as period/lifetime totals, not
@@ -183,6 +193,103 @@ const REAL_CASE_STUDY_PLACEMENTS = [
       `Real headline/URL/sentiment confirmed Aug 25 (byline: Cherranda Smith). DATE CONFLICT in her own source, not resolved: the article's byline reads "Mar 31, 2022," but the article URL itself is dated "2021-03-31" — used the byline date (2022) since it's the more explicit, human-written date, but this is a real inconsistency in the source material worth asking Tenyse about directly, not something guessed past. REACH FIGURE: deck shows "108,477 K Monthly readers &Viewers" — kept as 108,477 (not ×1,000 = 108,477,000), consistent with outletReference.js's existing reasoning that treating "K" as a literal ×1,000 multiplier here would put a single-market radio station's reach far above Blavity's national digital reach (4.1M), which isn't plausible. This CORRECTS the previous version of this same placement, which used 108,477,000 — that was the less-consistent reading; flagging so the change is visible rather than silent. Still unverified until Tenyse confirms directly.`,
     campaign: "Deeper Than Visibility",
   },
+  {
+    publication: "Houston Business Journal",
+    headline: "Local ministry opens affordable homes in OST/South Union area",
+    articleUrl: "https://muckrack.com/link/oAQHSr/local-ministry-opens-affordable-homes-in-ostsouth-union-area",
+    publicationDate: "2022-01-31",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "neutral",
+    audienceReach: "17243",
+    pitchSentDate: "",
+    landedDate: "2022-01-31",
+    notes:
+      'Real headline/date/URL/sentiment/reach confirmed Aug 25 from a second Canva deck (this one branded "Etched," not Verified Consulting — see REAL_CLIENT_PROFILES\' Houston Housing Authority notes for that flag). Reach (17,243) and tone (Neutral) from the deck\'s own "News Coverage Highlights" slide; headline/URL/date confirmed a second time from its Appendix news-clips table.',
+    campaign: "Media Relations Coverage — January 2022",
+  },
+  {
+    publication: "Houston Business Journal",
+    headline: "Profile interview with David A. Northern, Sr., new President & CEO of Houston Housing Authority",
+    articleUrl: "",
+    publicationDate: "2022-02-07",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "positive",
+    audienceReach: "6174084",
+    pitchSentDate: "",
+    landedDate: "2022-02-07",
+    notes:
+      'By reporter Florian Martin, 8:14pm EST. Real reach/date/sentiment confirmed Aug 25 from the "Etched"-branded deck\'s "News Coverage Highlights" slide. No article URL was shown for this specific piece (unlike the OST/South Union placement above) — left blank rather than guessed.',
+    campaign: "Media Relations Coverage — January 2022",
+  },
+  {
+    publication: "Bisnow",
+    headline: "Houston Housing Authority Hires New CEO As City Faces Slew Of Evictions",
+    articleUrl: "https://www.bisnow.com/houston/news/affordable-housing/houston-housing-authority-hires-new-ceo-111657",
+    publicationDate: "2022-01-28",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "positive",
+    pitchSentDate: "",
+    landedDate: "2022-01-28",
+    notes: "Real headline/date/URL/sentiment confirmed Aug 25 from the same deck's Appendix news-clips table (timestamp 6:02:22).",
+    campaign: "Media Relations Coverage — January 2022",
+  },
+  {
+    publication: "The Birmingham Times",
+    headline: "HABD's David Northern Sr. Named Head of Houston Housing Authority",
+    articleUrl: "http://www.birminghamtimes.com/2022/01/habds-david-northern-sr-named-head-of-houston-housing-authority/",
+    publicationDate: "2022-01-27",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "positive",
+    pitchSentDate: "",
+    landedDate: "2022-01-27",
+    notes: "Real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 8:00:41). Covers Northern's prior role at the Housing Authority of the Birmingham District (HABD) before Houston.",
+    campaign: "Media Relations Coverage — January 2022",
+  },
+  {
+    publication: "Yahoo Finance",
+    headline: "Houston Housing Authority Board of Directors Announces David A. Northern, Sr. as President & CEO",
+    articleUrl: "https://finance.yahoo.com/news/houston-housing-authority-board-directors-161000092.html",
+    publicationDate: "2022-01-26",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "positive",
+    pitchSentDate: "",
+    landedDate: "2022-01-26",
+    notes:
+      "Real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 11:10:00) — the underlying press release, syndicated; see the Daily Advent Nigeria and PRWeb placements below for the same story on other wires, each counted as its own placement per Tenyse's own reporting deck.",
+    campaign: "Media Relations Coverage — January 2022",
+  },
+  {
+    publication: "Daily Advent Nigeria",
+    headline: "Houston Housing Authority Board of Directors Announces David A. Northern, Sr. as President & CEO",
+    articleUrl: "https://www.dailyadvent.com/news/67c051804b11f9352d870cef9e0c523d-Houston-Housing-Authority-Board-of-Directors-Announces-David-A-Northern-Sr-as-President--CEO",
+    publicationDate: "2022-01-26",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "positive",
+    pitchSentDate: "",
+    landedDate: "2022-01-26",
+    notes: "Same syndicated press release as the Yahoo Finance placement above, on a different wire — real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 11:10:00).",
+    campaign: "Media Relations Coverage — January 2022",
+  },
+  {
+    publication: "PRWeb",
+    headline: "Houston Housing Authority Board of Directors Announces David A. Northern, Sr. as President & CEO.",
+    articleUrl: "https://muckrack.com/link/oALYJt/houston-housing-authority-board-of-directors-announces-david-a-northern-sr-as-president-ceo",
+    publicationDate: "2022-01-26",
+    client: "Houston Housing Authority",
+    aveValue: "",
+    sentiment: "positive",
+    pitchSentDate: "",
+    landedDate: "2022-01-26",
+    notes:
+      'Same syndicated press release as the two placements above, on a third wire — real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 7:00:00). Snippet: "HHA provides affordable homes and services to more than 60,000 low-income Houstonians, including over 17,000 families housed through the Housing Choice Voucher Program... and another 5,700 living in 25 public housing and tax credit developments."',
+    campaign: "Media Relations Coverage — January 2022",
+  },
 ];
 
 // Real Campaign records — status "completed" for all: these are closed
@@ -200,6 +307,7 @@ const REAL_CASE_STUDY_CAMPAIGNS = [
   { name: "National Press Push", client: "Candlelit Care", status: "completed", startDate: "" },
   { name: "Deeper Than Visibility", client: "SNAP Co.", status: "completed", startDate: "" },
   { name: "Social Media Management", client: "Houston Housing Authority", status: "completed", startDate: "", duration: "120 days" },
+  { name: "Media Relations Coverage — January 2022", client: "Houston Housing Authority", status: "completed", startDate: "2022-01-01", duration: "1 month" },
   { name: "Social Media Management", client: "Nude Barre", status: "completed", startDate: "", duration: "90 days" },
 ];
 
@@ -314,7 +422,15 @@ const REAL_CLIENT_PROFILES = [
     contactEmail: "",
     engagementStartDate: "",
     notes:
-      "Social media management engagement, not press placements — real results reported over a 120-day period (Facebook Analytics per the deck): 50% engagement rate, 45% profile visits, 50% likes. No AVE/reach dollar figures exist for this engagement; it's tracked as a Campaign record (\"Social Media Management\") with these numbers here since Campaign records have no free-text notes field to hold them. Real content examples cited in the deck: a Uvalde tragedy response post, a #HousingForHouston private Facebook group launch, a groundbreaking announcement, and an Astros game community outing.",
+      `ATTRIBUTION FLAG, not resolved: the second, more detailed Aug 25 deck for this client is branded "Etched" throughout ("Etched pitched and secured...", "Etched will continue media pitching...") — not "Verified Consulting." Every placement/number below is entered as real regardless, but worth asking Tenyse directly whether Etched is a dba/team name for her own agency, a subcontractor she worked with on this account, or something else — the numbers are trustworthy, the attribution isn't confirmed.
+
+SOCIAL MEDIA (Facebook), 120-day period — two different summary slides in the source material give different precision for what may be the same underlying numbers, not confirmed as identical: an earlier, rounder slide states 50% engagement rate / 45% profile visits / 50% likes; a more detailed Dec 2021→Jan 2022 slide states 349.2% increase in Facebook Page Audience Reach / 48.2% increase in Facebook Page visits / 50.0% increase in Facebook Page likes (this last one matches closely). Also real: 18.3K Facebook followers (63.9% Houston TX, 71.1% women/28.9% men). Per-post highlights: a "David Northern Announcement" post reached 4.5K with 377 comments/642 likes/22 shares; other posts reached 409–699 with much lower engagement. No AVE/reach dollar figure exists for the social work itself; tracked as the "Social Media Management" Campaign record since Campaign records have no free-text notes field.
+
+PRESS COVERAGE, January 2022 (see the "Media Relations Coverage — January 2022" campaign's real placements above — 7 real articles with headline/date/URL/sentiment): aggregate reported as 13M Total Audience Reach, 52,017,641 Viewership, 6 Clips, 83.3% Positive / 16.7% Neutral sentiment (source: Meltwater, SimilarWeb, NewsEdge per the deck). SECOND POSSIBLE TEMPLATE-REUSE FLAG: the slide carrying these aggregate numbers defines "Clips" in its own Terminology Guide as "the number of news clips mentioning HHFH" — not "HHA" (Houston Housing Authority), the actual client name used everywhere else in this same deck. Same pattern as the confirmed "Candlelit Therapy" leftover label found in the VeganHood/Vegan Dining Month batch — flagging, not confirming, since it could also just be an internal abbreviation.
+
+WEBSITE TRAFFIC, January 2022 — three separate microsites reported, not the main HHA site: East End Microsite (22 visits, +144% MoM); "2100 Memorial Microsite" at thirdwardchoice.com (100 users, 1m21s avg engagement); "Third Ward Choice Microsite," ALSO at thirdwardchoice.com (45 users, 3m00s avg engagement) — two different user counts for what appears to be the same domain in the same month, not reconciled. The deck's own author flagged the Third Ward Choice country breakdown (US/China/Canada/Uganda) as ambiguous — could mean served population or just search-topic overlap — a good model for how this file handles its own uncertain figures.
+
+UPCOMING (as of the Jan 2022 snapshot, not confirmed as materialized): interviews pitched/secured with Houston Chronicle and Texas Multifamily & Affordable Housing Business Magazine; a requested Blavity byline on affordable housing policy.`,
   },
   {
     name: "Nude Barre",
