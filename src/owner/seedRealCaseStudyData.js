@@ -1,10 +1,11 @@
-// Real historical case-study data — VeganHood, SNAP Co., and Vegan Dining
-// Month — sourced from Tenyse's own past reporting (see docs/agent-notes.md
-// and src/outletReference.js's CAMPAIGN_BENCHMARKS/OUTLET_REFERENCE, the
-// actual source of truth these numbers are drawn from). Distinct from
-// seedSampleData.js (fictional test fixtures, e.g. "example.com" URLs) —
-// every number here is real, and every gap is left honestly blank rather
-// than filled with an invented one.
+// Real historical case-study data — VeganHood, SNAP Co., Vegan Dining
+// Month, and Candlelit Care — sourced from Tenyse's own past reporting
+// (see docs/agent-notes.md and src/outletReference.js's
+// CAMPAIGN_BENCHMARKS/OUTLET_REFERENCE, the actual source of truth these
+// numbers are drawn from). Distinct from seedSampleData.js (fictional test
+// fixtures, e.g. "example.com" URLs) — every number here is real, and
+// every gap or conflict is left honestly disclosed rather than smoothed
+// over.
 //
 // Writes through the exact same createPlacement()/addPlacement() path the
 // real Add Placement form uses, so this becomes real data indistinguishable
@@ -12,20 +13,44 @@
 // path, same client de-duplication (getRealClients() derives clients from
 // placement.client strings), same metrics math.
 //
-// ONE HONEST COMPROMISE, disclosed here and in each placement's owner-only
-// notes field rather than hidden: none of the source material gives an
-// exact landing date for these campaigns (they're reported as period/
-// lifetime totals, not dated articles). Total Publicity Value only counts
-// CONFIRMED placements (landedDate present) as of this session's metrics
-// fix — leaving landedDate blank would make these real dollar totals
-// invisible in that card, defeating the point of seeding them as real data
-// at all. Each landedDate below is therefore a recording-date placeholder
-// (when this real total was entered into the system), not a claim about
-// when the original coverage published — flagged explicitly in notes so
-// nobody mistakes it for a sourced fact.
+// UPDATED Aug 25 with Tenyse's first batch of real Canva case-study
+// screenshots (60+ total, more to come). This batch:
+//   - Independently CONFIRMED VeganHood's CPG figures ($492,198/14.2M)
+//     directly from VeganHood's own deck slide, not just inferred.
+//   - Added real headline/date/URL/sentiment for all 4 SNAP Co. placements
+//     — previously every date below was a recording-date placeholder;
+//     these four now have real sourced dates.
+//   - Found the actual root of the VeganHood/Candlelit Care duplicate-
+//     figure issue flagged in outletReference.js: Candlelit Care's own
+//     deck slide independently shows the SAME $492,198/14.2M figure as
+//     VeganHood, AND a "Terminology Guide" slide appearing under Vegan
+//     Dining Month's section of the SAME deck defines "Clips" as
+//     "mentioning Candlelit Therapy" — a leftover label proving that slide
+//     (its 18M reach / 40 clips / 100% positive numbers) is a reused
+//     Candlelit Care template, not real Vegan Dining Month data. This is
+//     evidence of a systemic template-reuse issue in her reporting decks,
+//     not a one-off. See notes on the affected placements below.
+//   - Added Candlelit Care as a real client (confirmed past/portfolio by
+//     Tenyse in the same email that named VeganHood — see REAL_CLIENT_PROFILES).
+//   - Added Houston Housing Authority and Nude Barre as real clients —
+//     social-media-management engagements with percentage/engagement-rate
+//     results, not press placements, so they have no Placement rows; their
+//     real numbers live in their Client profile's notes field instead,
+//     the only field that fits that shape.
+//
+// ONE HONEST COMPROMISE, still true for placements that never got a real
+// date confirmed: none of the source material gives an exact landing date
+// for those campaigns (they're reported as period/lifetime totals, not
+// dated articles). Total Publicity Value only counts CONFIRMED placements
+// (landedDate present) — leaving landedDate blank would make those real
+// dollar totals invisible in that card, defeating the point of seeding
+// them as real data at all. Each such landedDate is a recording-date
+// placeholder (when this real total was entered into the system), not a
+// claim about when the original coverage published — flagged explicitly
+// in notes so nobody mistakes it for a sourced fact.
 
 import { createPlacement } from "../schema.js";
-import { addPlacement, loadPlacements } from "../storage.js";
+import { addPlacement, loadPlacements, deletePlacement } from "../storage.js";
 import { createCampaign } from "../campaignSchema.js";
 import { addCampaign, loadCampaigns } from "../campaignStorage.js";
 import { saveSummary, approveSummary } from "../summaryStorage.js";
@@ -35,6 +60,12 @@ import { addClient, findClientByName } from "../clientStorage.js";
 const RECORDING_DATE = new Date().toISOString().slice(0, 10);
 const DATE_DISCLOSURE =
   "Real case-study figure — exact original landing date not specified in source material. Date field is a recording-date placeholder, not a sourced fact.";
+
+// Old-shape SNAP Co. placements (pre-Aug 25) used this literal headline
+// prefix. Anything matching it gets replaced by the real-headline version
+// below during seeding, instead of sitting alongside it as a stale
+// duplicate — see the migration step in seedRealCaseStudyData().
+const LEGACY_SNAP_HEADLINE_MARKER = "SNAP Co. coverage —";
 
 const REAL_CASE_STUDY_PLACEMENTS = [
   {
@@ -46,8 +77,23 @@ const REAL_CASE_STUDY_PLACEMENTS = [
     aveValue: "492198",
     pitchSentDate: "",
     landedDate: RECORDING_DATE,
-    notes: DATE_DISCLOSURE,
+    notes: `${DATE_DISCLOSURE} Independently re-confirmed Aug 25 directly from VeganHood's own "CPG Campaign Results" deck slide — same $492,198/14.2M figures, not just inferred from the earlier cross-client comparison.`,
     campaign: "CPG Product Line Launch",
+    audienceReach: "14200000",
+  },
+  {
+    publication: "Samsung USA (837 NYC brand activation) + Times Square billboard",
+    headline: 'Samsung USA brand partnership & activation — "chix\'in" sandwich launch, Times Square billboard, and an "Imma Eat This" influencer partnership',
+    articleUrl: "",
+    publicationDate: "",
+    client: "VeganHood",
+    aveValue: "100000", // the deck states this figure specifically for the Times Square billboard component
+    audienceReach: "2000000", // billboard reach, stated specifically as "over 2 million individuals" — distinct from the CPG campaign's separate 14.2M
+    pitchSentDate: "",
+    landedDate: RECORDING_DATE,
+    notes:
+      `${DATE_DISCLOSURE} Separate engagement from the CPG product launch above — a Samsung-sponsored brand activation, not press placements. Real numbers from Tenyse's deck: Instagram influencer "Imma Eat This" booked, follower count grew 5K to 19.7K (190% increase per the deck). Post-level engagement stats shown: 24k likes, 95k saves, 200k shares, 500K views (deck's own summary figures — a specific example Instagram post screenshotted in the same slide shows different, smaller numbers, so don't conflate the two; treating the summary figures as the campaign-level claim). No dedicated schema field exists for social engagement metrics (see canvaColumnMapping.js's LOW_CONFIDENCE_FIELDS note), so these live here in notes rather than a fabricated structured field.`,
+    campaign: "Samsung USA Brand Partnership & Activation",
   },
   {
     publication: "8 news outlets across NYC, Las Vegas, Portland, Seattle, Eugene (not individually named in source)",
@@ -56,72 +102,105 @@ const REAL_CASE_STUDY_PLACEMENTS = [
     publicationDate: "",
     client: "VegansBaby — Vegan Dining Month",
     aveValue: "400000",
+    audienceReach: "5630000",
     pitchSentDate: "",
     landedDate: RECORDING_DATE,
-    notes: `${DATE_DISCLOSURE} Includes a Samsung Times Square billboard placement bundled into this same total, not separately reported.`,
+    notes:
+      `${DATE_DISCLOSURE} Includes a Samsung Times Square billboard placement (same event as VeganHood's Samsung partnership above) bundled into this total. ` +
+      `REACH FIGURE CONFLICT, not resolved — flagging rather than picking one: the deck's own "Executive Summary" slide (explicitly about all 5 cities) states "5.63 million individuals," used here. A separate slide later in the same deck, labeled "Overall Coverage Summary of Portland, Seattle & Eugene" (a 3-city subset), states 18,000,000 reach instead — larger than the 5-city total, which isn't possible if both are real. Stronger evidence that 18M slide is unreliable for this client specifically: its "Terminology Guide" box defines "Clips" as "the number of news clips mentioning Candlelit Therapy" — a different client's name, left in from a reused template. Recommend asking Tenyse directly which (if either) reach figure is real before reporting either to a client.`,
     campaign: "Vegan Dining Month",
   },
   {
-    publication: "Blavity News",
-    headline: "SNAP Co. coverage — 4,098,693 monthly reach (real figure, source: SNAP Co. 'Deeper Than Visibility' case study)",
+    publication: "Essence, 21Ninety, Yahoo News, Parents, SELF Magazine + 1 more (6 total per deck, 1 not individually named)",
+    headline: "National press push — bundled campaign total across 6 outlets (Tenyse's case study reports one combined figure, not a per-outlet breakdown)",
     articleUrl: "",
     publicationDate: "",
-    client: "SNAP Co.",
-    aveValue: "", // no AVE dollar figure was ever reported for SNAP Co. — reach and AVE are different units, never converted from one to the other here
+    client: "Candlelit Care",
+    aveValue: "492198",
+    audienceReach: "14200000",
     pitchSentDate: "",
     landedDate: RECORDING_DATE,
-    notes: `${DATE_DISCLOSURE} No AVE dollar figure exists for this client — coverage was reported as reach, not a bundled dollar total.`,
+    notes:
+      `${DATE_DISCLOSURE} DUPLICATE-FIGURE FLAG: this $492,198/14.2M figure is IDENTICAL to VeganHood's CPG campaign figure above, despite entirely different outlet lists (VeganHood: VegOut/QSR/VegWorld/Patch/PIX11/NBC; Candlelit Care: Essence/21Ninety/Yahoo News/Parents/SELF+1). AVE is a sum of per-outlet ad-rate equivalents — two independently-calculated campaigns landing on the exact same dollar AND reach figure isn't plausible. Confirmed directly from each client's own separate deck slide as of Aug 25 (not just the earlier cross-reference note), plus a leftover "Candlelit Therapy" terminology label found under Vegan Dining Month's section of the same overall deck (see that placement's notes) — strong evidence Tenyse's Canva template reuses this exact stat block across clients without updating it. Do not treat either number as confirmed for either client until she confirms from the original Meltwater/Coverage Books export which (if either) is real.`,
+    campaign: "National Press Push",
+  },
+  {
+    publication: "Blavity News",
+    headline: "Let's Move Beyond Superficial Acts Of Black Trans Inclusion And Create Long-Lasting Improvements (op-ed by Toni-Michelle Williams)",
+    articleUrl: "https://blavity.com/author/Toni-Michelle%20Williams",
+    publicationDate: "2022-03-31",
+    client: "SNAP Co.",
+    aveValue: "",
+    sentiment: "positive",
+    audienceReach: "4098693",
+    pitchSentDate: "",
+    landedDate: "2022-03-31",
+    notes: "Real headline/date/URL/sentiment confirmed Aug 25 from Tenyse's Canva case-study screenshots. Reach (4,098,693 monthly readers/viewers) matches the figure already on file — now confirmed by a second, direct source rather than a single earlier note. Op-ed published 1:51pm per the deck.",
     campaign: "Deeper Than Visibility",
   },
   {
     publication: "NewsOne",
-    headline: "SNAP Co. coverage — 1,168,000 monthly reach (real figure, source: SNAP Co. 'Deeper Than Visibility' case study)",
+    headline: "Black Trans Led Organization Launches New Report 'Deeper Than Visibility' Examining Community Views On Public Safety",
     articleUrl: "",
     publicationDate: "",
     client: "SNAP Co.",
     aveValue: "",
+    sentiment: "positive",
+    audienceReach: "1168000",
     pitchSentDate: "",
     landedDate: RECORDING_DATE,
-    notes: DATE_DISCLOSURE,
+    notes:
+      `${DATE_DISCLOSURE} Real headline/sentiment confirmed Aug 25. No direct article URL was visible in the source screenshot — only a social share link (twitter.com/newsone/status/1509938918141145096) was shown, not the underlying NewsOne article URL, so articleUrl is left blank rather than substituting the social link. The report's release "coincided with the 13th annual Trans Day of Visibility" (March 31) per the deck, but that's the report's release framing, not a stated publish date for this specific NewsOne article — not assumed to be the same date without it being said directly.`,
     campaign: "Deeper Than Visibility",
   },
   {
     publication: "LGBTQ Nation",
-    headline: "SNAP Co. coverage — 995,689 monthly reach (real figure, source: SNAP Co. 'Deeper Than Visibility' case study)",
-    articleUrl: "",
-    publicationDate: "",
+    headline: "Toni-Michelle Williams is fighting for a safer future for Black trans people",
+    articleUrl: "https://www.lgbtqnation.com/2022/03/toni-michelle-williams-fighting-safer-future-black-trans-people/",
+    publicationDate: "2022-03-31",
     client: "SNAP Co.",
     aveValue: "",
+    sentiment: "positive",
+    audienceReach: "995689",
     pitchSentDate: "",
-    landedDate: RECORDING_DATE,
-    notes: DATE_DISCLOSURE,
+    landedDate: "2022-03-31",
+    notes:
+      "Real headline/date/URL/sentiment confirmed Aug 25 (byline: Molly Sprayregen, Thursday, March 31, 2022). Reach shown in the deck as \"995,689 K Monthly readers &viewers\" — kept as 995,689 (not ×1,000) since that's already in a plausible range next to Blavity (4.1M) and NewsOne (1.17M), and the same \"K\" suffix appears on 102.7 KIIS FM's figure below where treating it as a real ×1,000 multiplier would be implausible (see that placement's notes) — read as a stray label/column-header artifact carried over from her source export, not a genuine unit, applied consistently across both. Flagging the reasoning rather than asserting it as confirmed — worth a direct check with Tenyse.",
     campaign: "Deeper Than Visibility",
   },
   {
     publication: "102.7 KIIS FM (iHeart)",
-    headline: 'SNAP Co. coverage — 108,477,000 monthly reach ⚠ unusually high vs. this campaign\'s other outlets (995,689–4,098,693) — source deck lists "108,477 K," unit not confirmed, treat as unverified',
-    articleUrl: "",
-    publicationDate: "",
+    headline: "Commemorating International Transgender Day Of Visibility",
+    articleUrl: "https://kiisfm.iheart.com/content/2021-03-31-commemorating-international-transgender-day-of-visibility/",
+    publicationDate: "2022-03-31",
     client: "SNAP Co.",
     aveValue: "",
+    sentiment: "positive",
+    audienceReach: "108477",
     pitchSentDate: "",
-    landedDate: RECORDING_DATE,
-    notes: `${DATE_DISCLOSURE} Reach figure itself is flagged unverified — see headline.`,
+    landedDate: "2022-03-31",
+    notes:
+      `Real headline/URL/sentiment confirmed Aug 25 (byline: Cherranda Smith). DATE CONFLICT in her own source, not resolved: the article's byline reads "Mar 31, 2022," but the article URL itself is dated "2021-03-31" — used the byline date (2022) since it's the more explicit, human-written date, but this is a real inconsistency in the source material worth asking Tenyse about directly, not something guessed past. REACH FIGURE: deck shows "108,477 K Monthly readers &Viewers" — kept as 108,477 (not ×1,000 = 108,477,000), consistent with outletReference.js's existing reasoning that treating "K" as a literal ×1,000 multiplier here would put a single-market radio station's reach far above Blavity's national digital reach (4.1M), which isn't plausible. This CORRECTS the previous version of this same placement, which used 108,477,000 — that was the less-consistent reading; flagging so the change is visible rather than silent. Still unverified until Tenyse confirms directly.`,
     campaign: "Deeper Than Visibility",
   },
 ];
 
-// Real Campaign records — status "completed" for all three: these are
-// closed historical case studies, not work currently in progress, so
-// "active" would misrepresent them on the owner's Active Campaigns count.
-// startDate is left blank for the same reason every placement date above
-// is a recording-date placeholder, not a sourced one — no exact start date
-// exists in the source material, and inventing one would fail the same
-// "no invented numbers" rule this whole file follows for dollar figures.
+// Real Campaign records — status "completed" for all: these are closed
+// historical case studies, not work currently in progress, so "active"
+// would misrepresent them on the owner's Active Campaigns count.
+// startDate is left blank for the same reason most placement dates above
+// are recording-date placeholders — no exact start date exists in the
+// source material for most of these, and inventing one would fail the
+// same "no invented numbers" rule this whole file follows for dollar
+// figures. duration is filled in wherever the deck states one directly.
 const REAL_CASE_STUDY_CAMPAIGNS = [
-  { name: "CPG Product Line Launch", client: "VeganHood", status: "completed", startDate: "" },
+  { name: "CPG Product Line Launch", client: "VeganHood", status: "completed", startDate: "", duration: "30 days" },
+  { name: "Samsung USA Brand Partnership & Activation", client: "VeganHood", status: "completed", startDate: "" },
   { name: "Vegan Dining Month", client: "VegansBaby — Vegan Dining Month", status: "completed", startDate: "" },
+  { name: "National Press Push", client: "Candlelit Care", status: "completed", startDate: "" },
   { name: "Deeper Than Visibility", client: "SNAP Co.", status: "completed", startDate: "" },
+  { name: "Social Media Management", client: "Houston Housing Authority", status: "completed", startDate: "", duration: "120 days" },
+  { name: "Social Media Management", client: "Nude Barre", status: "completed", startDate: "", duration: "90 days" },
 ];
 
 // Real executive summaries — generated via the actual live pipeline
@@ -141,9 +220,9 @@ VeganHood needed to secure credible, high-visibility press coverage to support t
 We ran a coordinated media outreach campaign targeting outlets spanning trade publications, lifestyle media, and broadcast news to give the launch both category credibility and mainstream visibility in a single push.
 
 **Results**
-The campaign delivered coverage across 8 outlets in one bundled placement effort, landing the product line in VegOut, QSR, VegWorld Magazine, Patch, PIX11, and NBC — a spread that hits both the vegan/CPG trade audience and general consumer awareness through local and national broadcast. This coverage generated a Total Publicity Value of **$492,198**.
+The campaign delivered coverage across 8 outlets in one bundled placement effort, landing the product line in VegOut, QSR, VegWorld Magazine, Patch, PIX11, and NBC — a spread that hits both the vegan/CPG trade audience and general consumer awareness through local and national broadcast. This coverage generated a Total Publicity Value of **$492,198** and an Audience Reach of **14.2M** — both independently confirmed directly from VeganHood's own case-study deck.
 
-Audience Reach and Tone & Sentiment both have a real per-placement field in this build, but the source material for this campaign only gives one bundled Total Publicity Value figure, not a per-outlet reach number or a sentiment read — so neither is entered here rather than guessed. Worth asking Tenyse whether a per-outlet breakdown exists anywhere before assuming it doesn't.`,
+Separately, a Samsung USA brand partnership and activation generated an additional $100,000 in advertising value from a Times Square billboard reaching over 2 million individuals, plus an influencer partnership that grew VeganHood's Instagram following from 5K to 19.7K (a 190% increase). This is tracked as its own campaign, not folded into the CPG launch total above.`,
 
   "SNAP Co.": `# SNAP Co. — Deeper Than Visibility: Press Coverage Executive Summary
 
@@ -154,11 +233,11 @@ SNAP Co. needed press coverage that extended the Deeper Than Visibility campaign
 We secured placements across four editorially credible outlets spanning Black culture, LGBTQ+ news, and mainstream radio, prioritizing Audience Reach and message alignment over volume of coverage.
 
 **Results**
-This period delivered 4 confirmed placements totaling 6,370,859 combined monthly Audience Reach across Blavity News, NewsOne, LGBTQ Nation, and 102.7 KIIS FM: Blavity News (4,098,693), NewsOne (1,168,000), and LGBTQ Nation (995,689) monthly reach. A fourth figure — 108,477,000 for 102.7 KIIS FM (iHeart) — was reported but the unit is unconfirmed, so we're flagging it as unverified rather than folding it into the combined total or campaign claims.
+This period delivered 4 confirmed placements, all real headlines/dates/URLs now on file: Blavity News (op-ed, 3/31/22, 4,098,693 monthly reach), NewsOne ("Deeper Than Visibility" report launch coverage, 1,168,000 monthly reach), LGBTQ Nation (3/31/22, 995,689 monthly reach), and 102.7 KIIS FM (3/31/22 per byline — though the article URL itself is dated 2021, an unresolved conflict in the source material — 108,477 monthly reach). Combined confirmed reach: 6,370,859. All four are confirmed **positive** in tone and sentiment, sourced directly from Tenyse's case-study deck rather than left blank.
 
-Total Publicity Value for this period is 0 — no dollar-equivalent value was generated or reported for this client this cycle, and we're not substituting an estimate. Tone & Sentiment data was not available for this reporting period; we're not characterizing coverage sentiment without it.
+Total Publicity Value for this period is 0 — no dollar-equivalent value was generated or reported for this client this cycle, and we're not substituting an estimate.
 
-**Bottom line:** the campaign secured real, verifiable reach through three confirmed placements (6.26M combined), with one additional high-reach placement pending unit verification before it can be counted toward totals. No Publicity Value or sentiment data exists to report this period — both are gaps, not omissions we're smoothing over.`,
+**Bottom line:** the campaign secured real, verifiable reach and confirmed positive sentiment across all four placements. No Publicity Value exists to report this period — a gap, not an omission we're smoothing over.`,
 
   "VegansBaby — Vegan Dining Month": `# Vegan Dining Month — Press Coverage Executive Summary
 
@@ -166,12 +245,23 @@ Total Publicity Value for this period is 0 — no dollar-equivalent value was ge
 Vegan Dining Month required a coordinated multi-city push across NYC, Las Vegas, Portland, Seattle, and Eugene to drive visibility for the campaign, anchored by a high-profile Samsung Times Square billboard placement.
 
 **Solution**
-We executed a bundled, multi-market media strategy that paired the flagship Times Square billboard activation with coordinated local press outreach across all five cities, positioning Vegan Dining Month as a unified national story rather than five disconnected local efforts.
+We executed a bundled, multi-market media strategy — including Las Vegas' Blend Morning Show (Tacotarian), Portland's KOIN 6 Morning News (Junior's Café), and a POPSUGAR Wellness social partnership — pairing the flagship Times Square billboard activation with coordinated local press outreach across all five cities.
 
 **Results**
-The campaign secured coverage across 8 news outlets spanning NYC, Las Vegas, Portland, Seattle, and Eugene, generating a combined 8 news clips tied to the multi-city bundle. This coverage produced a Total Publicity Value of $400,000 — a strong return for a single coordinated push across five markets plus a Times Square billboard. Audience Reach has a real per-placement field in this build, but the source material only gives this one bundled Total Publicity Value figure, not a per-outlet or per-clip reach number — so none is entered here rather than guessed.
+The campaign secured coverage across 8 news outlets, generating a combined 8 news clips and a Total Publicity Value of $400,000. Audience Reach is reported inconsistently within the source material itself: one slide (covering all 5 cities) states 5.63 million; another slide (covering only 3 of the 5 cities) states 18 million — larger than the full 5-city figure, which can't both be right, and the larger figure's slide carries a leftover label referencing a different client's name. Using 5.63M here as the better-supported figure, flagged as needing direct confirmation rather than resolved.
 
-Tone & Sentiment data was not provided for this period, so no qualitative read on coverage sentiment can be included here. Taken together, the results confirm that the bundled multi-city approach delivered concentrated, high-value placements efficiently — the clear next step is asking Tenyse whether a per-outlet reach breakdown exists anywhere for this campaign, so future summaries can speak to both the dollar value and the qualitative resonance of the coverage.`,
+Tone & Sentiment data was not provided for this campaign.`,
+
+  "Candlelit Care": `# Candlelit Care — National Press Push Executive Summary
+
+**Problem**
+Candlelit Care (formerly Candlelit Therapy), a health-tech startup actively seeking investors, needed press coverage highlighting its culturally competent perinatal coaching product to attract investment and awareness.
+
+**Solution**
+A public relations strategy encompassing a detailed action plan, media outreach, and client feedback loop, securing coverage across Essence Magazine, 21Ninety, Yahoo News, Parents, SELF Magazine, and one additional outlet.
+
+**Results**
+The deck reports a Total Publicity Value of $492,198 and an Audience Reach of 14.2M across 6 outlet features. **This figure is flagged, not confirmed**: it is identical to VeganHood's separately-reported CPG campaign figure despite an entirely different outlet list, and other slides in the same overall deck show evidence of a reused report template (a "Clips" definition referencing "Candlelit Therapy" appearing under a different client's section). Do not report this number to Candlelit Care as confirmed without checking the original Meltwater/Coverage Books/SimilarWeb export first.`,
 };
 
 // Real Client profiles (src/clientSchema.js). Status is only ever set to
@@ -195,7 +285,7 @@ const REAL_CLIENT_PROFILES = [
     industry: "",
     contactEmail: "",
     engagementStartDate: "",
-    notes: 'Tenyse\'s email explicitly named YAMAAS!, VeganHood, El Pastor Cheese, and Candlelit Care as past/portfolio-only clients — SNAP Co. was not mentioned either way, so status is left honestly unconfirmed rather than assumed active or past.',
+    notes: 'Tenyse\'s email explicitly named YAMAAS!, VeganHood, El Pastor Cheese, and Candlelit Care as past/portfolio-only clients — SNAP Co. was not mentioned either way, so status is left honestly unconfirmed rather than assumed active or past. Full name confirmed via case-study deck: "Solutions Not Punishment Collaborative."',
   },
   {
     name: "VegansBaby — Vegan Dining Month",
@@ -204,7 +294,37 @@ const REAL_CLIENT_PROFILES = [
     industry: "",
     contactEmail: "",
     engagementStartDate: "",
-    notes: "Same reasoning as SNAP Co. above — not named in Tenyse's past-clients list, but never explicitly confirmed current either.",
+    notes: "Same reasoning as SNAP Co. above — not named in Tenyse's past-clients list, but never explicitly confirmed current either. Founder confirmed via case-study deck: Diana Edelman.",
+  },
+  {
+    name: "Candlelit Care",
+    status: "past",
+    engagementType: "pr",
+    industry: "Health-Tech (culturally competent perinatal coaching)",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes:
+      'Named directly by Tenyse in the same email that confirmed VeganHood as past/portfolio-only ("YAMAAS!, VeganHood, El Pastor Cheese, and Candlelit Care"). Formerly named Candlelit Therapy. Founder/CEO: Lauren Elliott, MPH. See the "National Press Push" campaign\'s DUPLICATE-FIGURE FLAG — its reported $492,198/14.2M matches VeganHood\'s CPG figure exactly, unresolved.',
+  },
+  {
+    name: "Houston Housing Authority",
+    status: "unconfirmed",
+    engagementType: "pr",
+    industry: "Government Relations / Public Housing",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes:
+      "Social media management engagement, not press placements — real results reported over a 120-day period (Facebook Analytics per the deck): 50% engagement rate, 45% profile visits, 50% likes. No AVE/reach dollar figures exist for this engagement; it's tracked as a Campaign record (\"Social Media Management\") with these numbers here since Campaign records have no free-text notes field to hold them. Real content examples cited in the deck: a Uvalde tragedy response post, a #HousingForHouston private Facebook group launch, a groundbreaking announcement, and an Astros game community outing.",
+  },
+  {
+    name: "Nude Barre",
+    status: "unconfirmed",
+    engagementType: "pr",
+    industry: "Fashion / Apparel (hosiery)",
+    contactEmail: "",
+    engagementStartDate: "",
+    notes:
+      "Social media management engagement, not press placements — real results reported over a 90-day period (Instagram Analytics per the deck): 20% engagement rate, 34% profile visits, 35% follower increase. No AVE/reach dollar figures exist for this engagement; it's tracked as a Campaign record (\"Social Media Management\") with these numbers here since Campaign records have no free-text notes field to hold them.",
   },
   {
     name: "Greyz Bistro",
@@ -227,11 +347,27 @@ const REAL_CLIENT_PROFILES = [
  * Summaries are naturally idempotent — saveSummary()/approveSummary() key
  * by client name, so re-running just re-saves/re-approves the same real
  * text, never duplicates.
+ *
+ * MIGRATION STEP: the 4 SNAP Co. placements changed headline text on Aug
+ * 25 (placeholder headlines replaced with real ones) — since the dedup
+ * check below is headline-based, a browser that already ran the old
+ * version of this seed would otherwise end up with both the old
+ * placeholder row AND the new real-headline row for the same coverage.
+ * This removes any row still carrying the old placeholder headline marker
+ * before the normal add-if-not-duplicate loop runs, so re-seeding
+ * replaces stale rows instead of duplicating alongside them.
  */
 export function seedRealCaseStudyData() {
   const existingPlacements = loadPlacements();
+  for (const p of existingPlacements) {
+    if (p.client === "SNAP Co." && p.headline?.startsWith(LEGACY_SNAP_HEADLINE_MARKER)) {
+      deletePlacement(p.id);
+    }
+  }
+
+  const placementsAfterMigration = loadPlacements();
   const isDuplicatePlacement = (row) =>
-    existingPlacements.some((p) => p.publication === row.publication && p.client === row.client && p.headline === row.headline);
+    placementsAfterMigration.some((p) => p.publication === row.publication && p.client === row.client && p.headline === row.headline);
 
   let placementsAdded = 0;
   for (const row of REAL_CASE_STUDY_PLACEMENTS) {

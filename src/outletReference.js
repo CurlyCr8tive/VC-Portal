@@ -44,6 +44,14 @@ export const OUTLET_REFERENCE = [
     // with a single-market radio site next to outlets in the 1-4M range.
     // Treating "K" as a typo/label artifact and using the raw number as-is.
     // Confirm with Tenyse before using this one for anything real.
+    //
+    // Aug 25 update: LGBTQ Nation's slide in the same deck carries the
+    // identical "XXX,XXX K" formatting on its own reach figure (995,689 K)
+    // — and 995,689 is already a plausible number on its own (in line with
+    // Blavity/NewsOne), while ×1,000 would put it above Blavity's national
+    // digital reach for a single article. Same reasoning applied
+    // consistently to both entries now — see seedRealCaseStudyData.js's
+    // SNAP Co. placements for the full comparison. Still unconfirmed.
     notes: "Unit is ambiguous in the source deck ('108,477 K') — confirm before relying on this figure.",
     source: "SNAP Co. 'Deeper Than Visibility' case study (Canva deck)",
   },
@@ -100,6 +108,16 @@ export const KNOWN_OUTLETS_NO_RATE_YET = [
 // entirely different outlet lists. That's not a plausible coincidence for
 // independently-calculated AVE — treat BOTH as unverified until Tenyse
 // confirms which (if either) is correct.
+//
+// Aug 25 update: re-confirmed independently from each client's own deck
+// slide (not just this earlier cross-comparison note), AND found the
+// likely mechanism — a "Terminology Guide" slide appearing under Vegan
+// Dining Month's section of the same overall deck defines "Clips" as
+// "the number of news clips mentioning Candlelit Therapy," a different
+// client's name left in from a reused template. Strong evidence Tenyse's
+// Canva report template reuses a stat block across clients without every
+// field being updated — this is a systemic risk for future case studies
+// too, not just these two. See seedRealCaseStudyData.js for full detail.
 export const CAMPAIGN_BENCHMARKS = [
   {
     client: "VeganHood",
@@ -108,7 +126,7 @@ export const CAMPAIGN_BENCHMARKS = [
     audienceReach: 14200000,
     outletCount: 8,
     verified: false,
-    note: "Same figures as Candlelit Care below — needs confirmation.",
+    note: "Same figures as Candlelit Care below — needs confirmation. Re-confirmed directly from VeganHood's own deck slide Aug 25.",
   },
   {
     client: "Candlelit Care",
@@ -117,7 +135,7 @@ export const CAMPAIGN_BENCHMARKS = [
     audienceReach: 14200000,
     outletCount: 6,
     verified: false,
-    note: "Same figures as VeganHood CPG above — needs confirmation.",
+    note: "Same figures as VeganHood CPG above — needs confirmation. Re-confirmed directly from Candlelit Care's own deck slide Aug 25.",
   },
   {
     client: "Vegan Dining Month (VegansBaby)",
@@ -126,7 +144,8 @@ export const CAMPAIGN_BENCHMARKS = [
     audienceReach: 18000000,
     outletCount: null,
     verified: false,
-    note: "8 news clips + Samsung Times Square billboard bundled into the total.",
+    note:
+      "8 news clips + Samsung Times Square billboard bundled into the total. Aug 25: this 18M reach figure is now suspect — a differently-worded slide in the same deck (this one covering only 3 of the 5 cities) is the one carrying the leftover \"Candlelit Therapy\" terminology label described above. The deck's own 5-city Executive Summary slide states 5.63M instead, and is used as the better-supported figure in seedRealCaseStudyData.js — this benchmark row is kept as-is (not overwritten) since it predates that finding and the conflict itself is the useful signal here, not either individual number.",
   },
   {
     client: "VeganHood",
