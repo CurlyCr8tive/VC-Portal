@@ -103,6 +103,11 @@ const state = {
   // Client info form: null = not showing, true = "add new client," or a
   // client name string = editing that client's existing profile.
   editingClient: null,
+  // Clients view filter — "all" | "active" | "past". Unconfirmed-status
+  // clients (the honest default for a case-study client Tenyse hasn't
+  // said is current or closed) only show under "all", never silently
+  // bucketed into either — see clientSchema.js's CLIENT_STATUSES comment.
+  clientStatusFilter: "all",
   selectedCampaignId: null,
   // Hand-authored candidate mentions previewing the discovery-agent review
   // queue described in the PRD. Confirm/Reject only mutate this in-memory
@@ -689,8 +694,21 @@ function renderClientsView() {
   target.innerHTML = `
     <div class="section-heading"><h2>Clients</h2></div>
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+      <label for="client-status-filter" style="font-size:0.82rem; font-weight:600; color:var(--color-navy);">Show</label>
+      <select id="client-status-filter" style="max-width:220px;">
+        <option value="all" ${state.clientStatusFilter === "all" ? "selected" : ""}>All clients</option>
+        <option value="active" ${state.clientStatusFilter === "active" ? "selected" : ""}>Current (Active)</option>
+        <option value="past" ${state.clientStatusFilter === "past" ? "selected" : ""}>Previous (Past / Portfolio)</option>
+      </select>
+    </div>
     <div class="clients-grid" id="clients-full-grid"></div>
   `;
+
+  document.getElementById("client-status-filter").addEventListener("change", (e) => {
+    state.clientStatusFilter = e.target.value;
+    renderClientsView();
+  });
 
   if (isEditing) {
     renderClientDetailForm(document.getElementById("client-detail-form-wrap"), {
@@ -715,7 +733,12 @@ function renderClientsView() {
     });
   }
 
-  renderClientsList(document.getElementById("clients-full-grid"), getClientsWithMetrics(), {
+  const filteredClients =
+    state.clientStatusFilter === "all"
+      ? getClientsWithMetrics()
+      : getClientsWithMetrics().filter((c) => c.profile?.status === state.clientStatusFilter);
+
+  renderClientsList(document.getElementById("clients-full-grid"), filteredClients, {
     onInvite: state.dataSource === "real" ? inviteClient : undefined,
     onViewDashboard: (clientName) => {
       state.dashboardClientFilter = clientName;
@@ -1492,6 +1515,7 @@ function setDemoState(demoState) {
 
 function setDataSource(dataSource) {
   state.dataSource = dataSource;
+  autoSeedRealCaseStudyDataOnce();
   renderSidebarComponent();
   renderHeaderComponent();
   renderCurrentView();
@@ -1509,6 +1533,34 @@ function closeSidebarMobile() {
 
 document.getElementById("sidebar-overlay").addEventListener("click", closeSidebarMobile);
 
+// Runs the same seed functions Settings' "Load Real Case Study Data" /
+// "Load Greyz Bistro Coaching Data" buttons trigger manually, but once,
+// automatically, on this browser's first-ever visit to the real data
+// source — so real clients/placements/campaigns are there the moment the
+// Dashboard/Clients pages first load, not only after finding and clicking
+// two buttons in Settings. Gated by a one-time flag (not re-checked every
+// load) so it never fights with Tenyse's own edits later — deleting a
+// case-study client or placement she doesn't want stays deleted, it won't
+// silently reappear on the next page load. Both seed functions are
+// already idempotent on their own (checked by name/headline, not id), so
+// this is also safe if it somehow ran twice.
+//
+// This only covers what's in seedRealCaseStudyData.js as of when this
+// flag was first set — a future screenshot batch that adds more real data
+// to that file still needs the Settings buttons clicked manually once to
+// reach a browser that already has this flag set, same as it always has.
+const AUTO_SEED_FLAG_KEY = "vc_auto_seeded_real_case_study_data_v1";
+
+function autoSeedRealCaseStudyDataOnce() {
+  if (state.dataSource !== "real") return;
+  if (localStorage.getItem(AUTO_SEED_FLAG_KEY)) return;
+  seedRealCaseStudyData();
+  if (findClientByName("Greyz Bistro")) {
+    seedGreyzBistroCoachingData();
+  }
+  localStorage.setItem(AUTO_SEED_FLAG_KEY, "1");
+}
+
 if (session) {
   const demoParam = new URLSearchParams(location.search).get("demo");
   if (["loading", "empty", "error"].includes(demoParam)) {
@@ -1518,6 +1570,8 @@ if (session) {
   if (["real", "mock"].includes(dataParam)) {
     state.dataSource = dataParam;
   }
+
+  autoSeedRealCaseStudyDataOnce();
 
   renderSidebarComponent();
   renderHeaderComponent();
