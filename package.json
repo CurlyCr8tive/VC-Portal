@@ -1,0 +1,14 @@
+{
+  "name": "vc-portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static Verified Consulting portal with owner and client Express APIs.",
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check-build.mjs",
+    "start:owner-api": "npm --prefix server/owner-api start",
+    "start:client-api": "npm --prefix server/client-api start",
+    "serve:static": "python3 -m http.server 8420",
+    "install:apis": "npm --prefix server/owner-api ci && npm --prefix server/client-api ci"
+  }
+}

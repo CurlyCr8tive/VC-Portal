@@ -368,7 +368,12 @@ app.post(
   })
 );
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   const status = isSupabaseConfigured ? "connected to Supabase" : "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set — routes will 503";
   console.log(`owner-api listening on http://localhost:${PORT} (${status})`);
+});
+
+server.on("error", (err) => {
+  console.error(`owner-api failed to start on port ${PORT}: ${err.message}`);
+  process.exitCode = 1;
 });
