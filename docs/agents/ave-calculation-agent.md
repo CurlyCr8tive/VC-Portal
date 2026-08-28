@@ -12,8 +12,13 @@ sample output. The difference: that agent only needs to match a *voice*,
 which real case studies fully demonstrate. This agent needs a real
 per-outlet *ad rate*, and `db/schema.sql`'s `outlet_rates` table is empty
 on purpose — the PRD flags "per-outlet rate examples" as "Not yet raised"
-with Tenyse. `src/outletReference.js`'s `CAMPAIGN_BENCHMARKS` are
-explicitly marked `verified: false` on every single entry.
+with Tenyse. `src/outletReference.js`'s `CAMPAIGN_BENCHMARKS` had every
+entry marked `verified: false` as of Aug 13; as of Aug 25, Tenyse confirmed
+two of the four (Vegan Dining Month, VeganHood Lifetime) as usable for
+calibration — the VeganHood-CPG/Candlelit-Care duplicate pair stays
+excluded. Even with those two cleared, no *per-outlet* rate exists
+anywhere — these are still campaign-level totals, which is the actual
+blocker for a real `estimateAve()` function (see below).
 
 Building a calculator now would mean deriving a $/reach ratio from data
 that isn't confirmed real — producing a number that *looks* calibrated
@@ -68,3 +73,10 @@ positives against Vegan Dining Month or VeganHood's lifetime total, which
 have genuinely different figures. This is the honest version of "testing
 the agent" available right now: proving the guardrail catches a known-bad
 case, rather than demoing a calculator whose output can't be trusted yet.
+
+**Aug 25 update:** Tenyse confirmed Vegan Dining Month and VeganHood's
+lifetime total as cleared for calibration use (`verified: true` in
+`src/outletReference.js`) — the guardrail's clean result above is exactly
+why those two, and not the duplicate pair, were the ones to clear. This
+still doesn't unblock building `estimateAve()` — that needs a real
+per-outlet rate, which no confirmed number here provides.

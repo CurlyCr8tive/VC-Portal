@@ -130,3 +130,10 @@ not something to integrate with.
 
 - **Aug 13, 2026** — Initial version. Formula, agent spec, and industry
   benchmarks established. Real per-outlet rates still entirely open.
+- **Aug 25, 2026** — Tenyse confirmed the VeganHood-CPG/Candlelit-Care
+  duplicate pair ($492,198/14.2M) stays excluded from AI calibration. The
+  other two `CAMPAIGN_BENCHMARKS` rows (Vegan Dining Month, VeganHood
+  Lifetime) are cleared for calibration use — see `src/outletReference.js`
+  (`verified: true`) and `docs/agents/ave-calculation-agent.md`. This does
+  not supply a per-outlet rate (section 5 below is still empty); it only
+  changes which campaign-level totals a future agent may treat as real.

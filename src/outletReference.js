@@ -118,6 +118,15 @@ export const KNOWN_OUTLETS_NO_RATE_YET = [
 // Canva report template reuses a stat block across clients without every
 // field being updated — this is a systemic risk for future case studies
 // too, not just these two. See seedRealCaseStudyData.js for full detail.
+//
+// Aug 25 decision: confirmed — the VeganHood-CPG/Candlelit-Care pair stays
+// excluded from calibration (verified: false, unresolved). The other two
+// rows below (Vegan Dining Month, VeganHood Lifetime) have genuinely
+// distinct figures from each other and from the duplicate pair, so they're
+// cleared for AI-calibration use (verified: true). This is a decision
+// about which numbers a future AVE agent may treat as real, not a claim
+// that every remaining caveat on those rows (e.g. Vegan Dining Month's
+// reach-figure conflict, noted below) has been resolved.
 export const CAMPAIGN_BENCHMARKS = [
   {
     client: "VeganHood",
@@ -143,9 +152,9 @@ export const CAMPAIGN_BENCHMARKS = [
     aveValue: 400000,
     audienceReach: 18000000,
     outletCount: null,
-    verified: false,
+    verified: true,
     note:
-      "8 news clips + Samsung Times Square billboard bundled into the total. Aug 25: this 18M reach figure is now suspect — a differently-worded slide in the same deck (this one covering only 3 of the 5 cities) is the one carrying the leftover \"Candlelit Therapy\" terminology label described above. The deck's own 5-city Executive Summary slide states 5.63M instead, and is used as the better-supported figure in seedRealCaseStudyData.js — this benchmark row is kept as-is (not overwritten) since it predates that finding and the conflict itself is the useful signal here, not either individual number.",
+      "8 news clips + Samsung Times Square billboard bundled into the total. Aug 25: this 18M reach figure is now suspect — a differently-worded slide in the same deck (this one covering only 3 of the 5 cities) is the one carrying the leftover \"Candlelit Therapy\" terminology label described above. The deck's own 5-city Executive Summary slide states 5.63M instead, and is used as the better-supported figure in seedRealCaseStudyData.js — this benchmark row is kept as-is (not overwritten) since it predates that finding and the conflict itself is the useful signal here, not either individual number. Aug 25: cleared for calibration use (not part of the duplicate-figure issue) — but the reach-figure conflict above is a separate, still-open caveat worth weighting accordingly, not evidence against using the $400K AVE figure itself.",
   },
   {
     client: "VeganHood",
@@ -153,8 +162,8 @@ export const CAMPAIGN_BENCHMARKS = [
     aveValue: 18000000,
     audienceReach: 217400000,
     outletCount: 50,
-    verified: false,
-    note: "Cumulative total, not a single campaign — don't compare directly to the per-campaign rows above.",
+    verified: true,
+    note: "Cumulative total, not a single campaign — don't compare directly to the per-campaign rows above. Aug 25: cleared for calibration use — distinct figures from the duplicate pair above, no known data-quality issue on this row.",
   },
 ];
 
