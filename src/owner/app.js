@@ -19,7 +19,7 @@ import { addPlacement, updatePlacement, deletePlacement } from "../storage.js";
 import { createCampaign, applyCampaignEdit, addMilestone, toggleMilestone, removeMilestone } from "../campaignSchema.js";
 import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, deleteCampaign } from "../campaignStorage.js";
 import { createClient, applyClientEdit } from "../clientSchema.js";
-import { addClient, updateClient, findClientByName } from "../clientStorage.js";
+import { addClient, updateClient, upsertClientByName, findClientByName } from "../clientStorage.js";
 import { renderHeader } from "../client/components/DashboardHeader.js";
 import { renderMetricsGrid } from "../client/components/MetricCard.js";
 import { renderPlacementsTable } from "../client/components/PressPlacementTable.js";
@@ -108,6 +108,8 @@ const state = {
   // said is current or closed) only show under "all", never silently
   // bucketed into either — see clientSchema.js's CLIENT_STATUSES comment.
   clientStatusFilter: "all",
+  realClientsSync: "idle", // idle | loading | loaded | error
+  realClientsSyncMessage: "",
   selectedCampaignId: null,
   // Hand-authored candidate mentions previewing the discovery-agent review
   // queue described in the PRD. Confirm/Reject only mutate this in-memory
@@ -590,6 +592,47 @@ async function resolveRealClientId(clientName) {
   }
 }
 
+async function saveRealClient({ raw, existingRecord }) {
+  const method = existingRecord ? "PATCH" : "POST";
+  let clientId = existingRecord?.id;
+  if (existingRecord) {
+    const resolved = await resolveRealClientId(existingRecord.name);
+    if (resolved.ok) clientId = resolved.id;
+  }
+  const url = existingRecord ? `${OWNER_API_BASE}/api/clients/${encodeURIComponent(clientId)}` : `${OWNER_API_BASE}/api/clients`;
+
+  const res = await fetch(url, {
+    method,
+    headers: await authedJsonHeaders(),
+    body: JSON.stringify(raw),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.message || `Couldn't save client in Supabase (${res.status}).`);
+  }
+  return body;
+}
+
+async function syncRealClientsFromSupabase() {
+  if (state.dataSource !== "real" || state.realClientsSync === "loading" || state.realClientsSync === "loaded") return;
+  state.realClientsSync = "loading";
+  state.realClientsSyncMessage = "";
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/clients`, { headers: await authedJsonHeaders() });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.message || `Couldn't load Supabase clients (${res.status}).`);
+    }
+    (Array.isArray(body) ? body : []).forEach((client) => upsertClientByName(createClient(client)));
+    state.realClientsSync = "loaded";
+    if (state.view === "clients") renderClientsView();
+  } catch (err) {
+    state.realClientsSync = "error";
+    state.realClientsSyncMessage = err.message;
+    if (state.view === "clients") renderClientsView();
+  }
+}
+
 async function inviteClient({ clientName, email }) {
   const resolved = await resolveRealClientId(clientName);
   if (!resolved.ok) return resolved;
@@ -686,6 +729,7 @@ function renderClientsView() {
   const target = document.getElementById("clients-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+  syncRealClientsFromSupabase();
 
   const canManageClients = state.dataSource === "real";
   const isEditing = canManageClients && state.editingClient;
@@ -694,6 +738,11 @@ function renderClientsView() {
   target.innerHTML = `
     <div class="section-heading"><h2>Clients</h2></div>
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
+    ${
+      state.dataSource === "real" && state.realClientsSync === "error"
+        ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase clients: ${escapeHtml(state.realClientsSyncMessage)}</p>`
+        : ""
+    }
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
       <label for="client-status-filter" style="font-size:0.82rem; font-weight:600; color:var(--color-navy);">Show</label>
       <select id="client-status-filter" style="max-width:220px;">
@@ -713,12 +762,14 @@ function renderClientsView() {
   if (isEditing) {
     renderClientDetailForm(document.getElementById("client-detail-form-wrap"), {
       initialData: editingRecord || (state.editingClient !== true ? { name: state.editingClient } : null),
-      onSubmit: (raw) => {
+      onSubmit: async (raw) => {
         try {
           if (editingRecord) {
-            updateClient(applyClientEdit(editingRecord, raw));
+            const saved = await saveRealClient({ raw, existingRecord: editingRecord });
+            updateClient(applyClientEdit(editingRecord, saved));
           } else {
-            addClient(createClient(raw));
+            const saved = await saveRealClient({ raw });
+            addClient(createClient(saved));
           }
           state.editingClient = null;
           renderClientsView();

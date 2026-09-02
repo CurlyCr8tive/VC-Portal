@@ -76,13 +76,100 @@ function ownerRoute(handler) {
   };
 }
 
+const CLIENT_STATUSES = new Set(["active", "past", "unconfirmed"]);
+const ENGAGEMENT_TYPES = new Set(["pr", "coaching", "pr_and_coaching"]);
+
+function normalizeClientPayload(body) {
+  const name = String(body?.name || "").trim();
+  if (!name) {
+    return { error: "Client name is required." };
+  }
+
+  const status = CLIENT_STATUSES.has(body?.status) ? body.status : "unconfirmed";
+  const engagementType = ENGAGEMENT_TYPES.has(body?.engagementType || body?.engagement_type)
+    ? body.engagementType || body.engagement_type
+    : "pr";
+
+  return {
+    data: {
+      name,
+      status,
+      engagement_type: engagementType,
+      contact_email: String(body?.contactEmail || body?.contact_email || "").trim() || null,
+      industry: String(body?.industry || "").trim() || null,
+      engagement_start_date: body?.engagementStartDate || body?.engagement_start_date || null,
+      notes: String(body?.notes || "").trim() || null,
+    },
+  };
+}
+
+function clientRowToApi(row) {
+  if (!row) return row;
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    engagementType: row.engagement_type,
+    contactEmail: row.contact_email || "",
+    industry: row.industry || "",
+    engagementStartDate: row.engagement_start_date || "",
+    notes: row.notes || "",
+    createdAt: row.created_at,
+  };
+}
+
 // Owner sees everything — no client_id filter needed, unlike client-api.
 app.get(
   "/api/clients",
   ownerRoute(async (req, res) => {
     const { data, error } = await supabase.from("clients").select("*").order("name");
     if (error) throw error;
-    res.json(data);
+    res.json(data.map(clientRowToApi));
+  })
+);
+
+app.post(
+  "/api/clients",
+  ownerRoute(async (req, res) => {
+    const normalized = normalizeClientPayload(req.body);
+    if (normalized.error) {
+      return res.status(400).json({ error: "invalid_body", message: normalized.error });
+    }
+
+    const { data, error } = await supabase
+      .from("clients")
+      .insert({ ...normalized.data, created_by: req.profile.id })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return res.status(409).json({ error: "duplicate_client", message: "A client with that name or email may already exist." });
+      }
+      throw error;
+    }
+    res.status(201).json(clientRowToApi(data));
+  })
+);
+
+app.patch(
+  "/api/clients/:clientId",
+  ownerRoute(async (req, res) => {
+    const normalized = normalizeClientPayload(req.body);
+    if (normalized.error) {
+      return res.status(400).json({ error: "invalid_body", message: normalized.error });
+    }
+
+    const { data, error } = await supabase
+      .from("clients")
+      .update(normalized.data)
+      .eq("id", req.params.clientId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No client with that id." });
+    res.json(clientRowToApi(data));
   })
 );
 
@@ -151,14 +238,11 @@ app.get(
 // before this handler body ever runs — never a faked success.
 //
 // `clients` has no email column (see db/schema.sql) — nothing has ever
-// collected one, so rather than bolt on a schema change against the temp
-// Supabase project for one route, the owner types the email in at invite
-// time. inviteUserByEmail creates the auth.users row and emails the invite
-// link; it does NOT create the matching `profiles` row (role, client_id) —
-// that still needs to happen once the client actually completes setup,
-// most likely via a Supabase trigger on auth.users insert. Not built yet;
-// flagging here rather than silently pretending this route alone is enough
-// to produce a working client login.
+// collected one, so the owner types the email in at invite time.
+// inviteUserByEmail creates the auth.users row and emails the invite link;
+// db/migrations/2026-08-31-auth-profile-trigger.sql turns that auth row's
+// metadata into the matching public.profiles row (role, client_id) that
+// login/routing requires.
 app.post(
   "/api/clients/:clientId/invite",
   ownerRoute(async (req, res) => {

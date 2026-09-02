@@ -53,3 +53,9 @@ npm run start:client-api
 The APIs start without Supabase credentials and expose `/health`, but protected
 routes return `503` until each service has a `.env` copied from its
 `.env.example` with real Supabase values.
+
+## Client Onboarding
+
+Tenyse should manage clients from the owner portal, not from Supabase. The
+handoff workflow is documented in
+[`docs/client-onboarding.md`](docs/client-onboarding.md).

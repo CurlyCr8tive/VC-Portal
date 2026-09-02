@@ -38,6 +38,19 @@ export function updateClient(updatedClient) {
   return all;
 }
 
+export function upsertClientByName(client) {
+  const key = String(client.name || "").trim().toLowerCase();
+  const all = loadClients();
+  const index = all.findIndex((c) => c.name.trim().toLowerCase() === key);
+  if (index === -1) {
+    all.push(client);
+  } else {
+    all[index] = client;
+  }
+  saveAll(all);
+  return all;
+}
+
 export function deleteClient(id) {
   const all = loadClients().filter((c) => c.id !== id);
   saveAll(all);

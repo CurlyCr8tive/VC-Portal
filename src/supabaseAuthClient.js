@@ -57,9 +57,9 @@ export async function signInReal(email, password) {
     .eq("id", signInData.user.id)
     .single();
   if (profileError || !profile) {
-    // A real auth.users row with no matching profiles row is a real,
-    // known gap (see the invite route's comment in server/owner-api/
-    // index.js) — surface it plainly rather than pretending login worked.
+    // A real auth.users row with no matching profiles row means the
+    // Auth -> profiles trigger was not installed when this user was created,
+    // or the account metadata did not include a recognized app role.
     await supabase.auth.signOut();
     return { ok: false, message: "Signed in, but no matching profiles row exists for this account — can't determine a role." };
   }

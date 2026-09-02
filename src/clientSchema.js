@@ -40,8 +40,8 @@ function normalizeFields(raw) {
 
 export function createClient(raw) {
   return {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
+    id: raw.id || crypto.randomUUID(),
+    createdAt: raw.createdAt || new Date().toISOString(),
     ...normalizeFields(raw),
   };
 }

@@ -31,11 +31,10 @@ create table profiles (
   role text not null check (role in ('owner', 'pr_client', 'coaching_mentee')),
   name text not null,
   email text not null unique,
-  -- Only set when role = 'pr_client'. A pr_client profile with a null
-  -- client_id is invalid data, but Postgres can't express "required only
-  -- when X" as a single constraint without a trigger — enforce this at the
-  -- application layer (Express) for now, revisit if it becomes a real bug
-  -- source.
+  -- Only set when role = 'pr_client'. The invite trigger below fills this
+  -- from auth.users.raw_user_meta_data.client_id when Tenyse invites a
+  -- client through the owner portal; Express still rejects pr_client
+  -- sessions with no assigned client_id as a final guard.
   -- No inline `references clients(id)` here on purpose — clients doesn't
   -- exist yet at this point in the script (profiles/clients reference each
   -- other both ways: clients.created_by -> profiles, profiles.client_id ->
@@ -72,6 +71,56 @@ alter table clients add column contact_email text;
 alter table clients add column industry text;
 alter table clients add column engagement_start_date date;
 alter table clients add column notes text;
+
+-- ---------------------------------------------------------------------------
+-- auth.users -> profiles invite bridge
+-- ---------------------------------------------------------------------------
+-- Supabase Auth owns login/passwords. The app owns roles and client scoping
+-- in public.profiles. When Tenyse sends a client invite, owner-api includes
+-- raw_user_meta_data: { role: "pr_client", client_id, client_name }. This
+-- trigger turns that Auth user into the profile row the portal needs for
+-- login/routing, while leaving users with no recognized app role untouched.
+create or replace function public.handle_new_app_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  app_role text := new.raw_user_meta_data->>'role';
+  app_client_id uuid := nullif(new.raw_user_meta_data->>'client_id', '')::uuid;
+begin
+  if app_role is null or app_role not in ('owner', 'pr_client', 'coaching_mentee') then
+    return new;
+  end if;
+
+  insert into public.profiles (id, role, name, email, client_id)
+  values (
+    new.id,
+    app_role,
+    coalesce(
+      nullif(new.raw_user_meta_data->>'name', ''),
+      nullif(new.raw_user_meta_data->>'full_name', ''),
+      nullif(new.raw_user_meta_data->>'client_name', ''),
+      new.email
+    ),
+    new.email,
+    case when app_role in ('pr_client', 'coaching_mentee') then app_client_id else null end
+  )
+  on conflict (id) do update set
+    role = excluded.role,
+    name = excluded.name,
+    email = excluded.email,
+    client_id = excluded.client_id;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_app_user();
 
 -- ---------------------------------------------------------------------------
 -- campaigns — confirmed 7/31 as core to Tenyse's actual mental model.
