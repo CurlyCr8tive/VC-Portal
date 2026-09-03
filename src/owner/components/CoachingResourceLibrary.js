@@ -16,6 +16,7 @@ const PRIORITY_BADGE_CLASS = { high: "client-past", medium: "in-progress", low: 
 export function renderCoachingResourceLibrary(container, clientName) {
   let showingForm = false;
   let editingId = null;
+  let confirmation = "";
 
   render();
 
@@ -28,6 +29,7 @@ export function renderCoachingResourceLibrary(container, clientName) {
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
         <button type="button" class="btn-primary" id="crl-new-btn">${showingForm && !editingId ? "Cancel" : "+ New Item"}</button>
       </div>
+      ${confirmation ? `<div class="save-confirmation" role="status">${escapeHtml(confirmation)}</div>` : ""}
       ${showingForm ? formHtml(editingId ? items.find((i) => i.id === editingId) : null) : ""}
 
       <p style="margin:0 0 8px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Missing Assets Checklist</p>
@@ -115,8 +117,13 @@ export function renderCoachingResourceLibrary(container, clientName) {
         completed: existing?.completed || false,
       };
       try {
-        if (existing) updateResource(applyResourceEdit(existing, raw));
-        else addResource(createResource(raw));
+        if (existing) {
+          updateResource(applyResourceEdit(existing, raw));
+          confirmation = "Coaching item saved.";
+        } else {
+          addResource(createResource(raw));
+          confirmation = "Coaching item added.";
+        }
         showingForm = false;
         editingId = null;
         render();
@@ -133,6 +140,7 @@ export function renderCoachingResourceLibrary(container, clientName) {
     if (checkbox) {
       checkbox.addEventListener("change", () => {
         updateResource(toggleResourceComplete(item));
+        confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";
         render();
       });
     }
@@ -144,6 +152,7 @@ export function renderCoachingResourceLibrary(container, clientName) {
     row.querySelector(`[data-delete-item="${CSS.escape(item.id)}"]`).addEventListener("click", () => {
       if (!confirm(`Delete "${item.title}"?`)) return;
       deleteResource(item.id);
+      confirmation = "Coaching item deleted.";
       render();
     });
   }

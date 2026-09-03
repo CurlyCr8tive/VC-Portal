@@ -3,7 +3,8 @@ import { loadPhasesForClient, updatePhase } from "../../coachingPhaseStorage.js"
 import { updateHomeworkStatus, respondToReflection } from "../../coachingPhaseSchema.js";
 import { loadResourcesForClient } from "../../coachingResourceStorage.js";
 import { createOpportunity } from "../../opportunitySchema.js";
-import { addOpportunity } from "../../opportunityStorage.js";
+import { addOpportunity, loadOpportunitiesForClient } from "../../opportunityStorage.js";
+import { calculateCoachingProgress, OPPORTUNITY_STATUS_LABELS } from "../../coachingProgress.js";
 
 // Coaching Program — mentee (client-side) view. Real once a real Client
 // record (engagementType coaching/pr_and_coaching) has phases loaded for
@@ -24,6 +25,8 @@ const STATUS_LABEL = { not_started: "Not Started", in_progress: "In Progress", c
 const HOMEWORK_TYPE_LABEL = { action: "Action Item", reflection: "Reflection Prompt", standing: "Standing Instruction" };
 
 export function renderCoachingProgramView(container, clientName) {
+  let confirmation = "";
+
   render();
 
   function render() {
@@ -33,9 +36,9 @@ export function renderCoachingProgramView(container, clientName) {
       return;
     }
 
-    const completedCount = phases.filter((p) => p.status === "complete").length;
-    const progressPercent = Math.round((completedCount / phases.length) * 100);
     const resources = loadResourcesForClient(clientName);
+    const opportunities = loadOpportunitiesForClient(clientName);
+    const progress = calculateCoachingProgress({ phases, resources, opportunities });
 
     container.innerHTML = `
       <div class="section-heading">
@@ -43,13 +46,9 @@ export function renderCoachingProgramView(container, clientName) {
         <p class="hint" style="margin-top:4px;">Visibility to Revenue — 90 days across six phases.</p>
       </div>
 
-      <div class="card" style="margin-bottom:16px;">
-        <p style="margin:0 0 4px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Your progress</p>
-        <div style="background:var(--color-teal-tint); border-radius:var(--radius-md); height:10px; margin:10px 0; overflow:hidden;">
-          <div style="background:var(--color-teal); height:100%; width:${progressPercent}%;"></div>
-        </div>
-        <p class="hint" style="margin:0;">${completedCount} of ${phases.length} phases complete.</p>
-      </div>
+      ${confirmation ? `<div class="save-confirmation" role="status">${escapeHtml(confirmation)}</div>` : ""}
+
+      ${progressSummaryHtml(progress)}
 
       <div class="section-heading" style="margin-top:20px;"><h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">Phases</h3></div>
       <div id="cpv-phases" style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;"></div>
@@ -109,6 +108,38 @@ export function renderCoachingProgramView(container, clientName) {
     });
   }
 
+  function progressSummaryHtml(progress) {
+    const pipeline = Object.entries(progress.opportunities.pipeline)
+      .filter(([, count]) => count > 0)
+      .map(([status, count]) => `${count} ${OPPORTUNITY_STATUS_LABELS[status]}`)
+      .join(" · ");
+
+    return `
+      <section class="coaching-progress-summary" aria-label="Coaching progress summary">
+        ${progressMetricHtml("Phase Progress", progress.phases)}
+        ${progressMetricHtml("Homework", progress.homework)}
+        ${progressMetricHtml("Missing Assets", progress.checklist)}
+        <div class="coaching-progress-metric">
+          <p class="metric-kicker">Opportunities</p>
+          <p class="metric-value">${progress.opportunities.total}</p>
+          <p class="metric-note">${pipeline || "No opportunities submitted yet"}</p>
+        </div>
+      </section>
+    `;
+  }
+
+  function progressMetricHtml(label, metric) {
+    const note = metric.total > 0 ? `${metric.complete} of ${metric.total} complete` : "Nothing assigned yet";
+    return `
+      <div class="coaching-progress-metric">
+        <p class="metric-kicker">${escapeHtml(label)}</p>
+        <p class="metric-value">${metric.percent}%</p>
+        <div class="progress-track" aria-hidden="true"><div class="progress-fill" style="width:${metric.percent}%;"></div></div>
+        <p class="metric-note">${escapeHtml(note)}</p>
+      </div>
+    `;
+  }
+
   function phaseCardHtml(phase) {
     const homework = phase.homework || [];
     return `
@@ -153,6 +184,7 @@ export function renderCoachingProgramView(container, clientName) {
         const response = wrap.querySelector("[data-reflection-input]").value;
         if (!response.trim()) return;
         updatePhase(respondToReflection(phase, homeworkId, response));
+        confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
         render();
       });
     });
@@ -161,6 +193,7 @@ export function renderCoachingProgramView(container, clientName) {
       checkbox.addEventListener("change", () => {
         const homeworkId = wrap.dataset.hw;
         updatePhase(updateHomeworkStatus(phase, homeworkId, checkbox.checked ? "complete" : "not_started"));
+        confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
         render();
       });
     });

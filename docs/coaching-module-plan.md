@@ -251,7 +251,40 @@ Recommended near-term approach:
 - Add or confirm sample Chef Garth rows in the real project.
 - Wire client engagement type from real Supabase data through the client
   sidebar toggle.
-- Add a compact coaching progress summary component.
-- Add saved/sent confirmation states to coaching interactions.
-- Add a first pass of coaching behavior tests to `npm run check` or a
-  dedicated test command.
+
+## Unfinished / Open
+
+Still blocked on Tenyse's Supabase access:
+
+- Supabase migration into Tenyse's paid account.
+- Frontend Supabase config with real anon key.
+- Backend .env files with real service-role key.
+- Real owner/client auth users.
+- Matching profiles rows or auth trigger confirmation.
+- Real client data population issues caused by migration not being complete.
+- Coaching data still needs full Supabase/API persistence.
+- Coaching toggle needs real-auth end-to-end testing.
+
+Needs project/product confirmation:
+
+- Chef Garth / Greyz Bistro coaching page needs final screenshot/demo polish.
+- Homework needs richer metadata if required: due windows and optional VAAM tag per item.
+- Opportunity evaluator agent flow is not built; current version is manual scoring card.
+- Resource library/checklist does not support real file uploads yet.
+- Raise Local / matchmaking research is not part of the current VC Portal build, but still needs separate research/write-up if Tenyse expects it.
+- Canva bulk-create fields need final cross-check against Tenyse's case study/client report format.
+- Campaign structuring needs final verification: add campaign, duration, budget/ad spend, editable campaign names.
+- Production CORS/domain settings still need to be locked down.
+
+Moved forward in this pass:
+
+- Coaching progress summary added to the client coaching page.
+- Coaching saved/sent confirmation states added for client homework/reflections and owner phase/resource interactions.
+- Coaching behavior checks added to `npm run check`.
+
+Optional API keys not confirmed:
+
+- Currents or NewsData.
+- OpenAI or Anthropic.
+- Perplexity.
+- Gmail OAuth.

@@ -30,6 +30,7 @@ const HOMEWORK_TYPE_LABEL = { action: "Action Item", reflection: "Reflection Pro
 export function renderPhaseTrackerView(container, clientName) {
   let expandedPhaseId = null;
   let editingPhaseId = null;
+  let confirmation = "";
 
   render();
 
@@ -69,12 +70,16 @@ export function renderPhaseTrackerView(container, clientName) {
             })
           );
         }
+        confirmation = `${template.label} loaded for ${clientName}.`;
         render();
       });
       return;
     }
 
-    container.innerHTML = phases.map((phase) => phaseCardHtml(phase)).join("");
+    container.innerHTML = `
+      ${confirmation ? `<div class="save-confirmation" role="status">${escapeHtml(confirmation)}</div>` : ""}
+      ${phases.map((phase) => phaseCardHtml(phase)).join("")}
+    `;
 
     phases.forEach((phase) => wirePhaseCard(phase));
   }
@@ -205,6 +210,7 @@ export function renderPhaseTrackerView(container, clientName) {
     card.querySelector(`[data-status-select="${CSS.escape(phase.id)}"]`).addEventListener("change", (e) => {
       try {
         updatePhase(applyPhaseEdit(phase, { ...phase, status: e.target.value }));
+        confirmation = `Phase ${phase.phaseNumber} status saved.`;
         render();
       } catch (err) {
         logError({ source: "Coaching phase status update", message: err.message });
@@ -226,6 +232,7 @@ export function renderPhaseTrackerView(container, clientName) {
             })
           );
           editingPhaseId = null;
+          confirmation = `Phase ${phase.phaseNumber} details saved.`;
           render();
         } catch (err) {
           logError({ source: "Coaching phase edit", message: err.message });
@@ -245,6 +252,7 @@ export function renderPhaseTrackerView(container, clientName) {
             dueDate: form.querySelector("[data-hw-due]").value,
           });
           updatePhase(updated);
+          confirmation = `Homework added to Phase ${phase.phaseNumber}.`;
           render();
         } catch (err) {
           alert(err.message);
@@ -257,6 +265,7 @@ export function renderPhaseTrackerView(container, clientName) {
         const homeworkId = select.dataset.hwStatus;
         try {
           updatePhase(updateHomeworkStatus(phase, homeworkId, select.value));
+          confirmation = "Homework status saved.";
           render();
         } catch (err) {
           alert(err.message);
@@ -268,6 +277,7 @@ export function renderPhaseTrackerView(container, clientName) {
       btn.addEventListener("click", () => {
         if (!confirm("Remove this homework item?")) return;
         updatePhase(removeHomeworkItem(phase, btn.dataset.removeHomework));
+        confirmation = "Homework item removed.";
         render();
       });
     });
