@@ -42,3 +42,12 @@ export function deleteCampaign(id) {
   saveAll(all);
   return all;
 }
+
+export function upsertCampaign(campaign) {
+  const all = loadCampaigns();
+  const index = all.findIndex((c) => c.id === campaign.id);
+  if (index === -1) all.push(campaign);
+  else all[index] = campaign;
+  saveAll(all);
+  return all;
+}

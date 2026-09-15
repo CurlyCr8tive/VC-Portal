@@ -139,9 +139,9 @@ export function renderCampaignDetail(
   }
 
   const form = container.querySelector("#campaign-note-form");
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const textarea = document.getElementById("campaign-note-body");
-    onAddNote(textarea.value, currentUser);
+    await onAddNote(textarea.value, currentUser);
   });
 }

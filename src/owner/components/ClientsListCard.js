@@ -54,7 +54,14 @@ const STATUS_BADGE_CLASS = { active: "published", past: "client-past", unconfirm
 const STATUS_LABEL = { active: "Active", past: "Past / Portfolio", unconfirmed: "Status Unconfirmed" };
 const ENGAGEMENT_LABEL = { pr: "PR", coaching: "Coaching", pr_and_coaching: "PR + Coaching" };
 
-export function renderClientsList(container, clients, { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan, onViewCoaching } = {}) {
+function discoveryTermsCount(keywordConfig = {}) {
+  return [keywordConfig.clientName, keywordConfig.companyName, ...(Array.isArray(keywordConfig.aliases) ? keywordConfig.aliases : [])].filter(Boolean).length;
+}
+
+export function renderClientsList(
+  container,
+  { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan, onViewCoaching, onScheduleMeeting } = {}
+) {
   if (!clients || clients.length === 0) {
     renderEmptyState(container, {
       icon: "🗂️",
@@ -67,6 +74,7 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
   container.innerHTML = clients
     .map((c) => {
       const profile = c.profile || { status: "unconfirmed", engagementType: "pr" };
+      const termCount = discoveryTermsCount(profile.keywordConfig);
       return `
     <div class="card client-list-card">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
@@ -82,6 +90,9 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
       <p style="font-size:0.82rem; color:var(--text-secondary); margin:0;">
         ${c.campaignNames.length ? escapeHtml(c.campaignNames.join(", ")) : "No active campaigns"}
       </p>
+      <p style="font-size:0.78rem; color:var(--text-secondary); margin:8px 0 0;">
+        Discovery terms: ${termCount ? `${termCount} configured` : "not configured"}
+      </p>
       <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${onViewDashboard ? `<button type="button" class="link-btn" data-view-dashboard="${escapeHtml(c.name)}">View on Dashboard →</button>` : ""}
         ${
@@ -91,6 +102,8 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
         }
         ${onEditInfo ? `<button type="button" class="btn-secondary" data-edit-info="${escapeHtml(c.name)}">Edit Info</button>` : ""}
         ${onAddCampaign ? `<button type="button" class="btn-secondary" data-add-campaign="${escapeHtml(c.name)}">Add Campaign</button>` : ""}
+        ${onScheduleMeeting ? `<button type="button" class="btn-secondary" data-schedule-meeting="${escapeHtml(c.id)}">Schedule Meeting</button>` : ""}
+        <span data-schedule-status="${escapeHtml(c.id)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
       ${
         onInvite
@@ -133,6 +146,40 @@ export function renderClientsList(container, clients, { onInvite, onViewDashboar
   if (onViewCoaching) {
     container.querySelectorAll("[data-view-coaching]").forEach((btn) => {
       btn.addEventListener("click", () => onViewCoaching(btn.dataset.viewCoaching));
+    });
+  }
+
+  if (onScheduleMeeting) {
+    container.querySelectorAll("[data-schedule-meeting]").forEach((btn) => {
+      const clientId = btn.dataset.scheduleMeeting;
+      const client = clients.find((c) => c.id === clientId);
+      const statusEl = container.querySelector(`[data-schedule-status="${CSS.escape(clientId)}"]`);
+
+      btn.addEventListener("click", async () => {
+        const startDate = window.prompt("Meeting date (YYYY-MM-DD):", new Date().toISOString().slice(0, 10));
+        if (!startDate) return;
+        const startTime = window.prompt("Meeting time (24-hour HH:MM):", "10:00");
+        if (!startTime) return;
+
+        btn.disabled = true;
+        statusEl.textContent = "Creating calendar event...";
+        try {
+          const result = await onScheduleMeeting({
+            clientName: client?.name,
+            contactEmail: client?.profile?.contactEmail,
+            notes: client?.profile?.notes,
+            startDate,
+            startTime,
+          });
+          statusEl.innerHTML = result.ok && result.htmlLink
+            ? `Created: <a href="${escapeHtml(result.htmlLink)}" target="_blank" rel="noopener">open event</a>`
+            : `Could not create event: ${escapeHtml(result.message || "Google Calendar is not connected.")}`;
+        } catch (err) {
+          statusEl.textContent = `Could not create event: ${err.message || "Google Calendar failed."}`;
+        } finally {
+          btn.disabled = false;
+        }
+      });
     });
   }
 

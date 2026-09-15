@@ -1,15 +1,15 @@
 import { escapeHtml } from "../../client/utils.js";
 
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "clients", label: "Clients" },
-  { id: "campaigns", label: "Campaigns" },
-  { id: "placements", label: "Press Placements" },
-  { id: "reviewqueue", label: "Review Queue" },
-  { id: "reports", label: "Reports" },
-  { id: "analytics", label: "Analytics" },
-  { id: "coaching", label: "Coaching Program" },
-  { id: "settings", label: "Settings" },
+  { id: "dashboard", label: "Dashboard", icon: "⌂" },
+  { id: "clients", label: "Clients", icon: "♙" },
+  { id: "campaigns", label: "Campaigns (PR)", icon: "⌁" },
+  { id: "coaching", label: "Coaching Program", icon: "⊕", badge: "New" },
+  { id: "placements", label: "Press Placements", icon: "▤" },
+  { id: "reviewqueue", label: "Review Queue", icon: "▣" },
+  { id: "reports", label: "Reports", icon: "▥" },
+  { id: "analytics", label: "Analytics", icon: "⌘" },
+  { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
 /**
@@ -37,7 +37,9 @@ export function renderOwnerSidebar(container, opts) {
           (item) => `
           <li>
             <button data-nav="${item.id}" ${currentView === item.id ? 'aria-current="page"' : ""}>
-              ${escapeHtml(item.label)}
+              <span class="nav-icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
+              <span>${escapeHtml(item.label)}</span>
+              ${item.badge ? `<span class="nav-badge">${escapeHtml(item.badge)}</span>` : ""}
             </button>
           </li>`
         ).join("")}

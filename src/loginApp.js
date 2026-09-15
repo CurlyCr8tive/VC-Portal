@@ -7,19 +7,17 @@ if (existing) {
   window.location.href = landingPageFor(existing);
 }
 
-// Real accounts bootstrapped directly in the temp Supabase project (see
-// server/owner-api's admin scripts) — deliberately NOT paired with a
-// password here, unlike the mock list below. That password is real, if
-// low-stakes (temp/throwaway project, no real client data), and this file
-// ships in a currently-public repo — ask for it out of band instead.
-const REAL_DEMO_ACCOUNTS = [
-  { email: "test-owner@verified-consulting-temp.local", label: "owner" },
-  { email: "test-client@verified-consulting-temp.local", label: "client" },
+// Real Supabase accounts are deliberately NOT paired with passwords here,
+// unlike the mock list below. The owner types the password created in
+// Supabase Auth; the button only fills the email to avoid steering users
+// toward stale temp accounts during a walkthrough.
+const REAL_ACCOUNTS = [
+  { email: "tenyse@verifiedconsulting.com", label: "owner" },
 ];
 
 if (isRealAuthConfigured()) {
   document.getElementById("real-accounts-wrap").style.display = "block";
-  document.getElementById("real-account-list").innerHTML = REAL_DEMO_ACCOUNTS.map(
+  document.getElementById("real-account-list").innerHTML = REAL_ACCOUNTS.map(
     (a) => `<li><button type="button" data-real-email="${a.email}">${a.email}</button> — ${a.label}</li>`
   ).join("");
   document.querySelectorAll("[data-real-email]").forEach((btn) => {
@@ -52,11 +50,12 @@ form.addEventListener("submit", async (e) => {
   errorEl.classList.remove("visible");
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
+  const mockAccount = MOCK_ACCOUNTS.find((a) => a.email.toLowerCase() === email.toLowerCase());
 
   // Real auth is tried first whenever it's configured — a mismatch here
   // (e.g. typing a mock demo email) is expected, not an error, so it just
   // falls through to the mock lookup below rather than surfacing yet.
-  if (isRealAuthConfigured()) {
+  if (isRealAuthConfigured() && !mockAccount) {
     submitBtn.disabled = true;
     const result = await signInReal(email, password);
     submitBtn.disabled = false;
@@ -74,7 +73,7 @@ form.addEventListener("submit", async (e) => {
     }
   }
 
-  const account = login(email);
+  const account = mockAccount || login(email);
   if (!account) {
     errorEl.textContent = "No matching account for that email/password. Try one of the accounts listed below.";
     errorEl.classList.add("visible");

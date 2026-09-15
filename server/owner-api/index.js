@@ -29,6 +29,7 @@ import { buildCampaignActivitySummaryPrompt } from "./lib/prompts/campaignActivi
 import { buildReportNarrativePrompt } from "./lib/prompts/reportNarrativePrompt.js";
 import { buildSentimentAnalysisPrompt } from "./lib/prompts/sentimentAnalysisPrompt.js";
 import { buildLanguageSuggestionsPrompt } from "./lib/prompts/languageSuggestionsPrompt.js";
+import { createCalendarEvent, isGoogleWorkspaceConfigured, searchGmailForPitchDate } from "./lib/googleWorkspace.js";
 
 // process.env.PORT first — Render (and most PaaS hosts) assign the port
 // dynamically and expect the app to bind to whatever they inject via PORT,
@@ -64,6 +65,23 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", service: "owner-api", supabaseConnected: isSupabaseConfigured });
 });
 
+app.get(
+  "/api/google/status",
+  ownerRoute(async (req, res) => {
+    res.json({
+      configured: isGoogleWorkspaceConfigured,
+      gmailSearch: isGoogleWorkspaceConfigured,
+      calendarEvents: isGoogleWorkspaceConfigured,
+      requiredEnv: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
+      requiredScopes: [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/calendar.events",
+      ],
+    });
+  })
+);
+
 /** Wraps a route handler so `requireOwner` failures short-circuit before the handler body runs. */
 function ownerRoute(handler) {
   return async (req, res) => {
@@ -89,10 +107,28 @@ function normalizeClientPayload(body) {
   const engagementType = ENGAGEMENT_TYPES.has(body?.engagementType || body?.engagement_type)
     ? body.engagementType || body.engagement_type
     : "pr";
+  const existingKeywordConfig = body?.keywordConfig || body?.keyword_config || {};
+  const aliasesRaw = body?.discoveryAliases != null
+    ? body.discoveryAliases
+    : Array.isArray(existingKeywordConfig.aliases)
+      ? existingKeywordConfig.aliases.join("\n")
+      : "";
+  const aliases = String(aliasesRaw)
+    .split(/\r?\n|,/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const keywordConfig = {
+    clientName: String(body?.discoveryClientName || existingKeywordConfig.clientName || name).trim(),
+    ...(String(body?.discoveryCompanyName || existingKeywordConfig.companyName || "").trim()
+      ? { companyName: String(body?.discoveryCompanyName || existingKeywordConfig.companyName).trim() }
+      : {}),
+    ...(aliases.length ? { aliases } : {}),
+  };
 
   return {
     data: {
       name,
+      keyword_config: keywordConfig,
       status,
       engagement_type: engagementType,
       contact_email: String(body?.contactEmail || body?.contact_email || "").trim() || null,
@@ -114,7 +150,126 @@ function clientRowToApi(row) {
     industry: row.industry || "",
     engagementStartDate: row.engagement_start_date || "",
     notes: row.notes || "",
+    keywordConfig: row.keyword_config || {},
     createdAt: row.created_at,
+  };
+}
+
+function campaignRowToApi(row, clientName) {
+  return {
+    id: row.id,
+    name: row.name,
+    client: clientName || row.client_name || "",
+    startDate: row.start_date || "",
+    duration: row.duration || "",
+    budget: row.budget == null ? null : Number(row.budget),
+    status: row.status,
+    createdAt: row.created_at,
+    milestones: (row.campaign_milestones || []).map((m) => ({
+      id: m.id,
+      text: m.text,
+      done: Boolean(m.done),
+      createdAt: m.created_at,
+    })),
+  };
+}
+
+function placementRowToApi(row, { clientName = "", campaignName = null } = {}) {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    publication: row.publication,
+    headline: row.headline,
+    articleUrl: row.article_url || "",
+    publicationDate: row.publication_date || "",
+    client: clientName,
+    aveValue: row.ave_value == null ? null : Number(row.ave_value),
+    pitchSentDate: row.pitch_sent_date || "",
+    landedDate: row.landed_date || "",
+    notes: row.notes || "",
+    campaign: campaignName || null,
+    sentiment: row.sentiment_tag || null,
+    audienceReach: row.audience_reach == null ? null : Number(row.audience_reach),
+  };
+}
+
+async function findClientByName(name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return { error: "Client is required." };
+  const { data, error } = await supabase.from("clients").select("id, name").ilike("name", trimmed).limit(2);
+  if (error) throw error;
+  const exact = (data || []).find((c) => c.name.trim().toLowerCase() === trimmed.toLowerCase());
+  if (!exact) return { error: `No Supabase client row found for "${trimmed}". Add the client first.` };
+  return { client: exact };
+}
+
+async function findCampaignByName(clientId, name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return { campaign: null };
+  const { data, error } = await supabase.from("campaigns").select("id, name").eq("client_id", clientId).ilike("name", trimmed).limit(2);
+  if (error) throw error;
+  return { campaign: (data || []).find((c) => c.name.trim().toLowerCase() === trimmed.toLowerCase()) || null };
+}
+
+async function normalizeCampaignPayload(body) {
+  const name = String(body?.name || "").trim();
+  if (!name) return { error: "Campaign name is required." };
+  const clientResult = await findClientByName(body?.client);
+  if (clientResult.error) return clientResult;
+
+  const status = ["active", "completed", "paused"].includes(body?.status) ? body.status : "active";
+  const budgetRaw = body?.budget;
+  const budget = budgetRaw !== "" && budgetRaw != null && Number.isFinite(Number(budgetRaw)) ? Number(budgetRaw) : null;
+
+  return {
+    client: clientResult.client,
+    data: {
+      client_id: clientResult.client.id,
+      name,
+      start_date: body?.startDate || body?.start_date || null,
+      duration: String(body?.duration || "").trim() || null,
+      budget,
+      status,
+    },
+  };
+}
+
+async function normalizePlacementPayload(body) {
+  const publication = String(body?.publication || "").trim();
+  const headline = String(body?.headline || "").trim();
+  if (!publication || !headline) return { error: "Publication and headline are required." };
+
+  const clientResult = await findClientByName(body?.client);
+  if (clientResult.error) return clientResult;
+  const campaignResult = await findCampaignByName(clientResult.client.id, body?.campaign);
+  if (String(body?.campaign || "").trim() && !campaignResult.campaign) {
+    return { error: `No Supabase campaign row found for "${String(body.campaign).trim()}". Add the campaign first or leave Campaign blank.` };
+  }
+
+  const aveRaw = body?.aveValue ?? body?.ave_value;
+  const reachRaw = body?.audienceReach ?? body?.audience_reach;
+  const sentiment = ["positive", "neutral", "negative"].includes(body?.sentiment || body?.sentiment_tag)
+    ? body.sentiment || body.sentiment_tag
+    : null;
+
+  return {
+    client: clientResult.client,
+    campaign: campaignResult.campaign,
+    data: {
+      client_id: clientResult.client.id,
+      campaign_id: campaignResult.campaign?.id || null,
+      publication,
+      headline,
+      article_url: String(body?.articleUrl || body?.article_url || "").trim() || null,
+      publication_date: body?.publicationDate || body?.publication_date || null,
+      ave_value: aveRaw !== "" && aveRaw != null && Number.isFinite(Number(aveRaw)) ? Number(aveRaw) : null,
+      pitch_sent_date: body?.pitchSentDate || body?.pitch_sent_date || null,
+      landed_date: body?.landedDate || body?.landed_date || null,
+      sentiment_tag: sentiment,
+      audience_reach: reachRaw !== "" && reachRaw != null && Number.isFinite(Number(reachRaw)) ? Number(reachRaw) : null,
+      notes: String(body?.notes || "").trim() || null,
+      source: "manual",
+    },
   };
 }
 
@@ -178,7 +333,89 @@ app.get(
   ownerRoute(async (req, res) => {
     const { data, error } = await supabase.from("campaigns").select("*, campaign_milestones(*)").order("created_at", { ascending: false });
     if (error) throw error;
-    res.json(data);
+    const clientIds = [...new Set(data.map((c) => c.client_id).filter(Boolean))];
+    const { data: clients, error: clientsError } = clientIds.length
+      ? await supabase.from("clients").select("id, name").in("id", clientIds)
+      : { data: [], error: null };
+    if (clientsError) throw clientsError;
+    const clientNameById = new Map((clients || []).map((c) => [c.id, c.name]));
+    res.json(data.map((row) => campaignRowToApi(row, clientNameById.get(row.client_id))));
+  })
+);
+
+app.post(
+  "/api/campaigns",
+  ownerRoute(async (req, res) => {
+    const normalized = await normalizeCampaignPayload(req.body);
+    if (normalized.error) return res.status(400).json({ error: "invalid_body", message: normalized.error });
+
+    const { data, error } = await supabase.from("campaigns").insert(normalized.data).select("*, campaign_milestones(*)").single();
+    if (error) throw error;
+    res.status(201).json(campaignRowToApi(data, normalized.client.name));
+  })
+);
+
+app.patch(
+  "/api/campaigns/:campaignId",
+  ownerRoute(async (req, res) => {
+    const normalized = await normalizeCampaignPayload(req.body);
+    if (normalized.error) return res.status(400).json({ error: "invalid_body", message: normalized.error });
+
+    const { data, error } = await supabase
+      .from("campaigns")
+      .update(normalized.data)
+      .eq("id", req.params.campaignId)
+      .select("*, campaign_milestones(*)")
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No campaign with that id." });
+    res.json(campaignRowToApi(data, normalized.client.name));
+  })
+);
+
+app.delete(
+  "/api/campaigns/:campaignId",
+  ownerRoute(async (req, res) => {
+    const { error } = await supabase.from("campaigns").delete().eq("id", req.params.campaignId);
+    if (error) throw error;
+    res.status(204).send();
+  })
+);
+
+app.post(
+  "/api/campaigns/:campaignId/milestones",
+  ownerRoute(async (req, res) => {
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ error: "invalid_body", message: "Milestone text is required." });
+    const { data, error } = await supabase.from("campaign_milestones").insert({ campaign_id: req.params.campaignId, text }).select().single();
+    if (error) throw error;
+    res.status(201).json({ id: data.id, text: data.text, done: Boolean(data.done), createdAt: data.created_at });
+  })
+);
+
+app.patch(
+  "/api/campaign-milestones/:milestoneId",
+  ownerRoute(async (req, res) => {
+    const { data: existing, error: existingError } = await supabase
+      .from("campaign_milestones")
+      .select("done")
+      .eq("id", req.params.milestoneId)
+      .single();
+    if (existingError) throw existingError;
+    if (!existing) return res.status(404).json({ error: "not_found", message: "No milestone with that id." });
+    const done = typeof req.body?.done === "boolean" ? req.body.done : !existing.done;
+    const { data, error } = await supabase.from("campaign_milestones").update({ done }).eq("id", req.params.milestoneId).select().single();
+    if (error) throw error;
+    res.json({ id: data.id, text: data.text, done: Boolean(data.done), createdAt: data.created_at });
+  })
+);
+
+app.delete(
+  "/api/campaign-milestones/:milestoneId",
+  ownerRoute(async (req, res) => {
+    const { error } = await supabase.from("campaign_milestones").delete().eq("id", req.params.milestoneId);
+    if (error) throw error;
+    res.status(204).send();
   })
 );
 
@@ -187,7 +424,83 @@ app.get(
   ownerRoute(async (req, res) => {
     const { data, error } = await supabase.from("placements").select("*").order("publication_date", { ascending: false });
     if (error) throw error;
-    res.json(data);
+    const clientIds = [...new Set(data.map((p) => p.client_id).filter(Boolean))];
+    const campaignIds = [...new Set(data.map((p) => p.campaign_id).filter(Boolean))];
+    const [{ data: clients, error: clientsError }, { data: campaigns, error: campaignsError }] = await Promise.all([
+      clientIds.length ? supabase.from("clients").select("id, name").in("id", clientIds) : Promise.resolve({ data: [], error: null }),
+      campaignIds.length ? supabase.from("campaigns").select("id, name").in("id", campaignIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (clientsError) throw clientsError;
+    if (campaignsError) throw campaignsError;
+    const clientNameById = new Map((clients || []).map((c) => [c.id, c.name]));
+    const campaignNameById = new Map((campaigns || []).map((c) => [c.id, c.name]));
+    res.json(data.map((row) => placementRowToApi(row, { clientName: clientNameById.get(row.client_id), campaignName: campaignNameById.get(row.campaign_id) })));
+  })
+);
+
+app.post(
+  "/api/placements",
+  ownerRoute(async (req, res) => {
+    const normalized = await normalizePlacementPayload(req.body);
+    if (normalized.error) return res.status(400).json({ error: "invalid_body", message: normalized.error });
+
+    const { data, error } = await supabase.from("placements").insert({ ...normalized.data, created_by: req.profile.id }).select().single();
+    if (error) throw error;
+    res.status(201).json(placementRowToApi(data, { clientName: normalized.client.name, campaignName: normalized.campaign?.name }));
+  })
+);
+
+app.patch(
+  "/api/placements/:placementId",
+  ownerRoute(async (req, res) => {
+    const normalized = await normalizePlacementPayload(req.body);
+    if (normalized.error) return res.status(400).json({ error: "invalid_body", message: normalized.error });
+
+    const { data, error } = await supabase
+      .from("placements")
+      .update(normalized.data)
+      .eq("id", req.params.placementId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No placement with that id." });
+    res.json(placementRowToApi(data, { clientName: normalized.client.name, campaignName: normalized.campaign?.name }));
+  })
+);
+
+app.delete(
+  "/api/placements/:placementId",
+  ownerRoute(async (req, res) => {
+    const { error } = await supabase.from("placements").delete().eq("id", req.params.placementId);
+    if (error) throw error;
+    res.status(204).send();
+  })
+);
+
+app.post(
+  "/api/google/gmail/pitch-search",
+  ownerRoute(async (req, res) => {
+    const result = await searchGmailForPitchDate({
+      clientName: req.body?.clientName,
+      publication: req.body?.publication,
+      headline: req.body?.headline,
+    });
+    res.status(result.available ? 200 : 503).json(result);
+  })
+);
+
+app.post(
+  "/api/google/calendar/events",
+  ownerRoute(async (req, res) => {
+    const result = await createCalendarEvent({
+      clientName: req.body?.clientName,
+      contactEmail: req.body?.contactEmail,
+      notes: req.body?.notes,
+      startDate: req.body?.startDate,
+      startTime: req.body?.startTime,
+      durationMinutes: req.body?.durationMinutes,
+    });
+    res.status(result.available ? 201 : 503).json(result);
   })
 );
 
@@ -220,6 +533,76 @@ app.patch(
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "not_found", message: "No review_queue row with that id." });
     res.status(200).json(data);
+  })
+);
+
+app.post(
+  "/api/review-queue/:id/create-placement",
+  ownerRoute(async (req, res) => {
+    const { data: item, error: itemError } = await supabase
+      .from("review_queue")
+      .select("id, client_id, publication, headline, article_url, status")
+      .eq("id", req.params.id)
+      .single();
+    if (itemError || !item) {
+      return res.status(404).json({ error: "not_found", message: "No review_queue row with that id." });
+    }
+    if (item.status !== "pending") {
+      return res.status(409).json({ error: "already_resolved", message: "This review item has already been resolved." });
+    }
+
+    const { data: client, error: clientError } = await supabase.from("clients").select("id, name").eq("id", item.client_id).single();
+    if (clientError || !client) {
+      return res.status(404).json({ error: "not_found", message: "No client row is attached to this review item." });
+    }
+
+    const campaignResult = await findCampaignByName(client.id, req.body?.campaign);
+    if (String(req.body?.campaign || "").trim() && !campaignResult.campaign) {
+      return res.status(400).json({
+        error: "invalid_body",
+        message: `No Supabase campaign row found for "${String(req.body.campaign).trim()}". Add the campaign first or leave Campaign blank.`,
+      });
+    }
+
+    const publicationDate = req.body?.publicationDate || req.body?.publication_date || null;
+    const aveRaw = req.body?.aveValue ?? req.body?.ave_value;
+    const reachRaw = req.body?.audienceReach ?? req.body?.audience_reach;
+    const sentiment = ["positive", "neutral", "negative"].includes(req.body?.sentiment || req.body?.sentiment_tag)
+      ? req.body.sentiment || req.body.sentiment_tag
+      : null;
+
+    const { data: placement, error: placementError } = await supabase
+      .from("placements")
+      .insert({
+        client_id: client.id,
+        campaign_id: campaignResult.campaign?.id || null,
+        publication: String(req.body?.publication || item.publication || "Unknown").trim(),
+        headline: String(req.body?.headline || item.headline || "").trim(),
+        article_url: String(req.body?.articleUrl || req.body?.article_url || item.article_url || "").trim() || null,
+        publication_date: publicationDate,
+        ave_value: aveRaw !== "" && aveRaw != null && Number.isFinite(Number(aveRaw)) ? Number(aveRaw) : null,
+        pitch_sent_date: req.body?.pitchSentDate || req.body?.pitch_sent_date || null,
+        landed_date: req.body?.landedDate || req.body?.landed_date || publicationDate,
+        sentiment_tag: sentiment,
+        audience_reach: reachRaw !== "" && reachRaw != null && Number.isFinite(Number(reachRaw)) ? Number(reachRaw) : null,
+        notes: String(req.body?.notes || "Created from Discovery Agent review queue.").trim(),
+        source: "discovery_agent",
+        created_by: req.profile.id,
+      })
+      .select()
+      .single();
+    if (placementError) throw placementError;
+
+    const { error: queueError } = await supabase
+      .from("review_queue")
+      .update({ status: "confirmed", resolved_at: new Date().toISOString(), resolved_by: req.profile.id })
+      .eq("id", item.id);
+    if (queueError) throw queueError;
+
+    res.status(201).json({
+      reviewItemId: item.id,
+      placement: placementRowToApi(placement, { clientName: client.name, campaignName: campaignResult.campaign?.name }),
+    });
   })
 );
 

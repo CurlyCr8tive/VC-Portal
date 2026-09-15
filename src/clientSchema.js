@@ -22,6 +22,23 @@ export const ENGAGEMENT_TYPES = ["pr", "coaching", "pr_and_coaching"];
 
 const REQUIRED_FIELDS = ["name"];
 
+function normalizeKeywordConfig(raw) {
+  const existing = raw.keywordConfig || raw.keyword_config || {};
+  const clientName = String(raw.discoveryClientName || existing.clientName || raw.name || "").trim();
+  const companyName = String(raw.discoveryCompanyName || existing.companyName || "").trim();
+  const aliasesRaw = raw.discoveryAliases != null ? raw.discoveryAliases : Array.isArray(existing.aliases) ? existing.aliases.join("\n") : "";
+  const aliases = String(aliasesRaw)
+    .split(/\r?\n|,/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  return {
+    clientName,
+    ...(companyName ? { companyName } : {}),
+    ...(aliases.length ? { aliases } : {}),
+  };
+}
+
 function normalizeFields(raw) {
   const missing = REQUIRED_FIELDS.filter((f) => !raw[f] || !String(raw[f]).trim());
   if (missing.length) {
@@ -35,6 +52,7 @@ function normalizeFields(raw) {
     industry: raw.industry?.trim() || "",
     engagementStartDate: raw.engagementStartDate || "",
     notes: raw.notes?.trim() || "",
+    keywordConfig: normalizeKeywordConfig(raw),
   };
 }
 

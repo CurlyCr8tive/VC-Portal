@@ -35,9 +35,9 @@ function normalizeFields(raw) {
 
 export function createCampaign(raw) {
   return {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    milestones: [],
+    id: raw.id || crypto.randomUUID(),
+    createdAt: raw.createdAt || new Date().toISOString(),
+    milestones: raw.milestones || [],
     ...normalizeFields(raw),
   };
 }

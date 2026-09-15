@@ -54,6 +54,30 @@ function clientRoute(handler) {
 }
 
 app.get(
+  "/api/me",
+  clientRoute(async (req, res) => {
+    const { data: client, error } = await supabase
+      .from("clients")
+      .select("id, name, status, engagement_type, contact_email, industry, engagement_start_date, notes, keyword_config")
+      .eq("id", req.profile.client_id)
+      .single();
+    if (error) throw error;
+    if (!client) return res.status(404).json({ error: "not_found", message: "No client row is attached to this profile." });
+
+    res.json({
+      profile: {
+        id: req.profile.id,
+        role: req.profile.role,
+        name: req.profile.name,
+        email: req.profile.email,
+        client_id: req.profile.client_id,
+      },
+      client,
+    });
+  })
+);
+
+app.get(
   "/api/campaigns",
   clientRoute(async (req, res) => {
     const { data, error } = await supabase

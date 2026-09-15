@@ -53,7 +53,7 @@ for (const file of htmlFiles) {
   const html = readFileSync(file, "utf8");
   const assetPattern = /<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+)["']/gi;
   for (const match of html.matchAll(assetPattern)) {
-    const assetPath = match[1];
+    const assetPath = match[1].split(/[?#]/, 1)[0];
     if (/^(?:https?:)?\/\//.test(assetPath) || assetPath.startsWith("#")) continue;
     const resolvedAsset = join(root, assetPath);
     if (!existsSync(resolvedAsset)) {

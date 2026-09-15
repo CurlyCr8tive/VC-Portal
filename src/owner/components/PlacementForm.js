@@ -48,7 +48,20 @@ function val(initialData, field) {
   return v == null ? "" : v;
 }
 
-export function renderPlacementForm(container, { onSubmit, onCancel, initialData = null, onResearchRate, onSuggestHeadline, onAnalyzeSentiment, knownClients = [] }) {
+export function renderPlacementForm(
+  container,
+  {
+    onSubmit,
+    onCancel,
+    initialData = null,
+    onResearchRate,
+    onSuggestHeadline,
+    onAnalyzeSentiment,
+    onFindPitchDate,
+    knownClients = [],
+    submitDisabledReason = "",
+  }
+) {
   const isEdit = Boolean(initialData);
 
   container.innerHTML = `
@@ -106,7 +119,11 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
       <div class="field-row two-col">
         <div>
           <label for="op-pitchSentDate">Pitch Sent Date</label>
-          <input type="date" id="op-pitchSentDate" name="pitchSentDate" value="${val(initialData, "pitchSentDate")}" />
+          <div style="display:flex; gap:6px;">
+            <input type="date" id="op-pitchSentDate" name="pitchSentDate" value="${val(initialData, "pitchSentDate")}" style="flex:1;" />
+            ${onFindPitchDate ? `<button type="button" class="btn-secondary" id="op-gmail-search">Find in Gmail</button>` : ""}
+          </div>
+          <div id="op-gmail-search-result" style="margin-top:6px; font-size:0.82rem;"></div>
         </div>
         <div>
           <label for="op-landedDate">Landed Date</label>
@@ -148,9 +165,12 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
       </details>
 
       <div class="form-actions" style="display:flex; gap:10px;">
-        <button type="submit" class="btn-primary">${isEdit ? "Save Changes" : "Add Placement"}</button>
+        <button type="submit" class="btn-primary" ${submitDisabledReason ? "disabled" : ""} title="${escapeHtml(submitDisabledReason)}">
+          ${submitDisabledReason ? "Sign in to Save Placement" : isEdit ? "Save Changes" : "Add Placement"}
+        </button>
         ${isEdit ? `<button type="button" class="btn-secondary" id="op-cancel">Cancel</button>` : ""}
       </div>
+      ${submitDisabledReason ? `<p class="hint" style="margin:8px 0 0;">${escapeHtml(submitDisabledReason)}</p>` : ""}
     </form>
   `;
 
@@ -158,6 +178,34 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
   const aveInput = container.querySelector("#op-aveValue");
   const publicationInput = container.querySelector("#op-publication");
   const fallbackEl = container.querySelector("#op-ave-fallback");
+  const gmailSearchBtn = container.querySelector("#op-gmail-search");
+  const gmailSearchResult = container.querySelector("#op-gmail-search-result");
+
+  if (gmailSearchBtn) {
+    gmailSearchBtn.addEventListener("click", async () => {
+      gmailSearchBtn.disabled = true;
+      gmailSearchResult.textContent = "Searching Gmail...";
+      try {
+        const result = await onFindPitchDate({
+          clientName: container.querySelector("#op-client").value,
+          publication: publicationInput.value,
+          headline: container.querySelector("#op-headline").value,
+        });
+        if (!result.ok) {
+          gmailSearchResult.textContent = `Could not search Gmail: ${result.message}`;
+        } else if (result.suggestedDate) {
+          aveInput.form.querySelector("#op-pitchSentDate").value = result.suggestedDate;
+          gmailSearchResult.textContent = `Suggested pitch date from Gmail: ${result.suggestedDate}. Review before saving.`;
+        } else {
+          gmailSearchResult.textContent = "No matching pitch email found in Gmail.";
+        }
+      } catch (err) {
+        gmailSearchResult.textContent = `Could not search Gmail: ${err.message}`;
+      } finally {
+        gmailSearchBtn.disabled = false;
+      }
+    });
+  }
 
   // Set (and cleared) by the "save this rate for next time" checkbox inside
   // renderFallback below — read at submit time so the rate saved matches
@@ -279,10 +327,10 @@ export function renderPlacementForm(container, { onSubmit, onCancel, initialData
     });
   }
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const raw = Object.fromEntries(new FormData(form).entries());
-    const succeeded = onSubmit(raw);
+    const succeeded = await onSubmit(raw);
     if (succeeded) {
       if (pendingRateSave && raw.aveValue) {
         try {

@@ -42,3 +42,12 @@ export function updatePlacement(updatedPlacement) {
   saveAll(all);
   return all;
 }
+
+export function upsertPlacement(placement) {
+  const all = loadPlacements();
+  const index = all.findIndex((p) => p.id === placement.id);
+  if (index === -1) all.push(placement);
+  else all[index] = placement;
+  saveAll(all);
+  return all;
+}

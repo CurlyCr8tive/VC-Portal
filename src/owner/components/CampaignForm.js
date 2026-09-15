@@ -57,10 +57,10 @@ export function renderCampaignForm(container, { onSubmit, onCancel, initialData 
   `;
 
   const form = container.querySelector("#owner-campaign-form");
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const raw = Object.fromEntries(new FormData(form).entries());
-    const succeeded = onSubmit(raw);
+    const succeeded = await onSubmit(raw);
     if (succeeded && !isEdit) form.reset();
   });
 

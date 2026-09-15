@@ -11,13 +11,13 @@ import {
   getAggregateRealInsight,
   getRealReport,
 } from "../realDataSource.js";
-import { computeLeadTimeDays } from "../calculations.js";
+import { computeLeadTimeDays, formatCurrency } from "../calculations.js";
 import { requireSession, logout } from "../auth.js";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
-import { addPlacement, updatePlacement, deletePlacement } from "../storage.js";
+import { addPlacement, updatePlacement, deletePlacement, upsertPlacement } from "../storage.js";
 import { createCampaign, applyCampaignEdit, addMilestone, toggleMilestone, removeMilestone } from "../campaignSchema.js";
-import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, deleteCampaign } from "../campaignStorage.js";
+import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, deleteCampaign, upsertCampaign } from "../campaignStorage.js";
 import { createClient, applyClientEdit } from "../clientSchema.js";
 import { addClient, updateClient, upsertClientByName, findClientByName } from "../clientStorage.js";
 import { renderHeader } from "../client/components/DashboardHeader.js";
@@ -41,6 +41,10 @@ import { renderCoachingAdminView } from "./components/CoachingAdminView.js";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
+import { loadPhasesForClient } from "../coachingPhaseStorage.js";
+import { loadResourcesForClient } from "../coachingResourceStorage.js";
+import { loadOpportunitiesForClient } from "../opportunityStorage.js";
+import { calculateCoachingProgress } from "../coachingProgress.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
@@ -64,11 +68,25 @@ const session = requireSession("owner");
 // Local-dev fallback for owner-api's actual listen port (server/owner-api/index.js).
 // Becomes a real build-time/env-driven value once real hosting exists — same
 // "honest placeholder, not a fake success" posture as everything else here.
-// No Authorization header is attached below: this app's session (src/auth.js)
-// is still mock auth, not a real Supabase Auth JWT, so calls here will 401
-// once Supabase is configured but before real login exists — that's the
-// correct honest failure, not a bug to paper over.
+// Real owner sessions attach a Supabase Authorization header in ownerApi().
+// Mock preview sessions still get an honest 401 from live endpoints instead
+// of a fake success.
 const OWNER_API_BASE = window.OWNER_API_BASE_URL || "http://localhost:4001";
+
+function shouldUseOwnerApi() {
+  return state.dataSource === "real" && Boolean(session?.real);
+}
+
+function ownerApiAuthHint() {
+  if (state.dataSource !== "real" || shouldUseOwnerApi()) return "";
+  return `
+    <p class="hint" style="margin-bottom:12px;">
+      You are previewing real-data screens with the mock owner login. Sign in with the real Supabase
+      owner account to run Discovery scans, invite clients, use AI writing helpers, research AVE rates,
+      and save live database changes.
+    </p>
+  `;
+}
 
 const state = {
   view: "dashboard",
@@ -76,6 +94,8 @@ const state = {
   dataSource: "real", // real | mock — real reads storage.js placements across all clients
   chartRange: "30d",
   searchTerm: "",
+  dashboardMode: "pr", // pr | coaching
+  showCoachingOnDashboard: true,
   // Dashboard-only filter: null client = every client aggregated (the
   // original behavior); either date blank = unbounded on that side. Every
   // dashboard section (metrics, recent placements, campaigns, chart) reads
@@ -110,6 +130,8 @@ const state = {
   clientStatusFilter: "all",
   realClientsSync: "idle", // idle | loading | loaded | error
   realClientsSyncMessage: "",
+  realRecordsSync: "idle", // idle | loading | loaded | error
+  realRecordsSyncMessage: "",
   selectedCampaignId: null,
   // Hand-authored candidate mentions previewing the discovery-agent review
   // queue described in the PRD. Confirm/Reject only mutate this in-memory
@@ -323,18 +345,27 @@ function groupPlacementsByMonth(placements) {
 
 function dashboardSkeletonHTML() {
   return `
-    <section class="section" id="dashboard-coaching-banner"></section>
     <section class="section">
-      <div class="card" id="dashboard-filter-bar" style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;"></div>
-      <div class="metrics-grid" id="dashboard-metrics"></div>
+      <div class="owner-dashboard-control-card" id="dashboard-filter-bar"></div>
       <p id="dashboard-filter-summary" class="hint" style="margin:8px 0 0;"></p>
     </section>
     <section class="section">
-      <div class="section-heading">
-        <h2>Recent Press Placements</h2>
-        <button class="link-btn" data-goto="placements">View All</button>
-      </div>
-      <div class="card" id="dashboard-placements"></div>
+      <div class="metrics-grid" id="dashboard-metrics"></div>
+    </section>
+    <div class="owner-dashboard-split">
+      <section class="section" style="margin-bottom:0;">
+        <div class="owner-panel-card">
+          <div class="section-heading">
+            <h2>Recent Press Placements</h2>
+            <button class="link-btn" data-goto="placements">View All</button>
+          </div>
+          <div id="dashboard-placements"></div>
+        </div>
+      </section>
+      <section class="section" id="dashboard-coaching-overview" style="margin-bottom:0;"></section>
+    </div>
+    <section class="section">
+      <div id="dashboard-rollup-strip"></div>
     </section>
     <div class="dashboard-split">
       <section class="section" style="margin-bottom:0;">
@@ -356,6 +387,220 @@ function dashboardSkeletonHTML() {
       </div>
       <div id="dashboard-reports-summary"></div>
     </section>
+  `;
+}
+
+function ownerMetricCard({ label, value, note, icon, iconBg, tooltip }) {
+  return `
+    <div class="card metric-card owner-metric-card">
+      <div class="metric-top">
+        <span class="metric-label">${escapeHtml(label)}${tooltip ? ` <span class="info-icon" title="${escapeHtml(tooltip)}">i</span>` : ""}</span>
+        <span class="metric-icon" style="background:${iconBg}">${icon}</span>
+      </div>
+      <p class="metric-value">${escapeHtml(String(value))}</p>
+      ${note ? `<p class="metric-delta positive">${escapeHtml(note)}</p>` : ""}
+    </div>
+  `;
+}
+
+function formatCompactCurrency(value) {
+  if (value == null || Number.isNaN(value)) return "—";
+  if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
+  return formatCurrency(value);
+}
+
+function getCoachingClients() {
+  if (state.dataSource !== "real") return [];
+  return getClientsWithMetrics()
+    .map((c) => c.profile || c)
+    .filter((profile) => profile && (profile.engagementType === "coaching" || profile.engagementType === "pr_and_coaching"));
+}
+
+function getCoachingOverviewRows() {
+  return getCoachingClients().map((client) => {
+    const phases = loadPhasesForClient(client.name);
+    const resources = loadResourcesForClient(client.name);
+    const opportunities = loadOpportunitiesForClient(client.name);
+    const progress = calculateCoachingProgress({ phases, resources, opportunities });
+    const nextPhase = [...phases].reverse().find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status !== "complete") || phases[phases.length - 1];
+    const reachedPhases = phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length;
+    const roadmapPercent = phases.length ? Math.round((reachedPhases / phases.length) * 100) : 0;
+    const program = phases.some((phase) => phase.vaam === "NOT_APPLICABLE")
+      ? "Raise Local structure"
+      : phases.length
+        ? "Visibility to Revenue"
+        : client.engagementType === "pr_and_coaching"
+          ? "PR + Coaching"
+          : "Coaching Program";
+    return {
+      client: client.name,
+      program,
+      progress: progress.phases.total ? roadmapPercent : Math.max(progress.homework.percent, progress.checklist.percent),
+      nextMilestone: nextPhase ? `${nextPhase.name}${nextPhase.phaseNumber ? ` (Phase ${nextPhase.phaseNumber})` : ""}` : "Set first phase",
+      nextCall: "Schedule needed",
+    };
+  });
+}
+
+function renderOwnerMetrics(container, metrics) {
+  const coachingCount = getCoachingClients().length;
+  container.innerHTML = `
+    ${ownerMetricCard({
+      label: "Total Publicity Value (AVE)",
+      value: formatCompactCurrency(metrics.totalAVE),
+      note: metrics.aveDelta != null ? `${metrics.aveDelta > 0 ? "+" : ""}${metrics.aveDelta}% vs prior period` : "Confirmed placements only",
+      icon: "$",
+      iconBg: "#fbe2da",
+      tooltip: "Estimated equivalent paid-media value for confirmed coverage.",
+    })}
+    ${ownerMetricCard({
+      label: "Total Press Placements",
+      value: metrics.totalPlacements != null ? metrics.totalPlacements : "—",
+      note: metrics.placementsDelta != null ? `${metrics.placementsDelta > 0 ? "+" : ""}${metrics.placementsDelta} vs prior period` : "Across visible clients",
+      icon: "▦",
+      iconBg: "#e1f2f0",
+    })}
+    ${ownerMetricCard({
+      label: "Avg. Lead Time",
+      value: metrics.avgLeadTime != null ? `${metrics.avgLeadTime} days` : "—",
+      note: metrics.leadTimeDelta != null ? `${metrics.leadTimeDelta < 0 ? "" : "+"}${metrics.leadTimeDelta} days vs prior period` : "Needs pitch + landed dates",
+      icon: "◷",
+      iconBg: "#fdf0d8",
+      tooltip: "Days between pitch sent date and landed date.",
+    })}
+    ${ownerMetricCard({
+      label: "Active Campaigns (PR)",
+      value: metrics.activeCampaigns,
+      note: "Active",
+      icon: "□",
+      iconBg: "#efe9f5",
+    })}
+    ${ownerMetricCard({
+      label: "Active Coaching Programs",
+      value: coachingCount,
+      note: coachingCount === 1 ? "Client enrolled" : "Clients enrolled",
+      icon: "◎",
+      iconBg: "#e9ecff",
+    })}
+  `;
+}
+
+function renderCompactPlacementsTable(container, placements) {
+  if (!placements.length) {
+    container.innerHTML = `<div class="state-panel compact"><h3>No recent placements</h3><p>Add or confirm placements to populate this dashboard table.</p></div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="table-scroll">
+      <table class="placements-table compact-table">
+        <thead>
+          <tr>
+            <th>Outlet</th>
+            <th>Headline</th>
+            <th>Campaign</th>
+            <th>Date</th>
+            <th>AVE</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${placements
+            .map(
+              (p) => `
+            <tr>
+              <td><strong>${escapeHtml(p.publication || "—")}</strong></td>
+              <td>${p.articleUrl ? `<a href="${escapeHtml(p.articleUrl)}" target="_blank" rel="noopener">${escapeHtml(p.headline)}</a>` : escapeHtml(p.headline || "—")}</td>
+              <td>${escapeHtml(p.campaign || p.clientName || "—")}</td>
+              <td>${escapeHtml(p.publicationDate || "—")}</td>
+              <td>${formatCurrency(p.aveValue)}</td>
+            </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderCoachingOverview(container) {
+  if (!state.showCoachingOnDashboard) {
+    container.innerHTML = "";
+    return;
+  }
+  const rows = getCoachingOverviewRows();
+  container.innerHTML = `
+    <div class="owner-panel-card">
+      <div class="section-heading">
+        <h2>Coaching Program Overview</h2>
+        <button class="link-btn" data-goto="coaching">View All</button>
+      </div>
+      ${
+        rows.length
+          ? `<div class="table-scroll">
+        <table class="placements-table compact-table coaching-overview-table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Program</th>
+              <th>Progress</th>
+              <th>Next Milestone</th>
+              <th>Next Call</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) => `
+              <tr>
+                <td><strong>${escapeHtml(row.client)}</strong></td>
+                <td>${escapeHtml(row.program)}</td>
+                <td>
+                  <span class="progress-cell"><span>${row.progress}%</span><span class="mini-progress"><span style="width:${row.progress}%;"></span></span></span>
+                </td>
+                <td>${escapeHtml(row.nextMilestone)}</td>
+                <td>${escapeHtml(row.nextCall)}</td>
+                <td><button type="button" class="link-btn" data-coaching-client="${escapeHtml(row.client)}">›</button></td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>`
+          : `<div class="state-panel compact"><h3>No coaching programs yet</h3><p>Set a client's engagement type to Coaching or PR + Coaching to show program progress here.</p></div>`
+      }
+    </div>
+  `;
+
+  container.querySelectorAll("[data-coaching-client]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.coachingSelectedClient = btn.dataset.coachingClient;
+      navigate("coaching");
+    });
+  });
+}
+
+function renderDashboardRollup(container, metrics) {
+  const clients = getClientsWithMetrics();
+  const activePrCampaigns = getAllCampaigns().filter((campaign) => campaign.status === "active").length;
+  const coachingCount = getCoachingClients().length;
+  container.innerHTML = `
+    <div class="owner-rollup-strip">
+      <div class="owner-rollup-item">
+        <span class="owner-rollup-icon">◎</span>
+        <span><small>Clients</small><strong>${clients.length}</strong></span>
+      </div>
+      <div class="owner-rollup-item">
+        <span class="owner-rollup-icon">□</span>
+        <span><small>PR Campaigns</small><strong>${activePrCampaigns}</strong></span>
+      </div>
+      <div class="owner-rollup-item">
+        <span class="owner-rollup-icon">◎</span>
+        <span><small>Coaching Programs</small><strong>${coachingCount}</strong></span>
+      </div>
+      <div class="owner-rollup-item wide">
+        <span><small>Total Revenue Impact Est.</small><strong>${formatCompactCurrency(metrics.totalAVE)}</strong><em>YTD (AVE)</em></span>
+      </div>
+    </div>
   `;
 }
 
@@ -404,30 +649,40 @@ function renderCoachingBanner(container) {
  * worse bet than one cheap full re-render.
  */
 function renderDashboardFilterBar(container) {
-  const clientNames = [...new Set(getAllPlacements().map((p) => p.clientName).filter(Boolean))].sort();
-
   container.innerHTML = `
-    <div class="field-row" style="margin:0;">
-      <label for="dashboard-filter-client">Client</label>
-      <select id="dashboard-filter-client">
-        <option value="">All clients</option>
-        ${clientNames.map((name) => `<option value="${escapeHtml(name)}" ${state.dashboardClientFilter === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
-      </select>
+    <div class="owner-control-block">
+      <span class="control-label">View Mode</span>
+      <div class="owner-segmented-control" role="tablist" aria-label="Dashboard view mode">
+        <button type="button" class="${state.dashboardMode === "pr" ? "active" : ""}" data-dashboard-mode="pr">PR Reporting</button>
+        <button type="button" class="${state.dashboardMode === "coaching" ? "active" : ""}" data-dashboard-mode="coaching">Coaching Program</button>
+      </div>
     </div>
-    <div class="field-row" style="margin:0;">
-      <label for="dashboard-filter-from">From</label>
-      <input type="date" id="dashboard-filter-from" value="${escapeHtml(state.dashboardDateFrom)}" />
+    <div class="owner-control-block">
+      <span class="control-label">Time Range</span>
+      <div class="owner-date-range">
+        <span aria-hidden="true">▣</span>
+        <input type="date" id="dashboard-filter-from" value="${escapeHtml(state.dashboardDateFrom)}" aria-label="From date" />
+        <span aria-hidden="true">–</span>
+        <input type="date" id="dashboard-filter-to" value="${escapeHtml(state.dashboardDateTo)}" aria-label="To date" />
+      </div>
     </div>
-    <div class="field-row" style="margin:0;">
-      <label for="dashboard-filter-to">To</label>
-      <input type="date" id="dashboard-filter-to" value="${escapeHtml(state.dashboardDateTo)}" />
+    <div class="owner-control-block coaching-module-control">
+      <span class="control-label">Coaching Module</span>
+      <label class="switch-row">
+        <input type="checkbox" id="dashboard-coaching-toggle" ${state.showCoachingOnDashboard ? "checked" : ""} />
+        <span class="toggle-switch" aria-hidden="true"></span>
+        <span>Show coaching overview on dashboard</span>
+      </label>
+      <button type="button" class="btn-secondary" id="dashboard-open-coaching">Go to Coaching Hub</button>
     </div>
     ${isDashboardFilterActive() ? `<button type="button" class="btn-secondary" id="dashboard-filter-clear">Clear filter</button>` : ""}
   `;
 
-  container.querySelector("#dashboard-filter-client").addEventListener("change", (e) => {
-    state.dashboardClientFilter = e.target.value;
-    renderDashboard();
+  container.querySelectorAll("[data-dashboard-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.dashboardMode = btn.dataset.dashboardMode;
+      renderDashboard();
+    });
   });
   container.querySelector("#dashboard-filter-from").addEventListener("change", (e) => {
     state.dashboardDateFrom = e.target.value;
@@ -437,6 +692,11 @@ function renderDashboardFilterBar(container) {
     state.dashboardDateTo = e.target.value;
     renderDashboard();
   });
+  container.querySelector("#dashboard-coaching-toggle").addEventListener("change", (e) => {
+    state.showCoachingOnDashboard = e.target.checked;
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-open-coaching").addEventListener("click", () => navigate("coaching"));
   const clearBtn = container.querySelector("#dashboard-filter-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
@@ -460,13 +720,13 @@ function renderDashboard() {
 
   target.innerHTML = dashboardSkeletonHTML();
 
-  renderCoachingBanner(document.getElementById("dashboard-coaching-banner"));
   renderDashboardFilterBar(document.getElementById("dashboard-filter-bar"));
 
   const filterActive = isDashboardFilterActive();
   const filteredPlacements = getDashboardPlacements();
+  const metrics = filterActive ? computeFilteredMetrics(filteredPlacements) : getAggregateMetrics();
 
-  renderMetricsGrid(document.getElementById("dashboard-metrics"), filterActive ? computeFilteredMetrics(filteredPlacements) : getAggregateMetrics());
+  renderOwnerMetrics(document.getElementById("dashboard-metrics"), metrics);
 
   const filterSummaryEl = document.getElementById("dashboard-filter-summary");
   filterSummaryEl.textContent = filterActive
@@ -477,8 +737,10 @@ function renderDashboard() {
   const recentPlacements = filterPlacements(basePlacements, state.searchTerm)
     .slice()
     .sort((a, b) => (a.publicationDate < b.publicationDate ? 1 : -1))
-    .slice(0, 5);
-  renderPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements, { showClient: true });
+    .slice(0, 4);
+  renderCompactPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements);
+  renderCoachingOverview(document.getElementById("dashboard-coaching-overview"));
+  renderDashboardRollup(document.getElementById("dashboard-rollup-strip"), metrics);
 
   const filteredCampaigns = state.dashboardClientFilter
     ? getAllCampaigns().filter((c) => c.clientName === state.dashboardClientFilter)
@@ -614,7 +876,7 @@ async function saveRealClient({ raw, existingRecord }) {
 }
 
 async function syncRealClientsFromSupabase() {
-  if (state.dataSource !== "real" || state.realClientsSync === "loading" || state.realClientsSync === "loaded") return;
+  if (!shouldUseOwnerApi() || state.realClientsSync === "loading" || state.realClientsSync === "loaded") return;
   state.realClientsSync = "loading";
   state.realClientsSyncMessage = "";
   try {
@@ -631,6 +893,88 @@ async function syncRealClientsFromSupabase() {
     state.realClientsSyncMessage = err.message;
     if (state.view === "clients") renderClientsView();
   }
+}
+
+async function ownerApi(path, options = {}) {
+  const res = await fetch(`${OWNER_API_BASE}${path}`, {
+    ...options,
+    headers: { ...(await authedJsonHeaders()), ...(options.headers || {}) },
+  });
+  if (res.status === 204) return null;
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.message || `Owner API request failed (${res.status}).`);
+  }
+  return body;
+}
+
+async function syncOwnerRecordsFromSupabase({ force = false } = {}) {
+  if (!shouldUseOwnerApi()) return;
+  if (state.realRecordsSync === "loading") return;
+  if (!force && ["loaded", "error"].includes(state.realRecordsSync)) return;
+
+  state.realRecordsSync = "loading";
+  try {
+    const [campaigns, placements] = await Promise.all([
+      ownerApi("/api/campaigns"),
+      ownerApi("/api/placements"),
+    ]);
+    (Array.isArray(campaigns) ? campaigns : []).forEach((campaign) => upsertCampaign(createCampaign(campaign)));
+    (Array.isArray(placements) ? placements : []).forEach((placement) => upsertPlacement(createPlacement(placement)));
+    state.realRecordsSync = "loaded";
+    state.realRecordsSyncMessage = "";
+    if (["dashboard", "campaigns", "placements"].includes(state.view)) renderCurrentView();
+  } catch (err) {
+    state.realRecordsSync = "error";
+    state.realRecordsSyncMessage = err.message;
+    if (["campaigns", "placements"].includes(state.view)) renderCurrentView();
+  }
+}
+
+async function saveRealCampaign({ raw, existingRecord }) {
+  const body = JSON.stringify(raw);
+  const saved = existingRecord
+    ? await ownerApi(`/api/campaigns/${encodeURIComponent(existingRecord.id)}`, { method: "PATCH", body })
+    : await ownerApi("/api/campaigns", { method: "POST", body });
+  return createCampaign(saved);
+}
+
+async function deleteRealCampaign(id) {
+  await ownerApi(`/api/campaigns/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+async function addRealCampaignMilestone(campaignId, text) {
+  await ownerApi(`/api/campaigns/${encodeURIComponent(campaignId)}/milestones`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+  await syncOwnerRecordsFromSupabase({ force: true });
+}
+
+async function toggleRealCampaignMilestone(campaign, milestoneId) {
+  const milestone = (campaign.milestones || []).find((m) => m.id === milestoneId);
+  await ownerApi(`/api/campaign-milestones/${encodeURIComponent(milestoneId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ done: !milestone?.done }),
+  });
+  await syncOwnerRecordsFromSupabase({ force: true });
+}
+
+async function removeRealCampaignMilestone(milestoneId) {
+  await ownerApi(`/api/campaign-milestones/${encodeURIComponent(milestoneId)}`, { method: "DELETE" });
+  await syncOwnerRecordsFromSupabase({ force: true });
+}
+
+async function saveRealPlacement({ raw, existingRecord }) {
+  const body = JSON.stringify(raw);
+  const saved = existingRecord
+    ? await ownerApi(`/api/placements/${encodeURIComponent(existingRecord.id)}`, { method: "PATCH", body })
+    : await ownerApi("/api/placements", { method: "POST", body });
+  return createPlacement(saved);
+}
+
+async function deleteRealPlacement(id) {
+  await ownerApi(`/api/placements/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 async function inviteClient({ clientName, email }) {
@@ -725,18 +1069,68 @@ async function researchOutletRate(outletName) {
   }
 }
 
+async function findPitchDateInGmail({ clientName, publication, headline }) {
+  try {
+    const result = await ownerApi("/api/google/gmail/pitch-search", {
+      method: "POST",
+      body: JSON.stringify({ clientName, publication, headline }),
+    });
+    if (result.available === false) return { ok: false, ...result };
+    return { ok: true, ...result };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+}
+
+async function scheduleClientMeeting({ clientName, contactEmail, notes, startDate, startTime }) {
+  try {
+    const result = await ownerApi("/api/google/calendar/events", {
+      method: "POST",
+      body: JSON.stringify({ clientName, contactEmail, notes, startDate, startTime, durationMinutes: 30 }),
+    });
+    if (result.available === false) return { ok: false, ...result };
+    return { ok: true, ...result };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+}
+
+async function loadGoogleWorkspaceStatus() {
+  const statusEl = document.getElementById("google-workspace-status");
+  if (!statusEl) return;
+
+  if (!shouldUseOwnerApi()) {
+    statusEl.textContent = "Sign in with Tenyse's owner account to check the live Google Workspace connection.";
+    return;
+  }
+
+  try {
+    const status = await ownerApi("/api/google/status");
+    if (status.configured) {
+      statusEl.innerHTML =
+        "<strong>Connected:</strong> Gmail search, Gmail note notifications, and Calendar scheduling can use the configured Google OAuth account.";
+      return;
+    }
+    statusEl.innerHTML =
+      "<strong>Not connected:</strong> add Google OAuth credentials with Gmail read, Gmail send, and Calendar event scopes before using Gmail search or scheduling.";
+  } catch (err) {
+    statusEl.textContent = `Could not check Google Workspace status: ${err.message}`;
+  }
+}
+
 function renderClientsView() {
   const target = document.getElementById("clients-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
   syncRealClientsFromSupabase();
 
-  const canManageClients = state.dataSource === "real";
+  const canManageClients = shouldUseOwnerApi();
   const isEditing = canManageClients && state.editingClient;
   const editingRecord = isEditing && state.editingClient !== true ? findClientByName(state.editingClient) : null;
 
   target.innerHTML = `
     <div class="section-heading"><h2>Clients</h2></div>
+    ${ownerApiAuthHint()}
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
     ${
       state.dataSource === "real" && state.realClientsSync === "error"
@@ -790,7 +1184,7 @@ function renderClientsView() {
       : getClientsWithMetrics().filter((c) => c.profile?.status === state.clientStatusFilter);
 
   renderClientsList(document.getElementById("clients-full-grid"), filteredClients, {
-    onInvite: state.dataSource === "real" ? inviteClient : undefined,
+    onInvite: shouldUseOwnerApi() ? inviteClient : undefined,
     onViewDashboard: (clientName) => {
       state.dashboardClientFilter = clientName;
       state.dashboardDateFrom = "";
@@ -804,14 +1198,15 @@ function renderClientsView() {
         }
       : undefined,
     onAddCampaign:
-      state.dataSource === "real"
+      shouldUseOwnerApi()
         ? (clientName) => {
             state.addCampaignForClient = clientName;
             state.editingCampaignId = null;
             navigate("campaigns");
           }
         : undefined,
-    onDiscoveryScan: state.dataSource === "real" ? discoveryScanClient : undefined,
+    onDiscoveryScan: shouldUseOwnerApi() ? discoveryScanClient : undefined,
+    onScheduleMeeting: shouldUseOwnerApi() ? scheduleClientMeeting : undefined,
     onViewCoaching: (clientName) => {
       state.coachingSelectedClient = clientName;
       navigate("coaching");
@@ -823,13 +1218,20 @@ function renderCampaignsView() {
   const target = document.getElementById("campaigns-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+  syncOwnerRecordsFromSupabase();
 
-  const canManageCampaigns = state.dataSource === "real";
+  const canManageCampaigns = shouldUseOwnerApi();
   const editingCampaign = canManageCampaigns && state.editingCampaignId ? loadCampaigns().find((c) => c.id === state.editingCampaignId) : null;
   const lockClient = !editingCampaign ? state.addCampaignForClient : "";
 
   target.innerHTML = `
     <div class="section-heading"><h2>Campaigns</h2></div>
+    ${ownerApiAuthHint()}
+    ${
+      state.dataSource === "real" && state.realRecordsSync === "error"
+        ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase campaigns/placements: ${escapeHtml(state.realRecordsSyncMessage)}</p>`
+        : ""
+    }
     <div class="dashboard-split">
       <section class="section" style="margin-bottom:0;">
         <h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">Overview</h3>
@@ -860,15 +1262,18 @@ function renderCampaignsView() {
   renderCampaignForm(document.getElementById("campaign-form-wrap"), {
     initialData: editingCampaign,
     lockClient,
-    onSubmit: (rawData) => {
+    onSubmit: async (rawData) => {
       try {
         if (editingCampaign) {
-          updateCampaignRecord(applyCampaignEdit(editingCampaign, rawData));
+          const saved = shouldUseOwnerApi() ? await saveRealCampaign({ raw: rawData, existingRecord: editingCampaign }) : applyCampaignEdit(editingCampaign, rawData);
+          updateCampaignRecord(saved);
           state.editingCampaignId = null;
         } else {
-          addCampaign(createCampaign(rawData));
+          const saved = shouldUseOwnerApi() ? await saveRealCampaign({ raw: rawData }) : createCampaign(rawData);
+          addCampaign(saved);
         }
         state.addCampaignForClient = "";
+        if (shouldUseOwnerApi()) await syncOwnerRecordsFromSupabase({ force: true });
         renderCampaignsView();
         return true;
       } catch (err) {
@@ -892,26 +1297,42 @@ function renderCampaignsView() {
     },
     onDelete: (id) => {
       if (confirm("Delete this campaign? This can't be undone. Placements that reference it by name are unaffected.")) {
-        deleteCampaign(id);
-        if (state.editingCampaignId === id) state.editingCampaignId = null;
-        renderCampaignsView();
+        (shouldUseOwnerApi() ? deleteRealCampaign(id) : Promise.resolve())
+          .then(() => {
+            deleteCampaign(id);
+            if (state.editingCampaignId === id) state.editingCampaignId = null;
+            renderCampaignsView();
+          })
+          .catch((err) => alert(err.message));
       }
     },
-    onAddMilestone: (campaignId, text) => {
+    onAddMilestone: async (campaignId, text) => {
       try {
-        updateCampaignRecord(addMilestone(loadCampaigns().find((c) => c.id === campaignId), text));
+        if (shouldUseOwnerApi()) await addRealCampaignMilestone(campaignId, text);
+        else updateCampaignRecord(addMilestone(loadCampaigns().find((c) => c.id === campaignId), text));
         renderCampaignsView();
       } catch (err) {
         alert(err.message);
       }
     },
-    onToggleMilestone: (campaignId, milestoneId) => {
-      updateCampaignRecord(toggleMilestone(loadCampaigns().find((c) => c.id === campaignId), milestoneId));
-      renderCampaignsView();
+    onToggleMilestone: async (campaignId, milestoneId) => {
+      try {
+        const campaign = loadCampaigns().find((c) => c.id === campaignId);
+        if (shouldUseOwnerApi()) await toggleRealCampaignMilestone(campaign, milestoneId);
+        else updateCampaignRecord(toggleMilestone(campaign, milestoneId));
+        renderCampaignsView();
+      } catch (err) {
+        alert(err.message);
+      }
     },
-    onRemoveMilestone: (campaignId, milestoneId) => {
-      updateCampaignRecord(removeMilestone(loadCampaigns().find((c) => c.id === campaignId), milestoneId));
-      renderCampaignsView();
+    onRemoveMilestone: async (campaignId, milestoneId) => {
+      try {
+        if (shouldUseOwnerApi()) await removeRealCampaignMilestone(milestoneId);
+        else updateCampaignRecord(removeMilestone(loadCampaigns().find((c) => c.id === campaignId), milestoneId));
+        renderCampaignsView();
+      } catch (err) {
+        alert(err.message);
+      }
     },
   });
 }
@@ -920,13 +1341,21 @@ function renderPlacementsView() {
   const target = document.getElementById("placements-content");
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+  syncOwnerRecordsFromSupabase();
 
   const canManagePlacements = state.dataSource === "real";
+  const canSavePlacements = shouldUseOwnerApi();
   const editingPlacement =
     canManagePlacements && state.editingPlacementId ? getAllRealPlacements().find((p) => p.id === state.editingPlacementId) : null;
 
   target.innerHTML = `
     <div class="section-heading"><h2>Press Placements</h2></div>
+    ${ownerApiAuthHint()}
+    ${
+      state.dataSource === "real" && state.realRecordsSync === "error"
+        ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase campaigns/placements: ${escapeHtml(state.realRecordsSyncMessage)}</p>`
+        : ""
+    }
     ${
       canManagePlacements
         ? `<div class="card" id="placement-form-wrap" style="margin-bottom:24px;"></div>`
@@ -941,18 +1370,27 @@ function renderPlacementsView() {
   if (canManagePlacements) {
     renderPlacementForm(document.getElementById("placement-form-wrap"), {
       initialData: editingPlacement,
-      onResearchRate: researchOutletRate,
-      onSuggestHeadline: suggestHeadline,
-      onAnalyzeSentiment: analyzeSentiment,
+      onResearchRate: shouldUseOwnerApi() ? researchOutletRate : undefined,
+      onSuggestHeadline: shouldUseOwnerApi() ? suggestHeadline : undefined,
+      onAnalyzeSentiment: shouldUseOwnerApi() ? analyzeSentiment : undefined,
+      onFindPitchDate: shouldUseOwnerApi() ? findPitchDateInGmail : undefined,
+      submitDisabledReason: shouldUseOwnerApi() ? "" : "Sign in with the real Supabase owner account to save placements to the live database.",
       knownClients: getRealClients().map((c) => c.name),
-      onSubmit: (rawData) => {
+      onSubmit: async (rawData) => {
+        if (!canSavePlacements) {
+          alert("Sign in with the real Supabase owner account to save placements to the live database.");
+          return false;
+        }
         try {
           if (editingPlacement) {
-            updatePlacement(applyPlacementEdit(editingPlacement, rawData));
+            const saved = await saveRealPlacement({ raw: rawData, existingRecord: editingPlacement });
+            updatePlacement(saved);
             state.editingPlacementId = null;
           } else {
-            addPlacement(createPlacement(rawData));
+            const saved = await saveRealPlacement({ raw: rawData });
+            addPlacement(saved);
           }
+          await syncOwnerRecordsFromSupabase({ force: true });
           renderPlacementsView();
           return true;
         } catch (err) {
@@ -969,18 +1407,22 @@ function renderPlacementsView() {
 
   renderPlacementsTable(document.getElementById("placements-full-table"), filterPlacements(getAllPlacements(), state.searchTerm), {
     showClient: true,
-    onEdit: canManagePlacements
+    onEdit: canSavePlacements
       ? (id) => {
           state.editingPlacementId = id;
           renderPlacementsView();
         }
       : undefined,
-    onDelete: canManagePlacements
-      ? (id) => {
+    onDelete: canSavePlacements
+        ? (id) => {
           if (confirm("Delete this placement? This can't be undone.")) {
-            deletePlacement(id);
-            if (state.editingPlacementId === id) state.editingPlacementId = null;
-            renderPlacementsView();
+            (shouldUseOwnerApi() ? deleteRealPlacement(id) : Promise.resolve())
+              .then(() => {
+                deletePlacement(id);
+                if (state.editingPlacementId === id) state.editingPlacementId = null;
+                renderPlacementsView();
+              })
+              .catch((err) => alert(err.message));
           }
         }
       : undefined,
@@ -1006,12 +1448,26 @@ function renderReviewQueueView() {
     return;
   }
 
+  if (!shouldUseOwnerApi()) {
+    target.innerHTML = `
+      <div class="section-heading"><h2>Review Queue</h2></div>
+      ${ownerApiAuthHint()}
+      <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
+        The live Review Queue is fed by the Discovery Agent, so it needs a real Supabase owner session.
+        The preview below shows the confirm/reject workflow without making live changes.
+      </p>
+      <div class="card" id="review-queue-list"></div>
+    `;
+    renderMockReviewQueueSection();
+    return;
+  }
+
   target.innerHTML = `
     <div class="section-heading"><h2>Review Queue</h2></div>
     <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
       Real candidate mentions found by the Discovery Agent (Clients → Scan for Mentions), waiting for you
-      to confirm or reject. Confirming here only marks a candidate resolved — it does not automatically
-      create a Placement; add it via Press Placements once you've confirmed it's real coverage.
+      to turn into a placement or reject. Creating a placement keeps the article details and marks the
+      queue item confirmed.
     </p>
     <div class="card" id="review-queue-list"><p class="hint">Loading…</p></div>
   `;
@@ -1041,8 +1497,8 @@ function renderMockReviewQueueSection() {
  */
 async function loadRealReviewQueue() {
   const listEl = document.getElementById("review-queue-list");
-  const headers = await authedJsonHeaders();
   try {
+    const headers = await authedJsonHeaders();
     const [queueRes, clientsRes] = await Promise.all([
       fetch(`${OWNER_API_BASE}/api/review-queue`, { headers }),
       fetch(`${OWNER_API_BASE}/api/clients`, { headers }),
@@ -1059,13 +1515,17 @@ async function loadRealReviewQueue() {
       id: row.id,
       headline: row.headline || "(no headline)",
       publication: row.publication || "Unknown",
+      articleUrl: row.article_url || "",
+      clientId: row.client_id,
       client: clientNameById.get(row.client_id) || "Unknown client",
       matchedOn: row.matched_on || "",
       discoveredDate: row.discovered_at ? row.discovered_at.slice(0, 10) : "",
     }));
 
     renderReviewQueue(listEl, items, {
-      onConfirm: (id) => resolveRealReviewQueueItem(id, "confirmed"),
+      confirmLabel: "Create Placement",
+      showPlacementDetails: true,
+      onConfirm: (id, details) => createPlacementFromReviewQueueItem(id, details),
       onReject: (id) => resolveRealReviewQueueItem(id, "rejected"),
     });
   } catch (err) {
@@ -1090,6 +1550,20 @@ async function resolveRealReviewQueueItem(id, status) {
     return;
   }
   loadRealReviewQueue();
+}
+
+async function createPlacementFromReviewQueueItem(id, details = {}) {
+  try {
+    const result = await ownerApi(`/api/review-queue/${encodeURIComponent(id)}/create-placement`, {
+      method: "POST",
+      body: JSON.stringify(details),
+    });
+    if (result?.placement) upsertPlacement(createPlacement(result.placement));
+    await syncOwnerRecordsFromSupabase({ force: true });
+    loadRealReviewQueue();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 /**
@@ -1139,7 +1613,11 @@ function renderSummaryForm(container, clientName) {
       <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
         <button type="button" class="btn-secondary" id="summary-approve-${cssId(clientName)}" ${!existing ? "disabled" : ""} title="${!existing ? "Save a draft first" : "Approves the saved draft above — not unsaved edits in the box"}">Approve</button>
-        <button type="button" class="btn-secondary" id="summary-generate-${cssId(clientName)}">✨ Generate with AI</button>
+        ${
+          shouldUseOwnerApi()
+            ? `<button type="button" class="btn-secondary" id="summary-generate-${cssId(clientName)}">Generate with AI</button>`
+            : `<span class="hint">Sign in with the real owner account to generate with AI.</span>`
+        }
         <span id="summary-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>
@@ -1161,6 +1639,7 @@ function renderSummaryForm(container, clientName) {
 
   const generateBtn = container.querySelector(`#summary-generate-${cssId(clientName)}`);
   const generateStatus = container.querySelector(`#summary-generate-status-${cssId(clientName)}`);
+  if (!generateBtn) return;
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
     generateStatus.textContent = "Generating…";
@@ -1202,7 +1681,11 @@ function renderReportNarrativeForm(container, clientName) {
         <textarea id="narrative-text-${cssId(clientName)}" rows="4" placeholder="Click Generate to draft this from ${escapeHtml(clientName)}'s real confirmed placements." readonly></textarea>
       </div>
       <div class="form-actions" style="display:flex; gap:10px; align-items:center;">
-        <button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">✨ Generate</button>
+        ${
+          shouldUseOwnerApi()
+            ? `<button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">Generate</button>`
+            : `<span class="hint">Sign in with the real owner account to generate with AI.</span>`
+        }
         <span id="narrative-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>
@@ -1210,6 +1693,7 @@ function renderReportNarrativeForm(container, clientName) {
 
   const generateBtn = container.querySelector(`#narrative-generate-${cssId(clientName)}`);
   const statusEl = container.querySelector(`#narrative-generate-status-${cssId(clientName)}`);
+  if (!generateBtn) return;
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
     statusEl.textContent = "Generating…";
@@ -1323,7 +1807,7 @@ function renderSettingsView() {
   document.getElementById("settings-content").innerHTML = `
     <div class="section-heading"><h2>Settings</h2></div>
     <div class="card">
-      <p>Contractor permissions, brand template defaults, and notification preferences will live here. Nothing on this page is wired up yet.</p>
+      <p>Platform preferences, API connection health, and admin tools live here. Google Workspace status appears below once the owner is signed in with a real Supabase session.</p>
     </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Outlet Rates</h2></div>
     <div class="card">
@@ -1337,6 +1821,17 @@ function renderSettingsView() {
         same relationship every other real/localStorage pair in this app already has.
       </p>
       <div id="error-log-wrap"></div>
+    </div>
+    <div class="section-heading" style="margin-top:24px;"><h2>Google Workspace</h2></div>
+    <div class="card">
+      <p style="margin:0 0 10px;">Gmail and Calendar are real backend integrations in this build once Google OAuth is configured under Tenyse's account.</p>
+      <p class="hint" style="margin:0 0 10px;">Until GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN are set, these controls return a clear not-connected message instead of opening workaround links or fabricating dates/events.</p>
+      <p id="google-workspace-status" class="hint" style="margin:0 0 10px;">Checking Google Workspace connection...</p>
+      <ul style="margin:0; padding-left:18px; color:var(--text-secondary); font-size:0.86rem;">
+        <li>Client note notification email: backend support exists; requires Gmail OAuth env values.</li>
+        <li>Client meeting scheduling: Clients -> Schedule Meeting creates a Google Calendar event and invites the saved contact email.</li>
+        <li>Lead time: Press Placements -> Find in Gmail searches for pitch evidence and fills Pitch Sent Date when it finds a match.</li>
+      </ul>
     </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Real Case Study Data</h2></div>
     <div class="card">
@@ -1376,6 +1871,7 @@ function renderSettingsView() {
 
   renderOutletRatesView(document.getElementById("outlet-rates-wrap"));
   renderErrorLogPanel(document.getElementById("error-log-wrap"));
+  loadGoogleWorkspaceStatus();
 
   document.getElementById("seed-real-case-study-btn").addEventListener("click", () => {
     const { placementsAdded, campaignsAdded, summariesApproved, clientsAdded } = seedRealCaseStudyData();
@@ -1473,30 +1969,34 @@ function renderCampaignDetailView() {
         alert(err.message);
       }
     },
-    onGenerateActivitySummary: ({ campaign: camp, placements: campPlacements, notes }) => {
-      // "Since" the campaign's own start date if known, otherwise a
-      // rolling 7 days — either way, real placements/notes are filtered
-      // by an actual date, never just "everything ever," matching the
-      // prompt's own "near-real-time check-in" framing.
-      const sinceDate = camp.startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const newPlacements = campPlacements.filter((p) => p.landedDate && p.landedDate >= sinceDate);
-      return generateAIText("campaign-activity-summary", {
-        client: camp.clientName,
-        campaignName: camp.name,
-        sinceDate,
-        newPlacements,
-        milestonesUpdated: [], // no per-milestone timestamp exists yet to say which changed "since" a date
-        recentNotes: notes,
-      });
-    },
-    onGeneratePitchSuggestions: ({ campaign: camp, placements: campPlacements, targetOutlet }) =>
-      generateAIText("language-suggestions", {
-        mode: "pitch",
-        client: camp.clientName,
-        targetOutlet,
-        campaignAngle: camp.name,
-        existingCoverage: campPlacements.filter((p) => p.landedDate),
-      }),
+    onGenerateActivitySummary: shouldUseOwnerApi()
+      ? ({ campaign: camp, placements: campPlacements, notes }) => {
+          // "Since" the campaign's own start date if known, otherwise a
+          // rolling 7 days — either way, real placements/notes are filtered
+          // by an actual date, never just "everything ever," matching the
+          // prompt's own "near-real-time check-in" framing.
+          const sinceDate = camp.startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+          const newPlacements = campPlacements.filter((p) => p.landedDate && p.landedDate >= sinceDate);
+          return generateAIText("campaign-activity-summary", {
+            client: camp.clientName,
+            campaignName: camp.name,
+            sinceDate,
+            newPlacements,
+            milestonesUpdated: [], // no per-milestone timestamp exists yet to say which changed "since" a date
+            recentNotes: notes,
+          });
+        }
+      : undefined,
+    onGeneratePitchSuggestions: shouldUseOwnerApi()
+      ? ({ campaign: camp, placements: campPlacements, targetOutlet }) =>
+          generateAIText("language-suggestions", {
+            mode: "pitch",
+            client: camp.clientName,
+            targetOutlet,
+            campaignAngle: camp.name,
+            existingCoverage: campPlacements.filter((p) => p.landedDate),
+          })
+      : undefined,
   });
 }
 
@@ -1529,12 +2029,12 @@ function renderHeaderComponent() {
     dataSource: state.dataSource,
     greeting: "Welcome back, Tenyse!",
     subtitle: "Here's what's happening across all clients.",
-    searchPlaceholder: "Search clients, campaigns, placements…",
+    searchPlaceholder: "Search clients, campaigns, or programs...",
     extraAction: {
       label: "+ New Client",
       onClick: () => {
-        if (state.dataSource !== "real") {
-          alert('Switch the sidebar\'s Data source to "Real" to add a client — adding one while previewing demo data wouldn\'t show up in it.');
+        if (!shouldUseOwnerApi()) {
+          alert("Sign in with Tenyse's real Supabase owner account to add a live client.");
           return;
         }
         state.editingClient = true;

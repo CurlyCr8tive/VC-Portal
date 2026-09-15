@@ -1,14 +1,22 @@
 import { escapeHtml } from "../utils.js";
 
 const PR_NAV_ITEMS = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "campaigns", label: "My Campaigns" },
-  { id: "placements", label: "Press Placements" },
-  { id: "reports", label: "Reports" },
-  { id: "analytics", label: "Analytics" },
-  { id: "resources", label: "Resources" },
+  { id: "dashboard", label: "Dashboard", icon: "⌂" },
+  { id: "campaigns", label: "My Campaigns", icon: "▣" },
+  { id: "placements", label: "Press Placements", icon: "▤" },
+  { id: "reports", label: "Reports & Results", icon: "▥" },
+  { id: "analytics", label: "Analytics", icon: "⌘" },
+  { id: "resources", label: "Resources", icon: "□" },
 ];
-const COACHING_NAV_ITEMS = [{ id: "coaching", label: "Coaching Program" }];
+const COACHING_NAV_ITEMS = [
+  { id: "dashboard", label: "Dashboard", icon: "⌂" },
+  { id: "coaching", label: "My Programs", icon: "▣", caret: true },
+  { id: "resources", label: "Resources", icon: "▤" },
+  { id: "opportunities", label: "Opportunities", icon: "◎" },
+  { id: "reports", label: "Reports & Results", icon: "▥" },
+  { id: "messages", label: "Messages", icon: "✉" },
+  { id: "files", label: "Files", icon: "▱" },
+];
 const COACHING_VIEW_IDS = new Set(COACHING_NAV_ITEMS.map((item) => item.id));
 
 /**
@@ -30,40 +38,34 @@ const COACHING_VIEW_IDS = new Set(COACHING_NAV_ITEMS.map((item) => item.id));
  * PR-only regardless of what's passed in (see client/app.js's fallback).
  */
 export function renderSidebar(container, opts) {
-  const { client, sessionEmail, currentView, demoState, dataSource, engagementType, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
+  const { client, sessionEmail, currentView, demoState, dataSource, engagementType, programView, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
 
   const showPr = engagementType !== "coaching";
   const showCoaching = engagementType === "coaching" || engagementType === "pr_and_coaching";
   const isToggleable = showPr && showCoaching;
-  const isCoachingView = COACHING_VIEW_IDS.has(currentView);
+  const isCoachingView = COACHING_VIEW_IDS.has(currentView) || programView === "coaching";
   const navItems = isToggleable ? (isCoachingView ? COACHING_NAV_ITEMS : PR_NAV_ITEMS) : showCoaching ? COACHING_NAV_ITEMS : PR_NAV_ITEMS;
 
   container.innerHTML = `
     <button class="sidebar-close" aria-label="Close menu">✕ Close</button>
     <div class="sidebar-brand">
-      <span class="logo-mark" aria-hidden="true">V</span>
+      <span class="logo-mark" aria-hidden="true">${escapeHtml(client.avatarInitials || "V")}</span>
       <span class="brand-name">Verified Consulting</span>
     </div>
     <div class="sidebar-client-name">
-      Viewing portal for
+      Client portal
       <strong>${escapeHtml(client.name)}</strong>
       ${sessionEmail ? `<div style="font-size:0.72rem; opacity:0.75; margin-top:2px;">Logged in as ${escapeHtml(sessionEmail)}</div>` : ""}
     </div>
-    ${
-      isToggleable
-        ? `<div class="program-toggle" role="tablist" aria-label="Switch program">
-      <button type="button" data-nav="dashboard" role="tab" aria-selected="${!isCoachingView}" class="${!isCoachingView ? "active" : ""}">PR Program</button>
-      <button type="button" data-nav="coaching" role="tab" aria-selected="${isCoachingView}" class="${isCoachingView ? "active" : ""}">Coaching Program</button>
-    </div>`
-        : ""
-    }
     <nav aria-label="Client portal navigation">
       <ul class="sidebar-nav">
         ${navItems.map(
           (item) => `
           <li>
             <button data-nav="${item.id}" ${currentView === item.id ? 'aria-current="page"' : ""}>
-              ${escapeHtml(item.label)}
+              <span class="nav-icon" aria-hidden="true">${escapeHtml(item.icon || "•")}</span>
+              <span>${escapeHtml(item.label)}</span>
+              ${item.caret ? `<span class="nav-badge nav-caret" aria-hidden="true">⌄</span>` : ""}
             </button>
           </li>`
         ).join("")}

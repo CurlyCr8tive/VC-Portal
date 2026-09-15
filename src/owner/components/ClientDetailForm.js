@@ -9,6 +9,15 @@ function val(existing, field, fallback = "") {
   return v == null ? fallback : v;
 }
 
+function keywordVal(existing, field, fallback = "") {
+  return val(existing?.keywordConfig || {}, field, fallback);
+}
+
+function aliasesVal(existing) {
+  const aliases = existing?.keywordConfig?.aliases;
+  return Array.isArray(aliases) ? aliases.join("\n") : "";
+}
+
 /**
  * Add/edit form for a client's profile info (status, engagement type,
  * contact, industry, engagement date) — the fields a real Client record
@@ -72,6 +81,23 @@ export function renderClientDetailForm(container, { onSubmit, onCancel, initialD
         <textarea id="cd-notes" name="notes" rows="3" placeholder="Owner-only context — engagement details, standing rules, anything worth remembering">${escapeHtml(val(initialData, "notes"))}</textarea>
       </div>
 
+      <details class="optional-block" ${keywordVal(initialData, "clientName") || keywordVal(initialData, "companyName") || aliasesVal(initialData) ? "open" : ""}>
+        <summary>Discovery Agent search terms</summary>
+        <div class="field-row" style="margin-top:10px;">
+          <label for="cd-discoveryClientName">Primary Search Name</label>
+          <input type="text" id="cd-discoveryClientName" name="discoveryClientName" value="${escapeHtml(keywordVal(initialData, "clientName", val(initialData, "name")))}" />
+        </div>
+        <div class="field-row">
+          <label for="cd-discoveryCompanyName">Company / Brand Name</label>
+          <input type="text" id="cd-discoveryCompanyName" name="discoveryCompanyName" placeholder="Use when different from the client name" value="${escapeHtml(keywordVal(initialData, "companyName"))}" />
+        </div>
+        <div class="field-row" style="margin-bottom:0;">
+          <label for="cd-discoveryAliases">Aliases / Executives / Search Variants</label>
+          <textarea id="cd-discoveryAliases" name="discoveryAliases" rows="3" placeholder="One per line, e.g. founder name, alternate spelling, campaign nickname">${escapeHtml(aliasesVal(initialData))}</textarea>
+          <p class="hint" style="margin-top:6px;">These terms feed Clients → Scan for Mentions. The agent searches broadly, then scores matches before adding candidates to the Review Queue.</p>
+        </div>
+      </details>
+
       <div class="form-actions" style="display:flex; gap:10px;">
         <button type="submit" class="btn-primary">${isEdit ? "Save Client Info" : "Add Client"}</button>
         <button type="button" class="btn-secondary" id="cd-cancel">Cancel</button>
@@ -80,11 +106,11 @@ export function renderClientDetailForm(container, { onSubmit, onCancel, initialD
   `;
 
   const form = container.querySelector("#client-detail-form");
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const raw = Object.fromEntries(new FormData(form).entries());
     if (isEdit) raw.name = initialData.name; // name field is readonly in edit mode; FormData would still include it, but pin explicitly
-    onSubmit(raw);
+    await onSubmit(raw);
   });
 
   container.querySelector("#cd-cancel").addEventListener("click", onCancel);

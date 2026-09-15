@@ -13,23 +13,26 @@
 //   3. A one-time authorization by the sending account, to get a refresh
 //      token — this is a manual step (OAuth Playground or a short local
 //      script), not something that can be generated in advance.
-// Until GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN /
-// GMAIL_NOTIFY_TO are all set, sendNoteNotification() logs a warning and
-// no-ops — it does not throw, so a missing/misconfigured mailer never
-// breaks the actual note-saving request that triggered it.
+// Until Google OAuth credentials and a notify-to address are set,
+// sendNoteNotification() logs a warning and no-ops — it does not throw, so
+// a missing/misconfigured mailer never breaks the actual note-saving
+// request that triggered it.
 
-const REQUIRED_ENV = ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN", "GMAIL_NOTIFY_TO"];
+const clientId = () => process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+const clientSecret = () => process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
+const refreshToken = () => process.env.GMAIL_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN;
+const notifyTo = () => process.env.GMAIL_NOTIFY_TO || process.env.GOOGLE_NOTIFY_TO || "tenyse@verifiedconsulting.com";
 
-export const isGmailConfigured = REQUIRED_ENV.every((key) => Boolean(process.env[key]));
+export const isGmailConfigured = Boolean(clientId() && clientSecret() && refreshToken() && notifyTo());
 
 async function getAccessToken() {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GMAIL_CLIENT_ID,
-      client_secret: process.env.GMAIL_CLIENT_SECRET,
-      refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+      client_id: clientId(),
+      client_secret: clientSecret(),
+      refresh_token: refreshToken(),
       grant_type: "refresh_token",
     }),
   });
@@ -53,13 +56,13 @@ function buildRawMessage({ to, subject, body }) {
  */
 export async function sendNoteNotification({ clientName, campaignName, authorName, body }) {
   if (!isGmailConfigured) {
-    console.warn("[gmailNotify] Skipped — GMAIL_* env vars not set. See server/client-api/.env.example.");
+    console.warn("[gmailNotify] Skipped — Google OAuth env vars not set. See server/client-api/.env.example.");
     return false;
   }
   try {
     const accessToken = await getAccessToken();
     const raw = buildRawMessage({
-      to: process.env.GMAIL_NOTIFY_TO,
+      to: notifyTo(),
       subject: `New note on ${clientName} — ${campaignName}`,
       body: `${authorName} posted a new note on ${campaignName} (${clientName}):\n\n${body}`,
     });

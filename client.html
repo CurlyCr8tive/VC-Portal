@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verified Consulting — Client Portal</title>
-  <link rel="stylesheet" href="portal-styles.css" />
+  <link rel="stylesheet" href="portal-styles.css?v=20260915-client-dashboard" />
 </head>
 <body>
   <div class="client-shell">
@@ -42,6 +42,18 @@
         <div id="resources-content"></div>
       </div>
 
+      <div id="view-opportunities" class="client-view">
+        <div id="opportunities-content"></div>
+      </div>
+
+      <div id="view-messages" class="client-view">
+        <div id="messages-content"></div>
+      </div>
+
+      <div id="view-files" class="client-view">
+        <div id="files-content"></div>
+      </div>
+
       <div id="view-coaching" class="client-view">
         <div id="coaching-content"></div>
       </div>
@@ -49,6 +61,6 @@
   </div>
 
   <script src="src/supabaseConfig.js"></script>
-  <script type="module" src="src/client/app.js"></script>
+  <script type="module" src="src/client/app.js?v=20260915-client-dashboard-2"></script>
 </body>
 </html>
