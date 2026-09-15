@@ -20,14 +20,15 @@ import { loadOpportunitiesForClient, addOpportunity, updateOpportunity, deleteOp
 const DECISION_LABEL = { pursuing: "Pursuing", pressure_testing: "Pressure Testing", declined: "Declined" };
 const DECISION_BADGE_CLASS = { pursuing: "published", pressure_testing: "in-progress", declined: "client-past" };
 
-export function renderOpportunityEvaluator(container, clientName) {
+export function renderOpportunityEvaluator(container, clientName, { opportunities: apiOpportunities = null, onSaveOpportunity = null, onRemoveOpportunity = null } = {}) {
   let showingForm = false;
   let editingId = null;
+  let activeOpportunities = apiOpportunities;
 
   render();
 
   function render() {
-    const opportunities = loadOpportunitiesForClient(clientName);
+    const opportunities = activeOpportunities || loadOpportunitiesForClient(clientName);
     container.innerHTML = `
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
         <button type="button" class="btn-primary" id="oe-new-btn">${showingForm && !editingId ? "Cancel" : "+ New Opportunity"}</button>
@@ -132,12 +133,23 @@ export function renderOpportunityEvaluator(container, clientName) {
   }
 
   function wireForm(existing) {
-    document.getElementById("oe-save-btn").addEventListener("click", () => {
+    document.getElementById("oe-save-btn").addEventListener("click", async () => {
       try {
+        const raw = readForm();
         if (existing) {
-          updateOpportunity(applyOpportunityEdit(existing, readForm()));
+          if (onSaveOpportunity) {
+            const nextData = await onSaveOpportunity(clientName, raw, existing);
+            if (nextData) activeOpportunities = nextData.opportunities;
+          } else {
+            updateOpportunity(applyOpportunityEdit(existing, raw));
+          }
         } else {
-          addOpportunity(createOpportunity(readForm()));
+          if (onSaveOpportunity) {
+            const nextData = await onSaveOpportunity(clientName, raw);
+            if (nextData) activeOpportunities = nextData.opportunities;
+          } else {
+            addOpportunity(createOpportunity(raw));
+          }
         }
         showingForm = false;
         editingId = null;
@@ -155,10 +167,19 @@ export function renderOpportunityEvaluator(container, clientName) {
       editingId = o.id;
       render();
     });
-    card.querySelector(`[data-delete-opp="${CSS.escape(o.id)}"]`).addEventListener("click", () => {
+    card.querySelector(`[data-delete-opp="${CSS.escape(o.id)}"]`).addEventListener("click", async () => {
       if (!confirm(`Delete "${o.title}"? This can't be undone.`)) return;
-      deleteOpportunity(o.id);
-      render();
+      try {
+        if (onRemoveOpportunity) {
+          const nextData = await onRemoveOpportunity(o.id);
+          if (nextData) activeOpportunities = nextData.opportunities;
+        } else {
+          deleteOpportunity(o.id);
+        }
+        render();
+      } catch (err) {
+        alert(err.message);
+      }
     });
   }
 }

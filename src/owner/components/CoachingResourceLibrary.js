@@ -13,15 +13,16 @@ const PRIORITY_BADGE_CLASS = { high: "client-past", medium: "in-progress", low: 
 // high=urgent-looking (reuses the muted "past" tone as attention-grabbing
 // without introducing a 4th badge color), medium=amber, low=teal (calm).
 
-export function renderCoachingResourceLibrary(container, clientName) {
+export function renderCoachingResourceLibrary(container, clientName, { resources: apiResources = null, onSaveResource = null, onRemoveResource = null } = {}) {
   let showingForm = false;
   let editingId = null;
+  let activeResources = apiResources;
   let confirmation = "";
 
   render();
 
   function render() {
-    const items = loadResourcesForClient(clientName);
+    const items = activeResources || loadResourcesForClient(clientName);
     const checklistItems = items.filter((i) => i.kind === "checklist");
     const resourceItems = items.filter((i) => i.kind === "resource");
 
@@ -107,7 +108,7 @@ export function renderCoachingResourceLibrary(container, clientName) {
   }
 
   function wireForm(existing) {
-    document.getElementById("crl-save-btn").addEventListener("click", () => {
+    document.getElementById("crl-save-btn").addEventListener("click", async () => {
       const raw = {
         client: clientName,
         kind: document.getElementById("crl-kind").value,
@@ -118,10 +119,20 @@ export function renderCoachingResourceLibrary(container, clientName) {
       };
       try {
         if (existing) {
-          updateResource(applyResourceEdit(existing, raw));
+          if (onSaveResource) {
+            const nextData = await onSaveResource(clientName, raw, existing);
+            if (nextData) activeResources = nextData.resources;
+          } else {
+            updateResource(applyResourceEdit(existing, raw));
+          }
           confirmation = "Coaching item saved.";
         } else {
-          addResource(createResource(raw));
+          if (onSaveResource) {
+            const nextData = await onSaveResource(clientName, raw);
+            if (nextData) activeResources = nextData.resources;
+          } else {
+            addResource(createResource(raw));
+          }
           confirmation = "Coaching item added.";
         }
         showingForm = false;
@@ -139,9 +150,22 @@ export function renderCoachingResourceLibrary(container, clientName) {
     const checkbox = row.querySelector(`[data-toggle-complete="${CSS.escape(item.id)}"]`);
     if (checkbox) {
       checkbox.addEventListener("change", () => {
-        updateResource(toggleResourceComplete(item));
-        confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";
-        render();
+        const raw = { ...item, completed: checkbox.checked };
+        try {
+          if (onSaveResource) {
+            onSaveResource(clientName, raw, item).then((nextData) => {
+              if (nextData) activeResources = nextData.resources;
+              confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";
+              render();
+            }).catch((err) => alert(err.message));
+          } else {
+            updateResource(toggleResourceComplete(item));
+            confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";
+            render();
+          }
+        } catch (err) {
+          alert(err.message);
+        }
       });
     }
     row.querySelector(`[data-edit-item="${CSS.escape(item.id)}"]`).addEventListener("click", () => {
@@ -149,11 +173,20 @@ export function renderCoachingResourceLibrary(container, clientName) {
       editingId = item.id;
       render();
     });
-    row.querySelector(`[data-delete-item="${CSS.escape(item.id)}"]`).addEventListener("click", () => {
+    row.querySelector(`[data-delete-item="${CSS.escape(item.id)}"]`).addEventListener("click", async () => {
       if (!confirm(`Delete "${item.title}"?`)) return;
-      deleteResource(item.id);
-      confirmation = "Coaching item deleted.";
-      render();
+      try {
+        if (onRemoveResource) {
+          const nextData = await onRemoveResource(item.id);
+          if (nextData) activeResources = nextData.resources;
+        } else {
+          deleteResource(item.id);
+        }
+        confirmation = "Coaching item deleted.";
+        render();
+      } catch (err) {
+        alert(err.message);
+      }
     });
   }
 }

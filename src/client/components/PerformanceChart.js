@@ -14,6 +14,33 @@ const RANGE_LABELS = {
  * to anyone who can't read the chart visually.
  */
 export function renderPerformanceChart(container, { series, range, onRangeChange, rangeLabel }) {
+  const safeSeries = Array.isArray(series) ? series : [];
+  const hasDataPoints = safeSeries.some((point) => (Number(point.ave) || 0) > 0 || (Number(point.placements) || 0) > 0);
+  if (!safeSeries.length || !hasDataPoints) {
+    container.innerHTML = `
+      <div class="section-heading">
+        <h2>Placement &amp; Value Overview</h2>
+        ${
+          rangeLabel
+            ? `<span class="hint" style="margin:0;">${escapeHtml(rangeLabel)}</span>`
+            : `<select class="chart-range-select" aria-label="Select date range for chart">
+          ${Object.entries(RANGE_LABELS)
+            .map(([value, label]) => `<option value="${value}" ${value === range ? "selected" : ""}>${label}</option>`)
+            .join("")}
+        </select>`
+        }
+      </div>
+      <div class="state-panel compact">
+        <h3>No placement value data yet</h3>
+        <p>Add placements with publication dates and AVE values, or choose a wider date range.</p>
+      </div>
+    `;
+    const rangeSelect = container.querySelector(".chart-range-select");
+    if (rangeSelect) rangeSelect.addEventListener("change", (e) => onRangeChange(e.target.value));
+    return;
+  }
+
+  series = safeSeries;
   const width = 600;
   const height = 220;
   const padding = { top: 10, right: 10, bottom: 30, left: 46 };

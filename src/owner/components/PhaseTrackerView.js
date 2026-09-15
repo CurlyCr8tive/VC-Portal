@@ -27,15 +27,19 @@ const STATUS_LABEL = { not_started: "Not Started", in_progress: "In Progress", c
 const STATUS_BADGE_CLASS = { not_started: "awaiting-publication", in_progress: "in-progress", complete: "published" };
 const HOMEWORK_TYPE_LABEL = { action: "Action Item", reflection: "Reflection Prompt", standing: "Standing Instruction" };
 
-export function renderPhaseTrackerView(container, clientName) {
+export function renderPhaseTrackerView(
+  container,
+  { phases: apiPhases = null, onLoadTemplate = null, onSavePhase = null, onAddHomework = null, onSaveHomework = null, onRemoveHomework = null } = {}
+) {
   let expandedPhaseId = null;
   let editingPhaseId = null;
+  let activePhases = apiPhases;
   let confirmation = "";
 
   render();
 
   function render() {
-    const phases = loadPhasesForClient(clientName);
+    const phases = activePhases || loadPhasesForClient(clientName);
 
     if (phases.length === 0) {
       const templateKeys = Object.keys(PROGRAM_TEMPLATES);
@@ -53,25 +57,34 @@ export function renderPhaseTrackerView(container, clientName) {
           <button type="button" class="btn-primary" id="pt-load-template">Load Selected Program</button>
         </div>
       `;
-      container.querySelector("#pt-load-template").addEventListener("click", () => {
+      container.querySelector("#pt-load-template").addEventListener("click", async () => {
         const key = container.querySelector("#pt-template-select").value;
         const template = PROGRAM_TEMPLATES[key];
         if (!template) return;
-        for (const p of template.phases) {
-          addPhase(
-            createPhase({
-              client: clientName,
-              phaseNumber: p.phaseNumber,
-              name: p.name,
-              weeks: p.weeks,
-              vaam: p.vaam,
-              deliverables: p.defaultDeliverables,
-              goal: template.placeholderGoal || "",
-            })
-          );
+        try {
+          if (onLoadTemplate) {
+            const nextData = await onLoadTemplate(clientName, template);
+            if (nextData) activePhases = nextData.phases;
+          } else {
+            for (const p of template.phases) {
+              addPhase(
+                createPhase({
+                  client: clientName,
+                  phaseNumber: p.phaseNumber,
+                  name: p.name,
+                  weeks: p.weeks,
+                  vaam: p.vaam,
+                  deliverables: p.defaultDeliverables,
+                  goal: template.placeholderGoal || "",
+                })
+              );
+            }
+          }
+          confirmation = `${template.label} loaded for ${clientName}.`;
+          render();
+        } catch (err) {
+          alert(err.message);
         }
-        confirmation = `${template.label} loaded for ${clientName}.`;
-        render();
       });
       return;
     }
@@ -207,9 +220,13 @@ export function renderPhaseTrackerView(container, clientName) {
       editingPhaseId = editingPhaseId === phase.id ? null : phase.id;
       render();
     });
-    card.querySelector(`[data-status-select="${CSS.escape(phase.id)}"]`).addEventListener("change", (e) => {
+    card.querySelector(`[data-status-select="${CSS.escape(phase.id)}"]`).addEventListener("change", async (e) => {
       try {
-        updatePhase(applyPhaseEdit(phase, { ...phase, status: e.target.value }));
+        const updated = applyPhaseEdit(phase, { ...phase, status: e.target.value });
+        if (onSavePhase) {
+          const nextData = await onSavePhase(updated);
+          if (nextData) activePhases = nextData.phases;
+        } else updatePhase(updated);
         confirmation = `Phase ${phase.phaseNumber} status saved.`;
         render();
       } catch (err) {
@@ -220,17 +237,19 @@ export function renderPhaseTrackerView(container, clientName) {
 
     const saveBtn = card.querySelector(`[data-save-edit="${CSS.escape(phase.id)}"]`);
     if (saveBtn) {
-      saveBtn.addEventListener("click", () => {
+      saveBtn.addEventListener("click", async () => {
         const form = card.querySelector(`[data-edit-form="${CSS.escape(phase.id)}"]`);
         try {
-          updatePhase(
-            applyPhaseEdit(phase, {
-              ...phase,
-              goal: form.querySelector('[data-field="goal"]').value,
-              deliverables: form.querySelector('[data-field="deliverables"]').value,
-              notes: form.querySelector('[data-field="notes"]').value,
-            })
-          );
+          const updated = applyPhaseEdit(phase, {
+            ...phase,
+            goal: form.querySelector('[data-field="goal"]').value,
+            deliverables: form.querySelector('[data-field="deliverables"]').value,
+            notes: form.querySelector('[data-field="notes"]').value,
+          });
+          if (onSavePhase) {
+            const nextData = await onSavePhase(updated);
+            if (nextData) activePhases = nextData.phases;
+          } else updatePhase(updated);
           editingPhaseId = null;
           confirmation = `Phase ${phase.phaseNumber} details saved.`;
           render();
@@ -243,15 +262,20 @@ export function renderPhaseTrackerView(container, clientName) {
 
     const addHwBtn = card.querySelector(`[data-add-homework="${CSS.escape(phase.id)}"]`);
     if (addHwBtn) {
-      addHwBtn.addEventListener("click", () => {
+      addHwBtn.addEventListener("click", async () => {
         const form = card.querySelector(`[data-add-homework-form="${CSS.escape(phase.id)}"]`);
         try {
-          const updated = addHomeworkItem(phase, {
+          const raw = {
             type: form.querySelector("[data-hw-type]").value,
             text: form.querySelector("[data-hw-text]").value,
             dueDate: form.querySelector("[data-hw-due]").value,
-          });
-          updatePhase(updated);
+          };
+          if (onAddHomework) {
+            const nextData = await onAddHomework(phase.id, raw);
+            if (nextData) activePhases = nextData.phases;
+          } else {
+            updatePhase(addHomeworkItem(phase, raw));
+          }
           confirmation = `Homework added to Phase ${phase.phaseNumber}.`;
           render();
         } catch (err) {
@@ -261,10 +285,13 @@ export function renderPhaseTrackerView(container, clientName) {
     }
 
     card.querySelectorAll("[data-hw-status]").forEach((select) => {
-      select.addEventListener("change", () => {
+      select.addEventListener("change", async () => {
         const homeworkId = select.dataset.hwStatus;
         try {
-          updatePhase(updateHomeworkStatus(phase, homeworkId, select.value));
+          if (onSaveHomework) {
+            const nextData = await onSaveHomework(homeworkId, { status: select.value });
+            if (nextData) activePhases = nextData.phases;
+          } else updatePhase(updateHomeworkStatus(phase, homeworkId, select.value));
           confirmation = "Homework status saved.";
           render();
         } catch (err) {
@@ -274,11 +301,18 @@ export function renderPhaseTrackerView(container, clientName) {
     });
 
     card.querySelectorAll("[data-remove-homework]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         if (!confirm("Remove this homework item?")) return;
-        updatePhase(removeHomeworkItem(phase, btn.dataset.removeHomework));
-        confirmation = "Homework item removed.";
-        render();
+        try {
+          if (onRemoveHomework) {
+            const nextData = await onRemoveHomework(btn.dataset.removeHomework);
+            if (nextData) activePhases = nextData.phases;
+          } else updatePhase(removeHomeworkItem(phase, btn.dataset.removeHomework));
+          confirmation = "Homework item removed.";
+          render();
+        } catch (err) {
+          alert(err.message);
+        }
       });
     });
   }

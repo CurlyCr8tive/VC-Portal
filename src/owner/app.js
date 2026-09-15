@@ -132,6 +132,9 @@ const state = {
   realClientsSyncMessage: "",
   realRecordsSync: "idle", // idle | loading | loaded | error
   realRecordsSyncMessage: "",
+  realCoachingSync: "idle", // idle | loading | loaded | error
+  realCoachingSyncMessage: "",
+  realCoachingData: null,
   selectedCampaignId: null,
   // Hand-authored candidate mentions previewing the discovery-agent review
   // queue described in the PRD. Confirm/Reject only mutate this in-memory
@@ -417,10 +420,12 @@ function getCoachingClients() {
 }
 
 function getCoachingOverviewRows() {
+  const apiCoaching = shouldUseOwnerApi() ? state.realCoachingData : null;
   return getCoachingClients().map((client) => {
-    const phases = loadPhasesForClient(client.name);
-    const resources = loadResourcesForClient(client.name);
-    const opportunities = loadOpportunitiesForClient(client.name);
+    const clientData = apiCoaching ? coachingDataForClient(client.name) : null;
+    const phases = clientData?.phases || loadPhasesForClient(client.name);
+    const resources = clientData?.resources || loadResourcesForClient(client.name);
+    const opportunities = clientData?.opportunities || loadOpportunitiesForClient(client.name);
     const progress = calculateCoachingProgress({ phases, resources, opportunities });
     const nextPhase = [...phases].reverse().find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status !== "complete") || phases[phases.length - 1];
     const reachedPhases = phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length;
@@ -710,6 +715,8 @@ function renderDashboardFilterBar(container) {
 
 function renderDashboard() {
   const target = document.getElementById("dashboard-content");
+  syncOwnerRecordsFromSupabase();
+  syncOwnerCoachingFromSupabase();
   if (state.demoState === "loading") return renderLoadingState(target);
   if (state.demoState === "error") {
     return renderErrorState(target, {
@@ -929,6 +936,120 @@ async function syncOwnerRecordsFromSupabase({ force = false } = {}) {
     state.realRecordsSyncMessage = err.message;
     if (["campaigns", "placements"].includes(state.view)) renderCurrentView();
   }
+}
+
+function coachingDataForClient(clientName) {
+  const data = state.realCoachingData || { phases: [], opportunities: [], resources: [] };
+  return {
+    phases: (data.phases || []).filter((phase) => phase.client === clientName).sort((a, b) => a.phaseNumber - b.phaseNumber),
+    opportunities: (data.opportunities || []).filter((opportunity) => opportunity.client === clientName),
+    resources: (data.resources || []).filter((resource) => resource.client === clientName),
+  };
+}
+
+async function syncOwnerCoachingFromSupabase({ force = false } = {}) {
+  if (!shouldUseOwnerApi()) return;
+  if (state.realCoachingSync === "loading") return;
+  if (!force && ["loaded", "error"].includes(state.realCoachingSync)) return;
+
+  state.realCoachingSync = "loading";
+  try {
+    state.realCoachingData = await ownerApi("/api/coaching");
+    state.realCoachingSync = "loaded";
+    state.realCoachingSyncMessage = "";
+    if (["dashboard", "coaching"].includes(state.view)) renderCurrentView();
+  } catch (err) {
+    state.realCoachingSync = "error";
+    state.realCoachingSyncMessage = err.message;
+    if (state.view === "coaching") renderCurrentView();
+  }
+}
+
+async function createRealCoachingPhase(clientName, raw) {
+  const resolved = await resolveRealClientId(clientName);
+  if (!resolved.ok) throw new Error(resolved.message);
+  await ownerApi(`/api/clients/${encodeURIComponent(resolved.id)}/coaching/phases`, {
+    method: "POST",
+    body: JSON.stringify(raw),
+  });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(clientName);
+}
+
+async function saveRealCoachingPhase(phase) {
+  await ownerApi(`/api/coaching/phases/${encodeURIComponent(phase.id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(phase),
+  });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(phase.client);
+}
+
+async function createRealHomework(phaseId, raw) {
+  const phase = (state.realCoachingData?.phases || []).find((item) => item.id === phaseId);
+  await ownerApi(`/api/coaching/phases/${encodeURIComponent(phaseId)}/homework`, {
+    method: "POST",
+    body: JSON.stringify(raw),
+  });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(phase?.client || "");
+}
+
+async function saveRealHomework(homeworkId, patch) {
+  const phase = (state.realCoachingData?.phases || []).find((item) => (item.homework || []).some((homework) => homework.id === homeworkId));
+  await ownerApi(`/api/coaching/homework/${encodeURIComponent(homeworkId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(phase?.client || "");
+}
+
+async function removeRealHomework(homeworkId) {
+  const phase = (state.realCoachingData?.phases || []).find((item) => (item.homework || []).some((homework) => homework.id === homeworkId));
+  await ownerApi(`/api/coaching/homework/${encodeURIComponent(homeworkId)}`, { method: "DELETE" });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(phase?.client || "");
+}
+
+async function saveRealOpportunity(clientName, raw, existing = null) {
+  const body = JSON.stringify(raw);
+  if (existing) {
+    await ownerApi(`/api/coaching/opportunities/${encodeURIComponent(existing.id)}`, { method: "PATCH", body });
+  } else {
+    const resolved = await resolveRealClientId(clientName);
+    if (!resolved.ok) throw new Error(resolved.message);
+    await ownerApi(`/api/clients/${encodeURIComponent(resolved.id)}/coaching/opportunities`, { method: "POST", body });
+  }
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(clientName);
+}
+
+async function removeRealOpportunity(opportunityId) {
+  const opportunity = (state.realCoachingData?.opportunities || []).find((item) => item.id === opportunityId);
+  await ownerApi(`/api/coaching/opportunities/${encodeURIComponent(opportunityId)}`, { method: "DELETE" });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(opportunity?.client || "");
+}
+
+async function saveRealResource(clientName, raw, existing = null) {
+  const body = JSON.stringify(raw);
+  if (existing) {
+    await ownerApi(`/api/coaching/resources/${encodeURIComponent(existing.id)}`, { method: "PATCH", body });
+  } else {
+    const resolved = await resolveRealClientId(clientName);
+    if (!resolved.ok) throw new Error(resolved.message);
+    await ownerApi(`/api/clients/${encodeURIComponent(resolved.id)}/coaching/resources`, { method: "POST", body });
+  }
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(clientName);
+}
+
+async function removeRealResource(resourceId) {
+  const resource = (state.realCoachingData?.resources || []).find((item) => item.id === resourceId);
+  await ownerApi(`/api/coaching/resources/${encodeURIComponent(resourceId)}`, { method: "DELETE" });
+  await syncOwnerCoachingFromSupabase({ force: true });
+  return coachingDataForClient(resource?.client || "");
 }
 
 async function saveRealCampaign({ raw, existingRecord }) {
@@ -1926,6 +2047,7 @@ function renderCurrentView() {
 }
 
 function renderCoachingView() {
+  syncOwnerCoachingFromSupabase();
   const coachingClients =
     state.dataSource === "real"
       ? getClientsWithMetrics()
@@ -1934,7 +2056,37 @@ function renderCoachingView() {
       : [];
   const initialClient = state.coachingSelectedClient || null;
   state.coachingSelectedClient = "";
-  renderCoachingAdminView(document.getElementById("coaching-content"), { coachingClients, initialClient });
+  renderCoachingAdminView(document.getElementById("coaching-content"), {
+    coachingClients,
+    initialClient,
+    coachingDataForClient: shouldUseOwnerApi() ? coachingDataForClient : null,
+    syncStatus: shouldUseOwnerApi() ? state.realCoachingSync : "local",
+    syncMessage: state.realCoachingSyncMessage,
+    onLoadTemplate: shouldUseOwnerApi()
+      ? async (clientName, template) => {
+          let nextData = null;
+          for (const phase of template.phases) {
+            nextData = await createRealCoachingPhase(clientName, {
+              phaseNumber: phase.phaseNumber,
+              name: phase.name,
+              weeks: phase.weeks,
+              vaam: phase.vaam,
+              deliverables: phase.defaultDeliverables,
+              goal: template.placeholderGoal || "",
+            });
+          }
+          return nextData;
+        }
+      : null,
+    onSavePhase: shouldUseOwnerApi() ? saveRealCoachingPhase : null,
+    onAddHomework: shouldUseOwnerApi() ? createRealHomework : null,
+    onSaveHomework: shouldUseOwnerApi() ? saveRealHomework : null,
+    onRemoveHomework: shouldUseOwnerApi() ? removeRealHomework : null,
+    onSaveOpportunity: shouldUseOwnerApi() ? saveRealOpportunity : null,
+    onRemoveOpportunity: shouldUseOwnerApi() ? removeRealOpportunity : null,
+    onSaveResource: shouldUseOwnerApi() ? saveRealResource : null,
+    onRemoveResource: shouldUseOwnerApi() ? removeRealResource : null,
+  });
 }
 
 function showCampaignDetail(id) {

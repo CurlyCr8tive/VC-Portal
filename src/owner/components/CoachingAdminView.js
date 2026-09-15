@@ -19,7 +19,25 @@ const TABS = [
   { id: "resources", label: "Resources & Checklist" },
 ];
 
-export function renderCoachingAdminView(container, { coachingClients = [], initialClient = null } = {}) {
+export function renderCoachingAdminView(
+  container,
+  {
+    coachingClients = [],
+    initialClient = null,
+    coachingDataForClient = null,
+    syncStatus = "local",
+    syncMessage = "",
+    onLoadTemplate = null,
+    onSavePhase = null,
+    onAddHomework = null,
+    onSaveHomework = null,
+    onRemoveHomework = null,
+    onSaveOpportunity = null,
+    onRemoveOpportunity = null,
+    onSaveResource = null,
+    onRemoveResource = null,
+  } = {}
+) {
   // Prefer initialClient (set when arriving here via a "View Coaching
   // Program" link from a specific client, e.g. ClientsListCard.js or the
   // Dashboard's master button) over just defaulting to the first enrolled
@@ -36,6 +54,13 @@ export function renderCoachingAdminView(container, { coachingClients = [], initi
         <h2>Coaching Program</h2>
         <p class="hint" style="margin-top:4px;">Visibility to Revenue — VAAM framework (Visibility, Authority, Alignment, Monetization). Standing rule across every engagement: if it doesn't support credibility, audience, partnerships, or revenue goals, we don't chase it.</p>
       </div>
+      ${
+        syncStatus === "error"
+          ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase coaching data: ${escapeHtml(syncMessage)}</p>`
+          : syncStatus === "loading"
+            ? `<p class="hint" style="margin-bottom:12px;">Syncing coaching data from Supabase...</p>`
+            : ""
+      }
 
       <div class="section-heading"><h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">Enrolled Clients</h3></div>
       ${
@@ -100,8 +125,28 @@ export function renderCoachingAdminView(container, { coachingClients = [], initi
 
     const tabContent = document.getElementById("coaching-tab-content");
     if (!tabContent) return;
-    if (activeTab === "phases") renderPhaseTrackerView(tabContent, selectedClient);
-    else if (activeTab === "opportunities") renderOpportunityEvaluator(tabContent, selectedClient);
-    else if (activeTab === "resources") renderCoachingResourceLibrary(tabContent, selectedClient);
+    const clientData = coachingDataForClient ? coachingDataForClient(selectedClient) : null;
+    if (activeTab === "phases") {
+      renderPhaseTrackerView(tabContent, selectedClient, {
+        phases: clientData?.phases || null,
+        onLoadTemplate,
+        onSavePhase,
+        onAddHomework,
+        onSaveHomework,
+        onRemoveHomework,
+      });
+    } else if (activeTab === "opportunities") {
+      renderOpportunityEvaluator(tabContent, selectedClient, {
+        opportunities: clientData?.opportunities || null,
+        onSaveOpportunity,
+        onRemoveOpportunity,
+      });
+    } else if (activeTab === "resources") {
+      renderCoachingResourceLibrary(tabContent, selectedClient, {
+        resources: clientData?.resources || null,
+        onSaveResource,
+        onRemoveResource,
+      });
+    }
   }
 }
