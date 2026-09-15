@@ -2145,6 +2145,10 @@ table.placements-table {
     display: none;
   }
 
+  .owner-panel-card .placements-table {
+    display: table;
+  }
+
   .placement-cards {
     display: flex;
   }
