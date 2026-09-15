@@ -53,6 +53,62 @@ function clientRoute(handler) {
   };
 }
 
+function phaseRowToApi(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    phaseNumber: row.phase_number,
+    name: row.name,
+    weeks: row.weeks || "",
+    vaam: row.vaam,
+    status: row.status,
+    goal: row.goal || "",
+    deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+    notes: row.notes || "",
+    createdAt: row.created_at,
+    homework: (row.coaching_homework || []).map(homeworkRowToApi),
+  };
+}
+
+function homeworkRowToApi(row) {
+  return {
+    id: row.id,
+    phaseId: row.phase_id,
+    type: row.type,
+    text: row.text,
+    dueDate: row.due_date || "",
+    status: row.status,
+    response: row.response || "",
+    createdAt: row.created_at,
+  };
+}
+
+function opportunityRowToApi(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    title: row.title,
+    description: row.description || "",
+    scores: row.scores || {},
+    decisionStatus: row.decision_status,
+    writeUp: row.write_up || "",
+    createdAt: row.created_at,
+  };
+}
+
+function resourceRowToApi(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    kind: row.kind,
+    title: row.title,
+    content: row.content || "",
+    priority: row.priority,
+    completed: row.completed,
+    createdAt: row.created_at,
+  };
+}
+
 app.get(
   "/api/me",
   clientRoute(async (req, res) => {
@@ -74,6 +130,90 @@ app.get(
       },
       client,
     });
+  })
+);
+
+app.get(
+  "/api/coaching",
+  clientRoute(async (req, res) => {
+    const [{ data: phases, error: phaseError }, { data: opportunities, error: opportunityError }, { data: resources, error: resourceError }] =
+      await Promise.all([
+        supabase
+          .from("coaching_phases")
+          .select("*, coaching_homework(*)")
+          .eq("client_id", req.profile.client_id)
+          .order("phase_number"),
+        supabase
+          .from("opportunities")
+          .select("*")
+          .eq("client_id", req.profile.client_id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("coaching_resources")
+          .select("*")
+          .eq("client_id", req.profile.client_id)
+          .order("created_at", { ascending: false }),
+      ]);
+    if (phaseError) throw phaseError;
+    if (opportunityError) throw opportunityError;
+    if (resourceError) throw resourceError;
+
+    res.json({
+      phases: (phases || []).map((phase) => ({
+        ...phaseRowToApi(phase),
+        homework: [...(phase.coaching_homework || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map(homeworkRowToApi),
+      })),
+      opportunities: (opportunities || []).map(opportunityRowToApi),
+      resources: (resources || []).map(resourceRowToApi),
+    });
+  })
+);
+
+app.patch(
+  "/api/coaching/homework/:homeworkId",
+  clientRoute(async (req, res) => {
+    const patch = {};
+    if (["not_started", "in_progress", "complete"].includes(req.body?.status)) patch.status = req.body.status;
+    if (typeof req.body?.response === "string") patch.response = req.body.response.trim();
+    if (!Object.keys(patch).length) {
+      return res.status(400).json({ error: "invalid_body", message: "Send a valid homework status or reflection response." });
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from("coaching_homework")
+      .select("id, phase_id, coaching_phases!inner(client_id)")
+      .eq("id", req.params.homeworkId)
+      .single();
+    if (existingError || !existing || existing.coaching_phases.client_id !== req.profile.client_id) {
+      return res.status(404).json({ error: "not_found", message: "No homework item with that id for this client." });
+    }
+
+    const { data, error } = await supabase.from("coaching_homework").update(patch).eq("id", req.params.homeworkId).select().single();
+    if (error) throw error;
+    res.json(homeworkRowToApi(data));
+  })
+);
+
+app.post(
+  "/api/coaching/opportunities",
+  clientRoute(async (req, res) => {
+    const title = String(req.body?.title || "").trim();
+    if (!title) return res.status(400).json({ error: "invalid_body", message: "Opportunity title is required." });
+
+    const { data, error } = await supabase
+      .from("opportunities")
+      .insert({
+        client_id: req.profile.client_id,
+        title,
+        description: String(req.body?.description || "").trim() || null,
+        scores: {},
+        decision_status: "pressure_testing",
+        write_up: "Submitted by the client for Tenyse to review before responding.",
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(opportunityRowToApi(data));
   })
 );
 

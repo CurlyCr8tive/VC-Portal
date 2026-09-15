@@ -2,7 +2,7 @@ import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getCli
 import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js";
 import { requireSession, logout, landingPageFor } from "../auth.js";
 import { signOutReal } from "../supabaseAuthClient.js";
-import { buildClientApiChartSeries, loadClientApiData, loadClientApiNotes, postClientApiNote } from "../clientApiDataSource.js";
+import { buildClientApiChartSeries, loadClientApiData, loadClientApiNotes, postClientApiNote, postClientApiOpportunity, updateClientApiHomework } from "../clientApiDataSource.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
 import { renderHeader } from "./components/DashboardHeader.js";
 import { renderMetricsGrid } from "./components/MetricCard.js";
@@ -228,9 +228,10 @@ function shortText(text, maxLength = 76) {
 
 function clientCoachingContext() {
   const client = currentClientForChrome();
-  const phases = clientName ? loadPhasesForClient(clientName) : [];
-  const resources = clientName ? loadResourcesForClient(clientName) : [];
-  const opportunities = clientName ? loadOpportunitiesForClient(clientName) : [];
+  const snapshot = apiSnapshot();
+  const phases = snapshot?.coaching?.phases || (clientName ? loadPhasesForClient(clientName) : []);
+  const resources = snapshot?.coaching?.resources || (clientName ? loadResourcesForClient(clientName) : []);
+  const opportunities = snapshot?.coaching?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : []);
   const progress = calculateCoachingProgress({ phases, resources, opportunities });
   const actionableHomework = phases
     .flatMap((phase) => (phase.homework || []).map((homework) => ({ ...homework, phase })))
@@ -682,7 +683,9 @@ function renderAnalyticsView() {
 }
 
 function renderResourcesView() {
-  const resources = clientName ? loadResourcesForClient(clientName).filter((resource) => resource.kind === "resource") : [];
+  const snapshot = apiSnapshot();
+  const allResources = snapshot?.coaching?.resources || (clientName ? loadResourcesForClient(clientName) : []);
+  const resources = allResources.filter((resource) => resource.kind === "resource");
   document.getElementById("resources-content").innerHTML = `
     <div class="section-heading"><h2>Resources</h2></div>
     ${
@@ -704,11 +707,29 @@ function renderResourcesView() {
 
 function renderCoachingView() {
   if (renderApiGate(document.getElementById("coaching-content"))) return;
-  renderCoachingProgramView(document.getElementById("coaching-content"), clientName);
+  const snapshot = apiSnapshot();
+  renderCoachingProgramView(document.getElementById("coaching-content"), clientName, {
+    data: snapshot?.coaching || null,
+    onHomeworkPatch: shouldUseClientApi()
+      ? async (homeworkId, patch) => {
+          await updateClientApiHomework(homeworkId, patch);
+          state.apiData = await loadClientApiData(state.chartRange);
+          return state.apiData.coaching;
+        }
+      : null,
+    onOpportunitySubmit: shouldUseClientApi()
+      ? async (payload) => {
+          await postClientApiOpportunity(payload);
+          state.apiData = await loadClientApiData(state.chartRange);
+          return state.apiData.coaching;
+        }
+      : null,
+  });
 }
 
 function renderOpportunitiesView() {
-  const opportunities = clientName ? loadOpportunitiesForClient(clientName) : [];
+  const snapshot = apiSnapshot();
+  const opportunities = snapshot?.coaching?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : []);
   document.getElementById("opportunities-content").innerHTML = `
     <div class="section-heading"><h2>Opportunities</h2></div>
     ${
@@ -772,7 +793,9 @@ function renderMessagesView() {
 }
 
 function renderFilesView() {
-  const checklists = clientName ? loadResourcesForClient(clientName).filter((resource) => resource.kind === "checklist") : [];
+  const snapshot = apiSnapshot();
+  const allResources = snapshot?.coaching?.resources || (clientName ? loadResourcesForClient(clientName) : []);
+  const checklists = allResources.filter((resource) => resource.kind === "checklist");
   document.getElementById("files-content").innerHTML = `
     <div class="section-heading"><h2>Files</h2></div>
     <div class="resource-library-grid">

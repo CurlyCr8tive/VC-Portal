@@ -24,20 +24,22 @@ import { calculateCoachingProgress, OPPORTUNITY_STATUS_LABELS } from "../../coac
 const STATUS_LABEL = { not_started: "Not Started", in_progress: "In Progress", complete: "Complete" };
 const HOMEWORK_TYPE_LABEL = { action: "Action Item", reflection: "Reflection Prompt", standing: "Standing Instruction" };
 
-export function renderCoachingProgramView(container, clientName) {
+export function renderCoachingProgramView(container, clientName, opts = {}) {
+  const { data = null, onHomeworkPatch = null, onOpportunitySubmit = null } = opts;
+  let activeData = data;
   let confirmation = "";
 
   render();
 
   function render() {
-    const phases = clientName ? loadPhasesForClient(clientName) : [];
+    const phases = activeData?.phases || (clientName ? loadPhasesForClient(clientName) : []);
     if (phases.length === 0) {
       renderPlaceholder();
       return;
     }
 
-    const resources = loadResourcesForClient(clientName);
-    const opportunities = loadOpportunitiesForClient(clientName);
+    const resources = activeData?.resources || loadResourcesForClient(clientName);
+    const opportunities = activeData?.opportunities || loadOpportunitiesForClient(clientName);
     const progress = calculateCoachingProgress({ phases, resources, opportunities });
 
     container.innerHTML = `
@@ -94,11 +96,16 @@ export function renderCoachingProgramView(container, clientName) {
       wirePhaseCard(card, phase);
     });
 
-    document.getElementById("cpv-opp-submit").addEventListener("click", () => {
+    document.getElementById("cpv-opp-submit").addEventListener("click", async () => {
       const title = document.getElementById("cpv-opp-title").value;
       const description = document.getElementById("cpv-opp-desc").value;
       try {
-        addOpportunity(createOpportunity({ client: clientName, title, description }));
+        if (onOpportunitySubmit) {
+          const nextData = await onOpportunitySubmit({ title, description });
+          if (nextData) activeData = nextData;
+        } else {
+          addOpportunity(createOpportunity({ client: clientName, title, description }));
+        }
         document.getElementById("cpv-opp-title").value = "";
         document.getElementById("cpv-opp-desc").value = "";
         document.getElementById("cpv-opp-result").textContent = "✓ Sent — Tenyse will review it before you respond to anyone.";
@@ -179,22 +186,37 @@ export function renderCoachingProgramView(container, clientName) {
   function wirePhaseCard(card, phase) {
     card.querySelectorAll("[data-submit-reflection]").forEach((btn) => {
       const wrap = btn.closest("[data-hw]");
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         const homeworkId = wrap.dataset.hw;
         const response = wrap.querySelector("[data-reflection-input]").value;
         if (!response.trim()) return;
-        updatePhase(respondToReflection(phase, homeworkId, response));
-        confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
-        render();
+        if (onHomeworkPatch) {
+          const nextData = await onHomeworkPatch(homeworkId, { response, status: "complete" });
+          if (nextData) activeData = nextData;
+          confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
+          render();
+        } else {
+          updatePhase(respondToReflection(phase, homeworkId, response));
+          confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
+          render();
+        }
       });
     });
     card.querySelectorAll("[data-action-checkbox]").forEach((checkbox) => {
       const wrap = checkbox.closest("[data-hw]");
-      checkbox.addEventListener("change", () => {
+      checkbox.addEventListener("change", async () => {
         const homeworkId = wrap.dataset.hw;
-        updatePhase(updateHomeworkStatus(phase, homeworkId, checkbox.checked ? "complete" : "not_started"));
-        confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
-        render();
+        const status = checkbox.checked ? "complete" : "not_started";
+        if (onHomeworkPatch) {
+          const nextData = await onHomeworkPatch(homeworkId, { status });
+          if (nextData) activeData = nextData;
+          confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
+          render();
+        } else {
+          updatePhase(updateHomeworkStatus(phase, homeworkId, status));
+          confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
+          render();
+        }
       });
     });
   }

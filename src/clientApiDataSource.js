@@ -86,6 +86,61 @@ function mapPlacement(row, campaignNameById) {
   };
 }
 
+function mapPhase(row) {
+  return {
+    id: row.id,
+    client: row.client || "",
+    clientId: row.clientId,
+    phaseNumber: row.phaseNumber,
+    name: row.name,
+    weeks: row.weeks || "",
+    vaam: row.vaam,
+    status: row.status,
+    goal: row.goal || "",
+    deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+    notes: row.notes || "",
+    createdAt: row.createdAt,
+    homework: (row.homework || []).map((h) => ({
+      id: h.id,
+      phaseId: h.phaseId,
+      type: h.type,
+      text: h.text,
+      dueDate: h.dueDate || "",
+      status: h.status,
+      response: h.response || "",
+      createdAt: h.createdAt,
+    })),
+  };
+}
+
+function mapOpportunity(row) {
+  return {
+    id: row.id,
+    client: row.client || "",
+    clientId: row.clientId,
+    title: row.title,
+    description: row.description || "",
+    scores: row.scores || {},
+    decisionStatus: row.decisionStatus,
+    writeUp: row.writeUp || "",
+    createdAt: row.createdAt,
+  };
+}
+
+function mapResource(row) {
+  return {
+    id: row.id,
+    client: row.client || "",
+    clientId: row.clientId,
+    kind: row.kind,
+    title: row.title,
+    content: row.content || "",
+    priority: row.priority,
+    completed: row.completed,
+    createdAt: row.createdAt,
+  };
+}
+
 function bucketByMonth(placements, range) {
   const now = new Date();
   const monthsBack = range === "30d" ? 1 : range === "90d" ? 3 : 12;
@@ -125,10 +180,11 @@ function metricsFrom({ placements, campaigns }) {
 }
 
 export async function loadClientApiData(range = "30d") {
-  const [me, rawCampaigns, rawPlacements] = await Promise.all([
+  const [me, rawCampaigns, rawPlacements, rawCoaching] = await Promise.all([
     apiFetch("/api/me"),
     apiFetch("/api/campaigns"),
     apiFetch("/api/placements"),
+    apiFetch("/api/coaching").catch(() => ({ phases: [], opportunities: [], resources: [] })),
   ]);
   const campaignNameById = new Map(rawCampaigns.map((c) => [c.id, c.name]));
   const placements = rawPlacements.map((p) => mapPlacement(p, campaignNameById));
@@ -140,6 +196,11 @@ export async function loadClientApiData(range = "30d") {
     campaigns,
     metrics: metricsFrom({ placements, campaigns }),
     chartSeries: bucketByMonth(placements, range),
+    coaching: {
+      phases: (rawCoaching.phases || []).map(mapPhase),
+      opportunities: (rawCoaching.opportunities || []).map(mapOpportunity),
+      resources: (rawCoaching.resources || []).map(mapResource),
+    },
     insight: null,
     report: null,
   };
@@ -161,5 +222,19 @@ export async function postClientApiNote(campaignId, body) {
   return apiFetch(`/api/campaigns/${encodeURIComponent(campaignId)}/notes`, {
     method: "POST",
     body: JSON.stringify({ body }),
+  });
+}
+
+export async function updateClientApiHomework(homeworkId, patch) {
+  return apiFetch(`/api/coaching/homework/${encodeURIComponent(homeworkId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function postClientApiOpportunity({ title, description }) {
+  return apiFetch("/api/coaching/opportunities", {
+    method: "POST",
+    body: JSON.stringify({ title, description }),
   });
 }

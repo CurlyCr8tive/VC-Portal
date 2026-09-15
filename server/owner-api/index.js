@@ -193,6 +193,65 @@ function placementRowToApi(row, { clientName = "", campaignName = null } = {}) {
   };
 }
 
+function phaseRowToApi(row, clientName = "") {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    client: clientName || row.client_name || "",
+    phaseNumber: row.phase_number,
+    name: row.name,
+    weeks: row.weeks || "",
+    vaam: row.vaam,
+    status: row.status,
+    goal: row.goal || "",
+    deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+    notes: row.notes || "",
+    createdAt: row.created_at,
+    homework: (row.coaching_homework || []).map(homeworkRowToApi),
+  };
+}
+
+function homeworkRowToApi(row) {
+  return {
+    id: row.id,
+    phaseId: row.phase_id,
+    type: row.type,
+    text: row.text,
+    dueDate: row.due_date || "",
+    status: row.status,
+    response: row.response || "",
+    createdAt: row.created_at,
+  };
+}
+
+function opportunityRowToApi(row, clientName = "") {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    client: clientName || row.client_name || "",
+    title: row.title,
+    description: row.description || "",
+    scores: row.scores || {},
+    decisionStatus: row.decision_status,
+    writeUp: row.write_up || "",
+    createdAt: row.created_at,
+  };
+}
+
+function resourceRowToApi(row, clientName = "") {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    client: clientName || row.client_name || "",
+    kind: row.kind,
+    title: row.title,
+    content: row.content || "",
+    priority: row.priority,
+    completed: row.completed,
+    createdAt: row.created_at,
+  };
+}
+
 async function findClientByName(name) {
   const trimmed = String(name || "").trim();
   if (!trimmed) return { error: "Client is required." };
@@ -472,6 +531,264 @@ app.delete(
   "/api/placements/:placementId",
   ownerRoute(async (req, res) => {
     const { error } = await supabase.from("placements").delete().eq("id", req.params.placementId);
+    if (error) throw error;
+    res.status(204).send();
+  })
+);
+
+app.get(
+  "/api/coaching",
+  ownerRoute(async (req, res) => {
+    const [{ data: phases, error: phaseError }, { data: opportunities, error: opportunityError }, { data: resources, error: resourceError }] =
+      await Promise.all([
+        supabase.from("coaching_phases").select("*, coaching_homework(*)").order("phase_number"),
+        supabase.from("opportunities").select("*").order("created_at", { ascending: false }),
+        supabase.from("coaching_resources").select("*").order("created_at", { ascending: false }),
+      ]);
+    if (phaseError) throw phaseError;
+    if (opportunityError) throw opportunityError;
+    if (resourceError) throw resourceError;
+
+    const clientIds = [
+      ...new Set([
+        ...(phases || []).map((row) => row.client_id),
+        ...(opportunities || []).map((row) => row.client_id),
+        ...(resources || []).map((row) => row.client_id),
+      ].filter(Boolean)),
+    ];
+    const { data: clients, error: clientsError } = clientIds.length
+      ? await supabase.from("clients").select("id, name").in("id", clientIds)
+      : { data: [], error: null };
+    if (clientsError) throw clientsError;
+    const clientNameById = new Map((clients || []).map((client) => [client.id, client.name]));
+
+    res.json({
+      phases: (phases || []).map((phase) => ({
+        ...phaseRowToApi(phase, clientNameById.get(phase.client_id)),
+        homework: [...(phase.coaching_homework || [])].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map(homeworkRowToApi),
+      })),
+      opportunities: (opportunities || []).map((row) => opportunityRowToApi(row, clientNameById.get(row.client_id))),
+      resources: (resources || []).map((row) => resourceRowToApi(row, clientNameById.get(row.client_id))),
+    });
+  })
+);
+
+app.post(
+  "/api/clients/:clientId/coaching/phases",
+  ownerRoute(async (req, res) => {
+    const phaseNumber = Number(req.body?.phaseNumber ?? req.body?.phase_number);
+    const name = String(req.body?.name || "").trim();
+    if (!Number.isFinite(phaseNumber) || !name) {
+      return res.status(400).json({ error: "invalid_body", message: "Phase number and name are required." });
+    }
+
+    const { data: client, error: clientError } = await supabase.from("clients").select("id, name").eq("id", req.params.clientId).single();
+    if (clientError || !client) return res.status(404).json({ error: "not_found", message: "No client with that id." });
+
+    const { data, error } = await supabase
+      .from("coaching_phases")
+      .insert({
+        client_id: client.id,
+        phase_number: phaseNumber,
+        name,
+        weeks: String(req.body?.weeks || "").trim() || null,
+        vaam: ["V", "A_AUTHORITY", "A_ALIGNMENT", "M", "NOT_APPLICABLE"].includes(req.body?.vaam) ? req.body.vaam : "V",
+        status: ["not_started", "in_progress", "complete"].includes(req.body?.status) ? req.body.status : "not_started",
+        goal: String(req.body?.goal || "").trim() || null,
+        deliverables: Array.isArray(req.body?.deliverables) ? req.body.deliverables.filter(Boolean) : [],
+        notes: String(req.body?.notes || "").trim() || null,
+      })
+      .select("*, coaching_homework(*)")
+      .single();
+    if (error) throw error;
+    res.status(201).json(phaseRowToApi(data, client.name));
+  })
+);
+
+app.patch(
+  "/api/coaching/phases/:phaseId",
+  ownerRoute(async (req, res) => {
+    const patch = {
+      phase_number: Number(req.body?.phaseNumber ?? req.body?.phase_number),
+      name: String(req.body?.name || "").trim(),
+      weeks: String(req.body?.weeks || "").trim() || null,
+      vaam: ["V", "A_AUTHORITY", "A_ALIGNMENT", "M", "NOT_APPLICABLE"].includes(req.body?.vaam) ? req.body.vaam : "V",
+      status: ["not_started", "in_progress", "complete"].includes(req.body?.status) ? req.body.status : "not_started",
+      goal: String(req.body?.goal || "").trim() || null,
+      deliverables: Array.isArray(req.body?.deliverables) ? req.body.deliverables.filter(Boolean) : [],
+      notes: String(req.body?.notes || "").trim() || null,
+    };
+    if (!Number.isFinite(patch.phase_number) || !patch.name) {
+      return res.status(400).json({ error: "invalid_body", message: "Phase number and name are required." });
+    }
+
+    const { data, error } = await supabase
+      .from("coaching_phases")
+      .update(patch)
+      .eq("id", req.params.phaseId)
+      .select("*, coaching_homework(*)")
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No phase with that id." });
+    res.json(phaseRowToApi(data));
+  })
+);
+
+app.post(
+  "/api/coaching/phases/:phaseId/homework",
+  ownerRoute(async (req, res) => {
+    const type = ["action", "reflection", "standing"].includes(req.body?.type) ? req.body.type : null;
+    const text = String(req.body?.text || "").trim();
+    if (!type || !text) return res.status(400).json({ error: "invalid_body", message: "Homework type and text are required." });
+    const { data, error } = await supabase
+      .from("coaching_homework")
+      .insert({
+        phase_id: req.params.phaseId,
+        type,
+        text,
+        due_date: type === "standing" ? null : req.body?.dueDate || req.body?.due_date || null,
+        status: ["not_started", "in_progress", "complete"].includes(req.body?.status) ? req.body.status : "not_started",
+        response: String(req.body?.response || "").trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(homeworkRowToApi(data));
+  })
+);
+
+app.patch(
+  "/api/coaching/homework/:homeworkId",
+  ownerRoute(async (req, res) => {
+    const patch = {};
+    if (["not_started", "in_progress", "complete"].includes(req.body?.status)) patch.status = req.body.status;
+    if (typeof req.body?.response === "string") patch.response = req.body.response.trim();
+    if (!Object.keys(patch).length) return res.status(400).json({ error: "invalid_body", message: "Send a valid homework status or response." });
+    const { data, error } = await supabase.from("coaching_homework").update(patch).eq("id", req.params.homeworkId).select().single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No homework item with that id." });
+    res.json(homeworkRowToApi(data));
+  })
+);
+
+app.delete(
+  "/api/coaching/homework/:homeworkId",
+  ownerRoute(async (req, res) => {
+    const { error } = await supabase.from("coaching_homework").delete().eq("id", req.params.homeworkId);
+    if (error) throw error;
+    res.status(204).send();
+  })
+);
+
+app.post(
+  "/api/clients/:clientId/coaching/opportunities",
+  ownerRoute(async (req, res) => {
+    const title = String(req.body?.title || "").trim();
+    if (!title) return res.status(400).json({ error: "invalid_body", message: "Opportunity title is required." });
+    const { data, error } = await supabase
+      .from("opportunities")
+      .insert({
+        client_id: req.params.clientId,
+        title,
+        description: String(req.body?.description || "").trim() || null,
+        scores: req.body?.scores && typeof req.body.scores === "object" ? req.body.scores : {},
+        decision_status: ["pursuing", "pressure_testing", "declined"].includes(req.body?.decisionStatus || req.body?.decision_status)
+          ? req.body.decisionStatus || req.body.decision_status
+          : "pressure_testing",
+        write_up: String(req.body?.writeUp || req.body?.write_up || "").trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(opportunityRowToApi(data));
+  })
+);
+
+app.patch(
+  "/api/coaching/opportunities/:opportunityId",
+  ownerRoute(async (req, res) => {
+    const title = String(req.body?.title || "").trim();
+    if (!title) return res.status(400).json({ error: "invalid_body", message: "Opportunity title is required." });
+    const { data, error } = await supabase
+      .from("opportunities")
+      .update({
+        title,
+        description: String(req.body?.description || "").trim() || null,
+        scores: req.body?.scores && typeof req.body.scores === "object" ? req.body.scores : {},
+        decision_status: ["pursuing", "pressure_testing", "declined"].includes(req.body?.decisionStatus || req.body?.decision_status)
+          ? req.body.decisionStatus || req.body.decision_status
+          : "pressure_testing",
+        write_up: String(req.body?.writeUp || req.body?.write_up || "").trim() || null,
+      })
+      .eq("id", req.params.opportunityId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No opportunity with that id." });
+    res.json(opportunityRowToApi(data));
+  })
+);
+
+app.delete(
+  "/api/coaching/opportunities/:opportunityId",
+  ownerRoute(async (req, res) => {
+    const { error } = await supabase.from("opportunities").delete().eq("id", req.params.opportunityId);
+    if (error) throw error;
+    res.status(204).send();
+  })
+);
+
+app.post(
+  "/api/clients/:clientId/coaching/resources",
+  ownerRoute(async (req, res) => {
+    const kind = ["resource", "checklist"].includes(req.body?.kind) ? req.body.kind : "resource";
+    const title = String(req.body?.title || "").trim();
+    if (!title) return res.status(400).json({ error: "invalid_body", message: "Resource title is required." });
+    const { data, error } = await supabase
+      .from("coaching_resources")
+      .insert({
+        client_id: req.params.clientId,
+        kind,
+        title,
+        content: String(req.body?.content || "").trim() || null,
+        priority: ["high", "medium", "low"].includes(req.body?.priority) ? req.body.priority : "medium",
+        completed: kind === "checklist" ? Boolean(req.body?.completed) : null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(resourceRowToApi(data));
+  })
+);
+
+app.patch(
+  "/api/coaching/resources/:resourceId",
+  ownerRoute(async (req, res) => {
+    const kind = ["resource", "checklist"].includes(req.body?.kind) ? req.body.kind : "resource";
+    const title = String(req.body?.title || "").trim();
+    if (!title) return res.status(400).json({ error: "invalid_body", message: "Resource title is required." });
+    const { data, error } = await supabase
+      .from("coaching_resources")
+      .update({
+        kind,
+        title,
+        content: String(req.body?.content || "").trim() || null,
+        priority: ["high", "medium", "low"].includes(req.body?.priority) ? req.body.priority : "medium",
+        completed: kind === "checklist" ? Boolean(req.body?.completed) : null,
+      })
+      .eq("id", req.params.resourceId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No resource with that id." });
+    res.json(resourceRowToApi(data));
+  })
+);
+
+app.delete(
+  "/api/coaching/resources/:resourceId",
+  ownerRoute(async (req, res) => {
+    const { error } = await supabase.from("coaching_resources").delete().eq("id", req.params.resourceId);
     if (error) throw error;
     res.status(204).send();
   })
