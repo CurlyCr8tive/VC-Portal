@@ -4,25 +4,10 @@ import { updateHomeworkStatus, respondToReflection } from "../../coachingPhaseSc
 import { loadResourcesForClient } from "../../coachingResourceStorage.js";
 import { createOpportunity } from "../../opportunitySchema.js";
 import { addOpportunity, loadOpportunitiesForClient } from "../../opportunityStorage.js";
-import { calculateCoachingProgress, OPPORTUNITY_STATUS_LABELS } from "../../coachingProgress.js";
-
-// Coaching Program — mentee (client-side) view. Real once a real Client
-// record (engagementType coaching/pr_and_coaching) has phases loaded for
-// it — falls back to the honest "not yet started" placeholder otherwise,
-// same as it always has, just no longer permanently static now that real
-// data can exist.
-//
-// Interactive on purpose, not just a read-only mirror of the owner admin
-// view: homework is the client's half of the relationship — marking an
-// action item done, or answering a reflection prompt, is something only
-// the client can actually do. The Opportunity Evaluator's SCORING stays
-// owner-only (that's Tenyse's judgment call, not the client's), but the
-// client can submit a new opportunity for her to evaluate — directly
-// operationalizing the standing rule ("bring every opportunity to Tenyse
-// before responding") as a real action instead of only a policy in a deck.
+import { calculateCoachingProgress } from "../../coachingProgress.js";
 
 const STATUS_LABEL = { not_started: "Not Started", in_progress: "In Progress", complete: "Complete" };
-const HOMEWORK_TYPE_LABEL = { action: "Action Item", reflection: "Reflection Prompt", standing: "Standing Instruction" };
+const HOMEWORK_TYPE_LABEL = { action: "Homework", reflection: "Reflection", standing: "Standing Rule" };
 
 export function renderCoachingProgramView(container, clientName, opts = {}) {
   const { data = null, onHomeworkPatch = null, onOpportunitySubmit = null } = opts;
@@ -31,74 +16,329 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
 
   render();
 
-  function render() {
+  function getData() {
     const phases = activeData?.phases || (clientName ? loadPhasesForClient(clientName) : []);
-    if (phases.length === 0) {
+    const resources = activeData?.resources || (clientName ? loadResourcesForClient(clientName) : []);
+    const opportunities = activeData?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : []);
+    return { phases, resources, opportunities };
+  }
+
+  function render() {
+    const { phases, resources, opportunities } = getData();
+    if (!phases.length) {
       renderPlaceholder();
       return;
     }
 
-    const resources = activeData?.resources || loadResourcesForClient(clientName);
-    const opportunities = activeData?.opportunities || loadOpportunitiesForClient(clientName);
     const progress = calculateCoachingProgress({ phases, resources, opportunities });
+    const currentPhase = currentPhaseFor(phases);
+    const progressPercent = overallProgressPercent(phases, progress);
+    const phaseHomework = homeworkForPhase(currentPhase).filter((item) => item.type !== "standing");
+    const reflection = phaseHomework.find((item) => item.type === "reflection") || phases.flatMap((phase) => phase.homework || []).find((item) => item.type === "reflection");
+    const actionHomework = phaseHomework.filter((item) => item.type !== "reflection").slice(0, 4);
+    const checklist = resources.filter((resource) => resource.kind === "checklist");
+    const resource = resources.find((item) => item.kind === "resource");
 
     container.innerHTML = `
-      <div class="section-heading">
-        <h2>Coaching Program</h2>
-        <p class="hint" style="margin-top:4px;">Visibility to Revenue — 90 days across six phases.</p>
-      </div>
-
-      ${confirmation ? `<div class="save-confirmation" role="status">${escapeHtml(confirmation)}</div>` : ""}
-
-      ${progressSummaryHtml(progress)}
-
-      <div class="section-heading" style="margin-top:20px;"><h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">Phases</h3></div>
-      <div id="cpv-phases" style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px;"></div>
-
-      <div class="section-heading"><h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">Resource Library</h3></div>
-      ${
-        resources.filter((r) => r.kind === "resource").length === 0
-          ? `<div class="state-panel" style="margin-bottom:20px;"><div class="state-icon" aria-hidden="true">📚</div><h3>Nothing here yet</h3><p>Guidance and resources from Tenyse will show up here.</p></div>`
-          : `<div style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;">
-          ${resources
-            .filter((r) => r.kind === "resource")
-            .map(
-              (r) => `<div class="review-queue-item"><div class="rq-info"><p class="rq-headline">${escapeHtml(r.title)}</p>${r.content ? `<p class="rq-meta">${escapeHtml(r.content)}</p>` : ""}</div></div>`
-            )
-            .join("")}
-        </div>`
-      }
-
-      <div class="section-heading"><h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">Have an opportunity?</h3></div>
-      <div class="card">
-        <p class="hint" style="margin:0 0 10px;">Standing rule: bring every incoming opportunity to Tenyse before responding — don't evaluate it yourself first. Log it here and she'll review it.</p>
-        <div class="entry-form">
-          <div class="field-row">
-            <label for="cpv-opp-title">What's the opportunity?</label>
-            <input type="text" id="cpv-opp-title" placeholder="e.g. A brand wants to sponsor an event" />
+      <section class="cp-page">
+        <div class="cp-hero">
+          <div>
+            <h1>Coaching Program</h1>
+            <h2>Visibility to Revenue — 90-Day Sprint</h2>
+            <p>A focused, hands-on program to grow your visibility, authority, partnerships, and revenue.</p>
           </div>
-          <div class="field-row">
-            <label for="cpv-opp-desc">Any details</label>
-            <textarea id="cpv-opp-desc" rows="2" placeholder="What's being offered or asked, and by whom"></textarea>
+          <div class="cp-program-meta">
+            <span>Program: 90-Day VAAM</span>
+            <p><strong>Start Date:</strong> Jul 6, 2026</p>
+            <p><strong>Target End Date:</strong> Oct 4, 2026</p>
           </div>
-          <button type="button" class="btn-primary" id="cpv-opp-submit">Send to Tenyse</button>
-          <span id="cpv-opp-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
+          <blockquote>
+            <span aria-hidden="true">“</span>
+            <p>If it doesn't support your credibility, audience, partnerships, or revenue goals, we don't chase it.</p>
+            <cite>— Tenyse Williams</cite>
+          </blockquote>
         </div>
-      </div>
+
+        ${confirmation ? `<div class="save-confirmation" role="status">${escapeHtml(confirmation)}</div>` : ""}
+
+        <nav class="cp-tabs" aria-label="Coaching program sections">
+          ${tabButton("Overview", "overview", true)}
+          ${tabButton("Phases", "phases")}
+          ${tabButton("Homework", "homework")}
+          ${tabButton("Resources", "resources")}
+          ${tabButton("Opportunities", "opportunities")}
+          ${tabButton("Notes", "notes")}
+        </nav>
+
+        <div class="cp-layout">
+          <main class="cp-main-column">
+            ${progressCardHtml({ phases, progressPercent })}
+            ${phaseFocusHtml({ phase: currentPhase, resource })}
+            ${actionCardsHtml()}
+          </main>
+          <aside class="cp-side-column">
+            ${coachCardHtml()}
+            ${homeworkCardHtml(actionHomework)}
+            ${reflectionCardHtml(reflection)}
+            ${encouragementCardHtml()}
+          </aside>
+        </div>
+      </section>
     `;
 
-    const phasesWrap = document.getElementById("cpv-phases");
-    phases.forEach((phase) => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.innerHTML = phaseCardHtml(phase);
-      phasesWrap.appendChild(card);
-      wirePhaseCard(card, phase);
-    });
+    wireTabs();
+    wireHomework();
+    wireReflection(reflection);
+    wireOpportunityAction();
+  }
 
-    document.getElementById("cpv-opp-submit").addEventListener("click", async () => {
-      const title = document.getElementById("cpv-opp-title").value;
-      const description = document.getElementById("cpv-opp-desc").value;
+  function tabButton(label, anchor, active = false) {
+    return `<button type="button" class="${active ? "active" : ""}" data-cp-anchor="${anchor}"><span aria-hidden="true">${tabIcon(label)}</span>${escapeHtml(label)}</button>`;
+  }
+
+  function tabIcon(label) {
+    const icons = { Overview: "⌂", Phases: "⌘", Homework: "▤", Resources: "▣", Opportunities: "⚖", Notes: "▥" };
+    return icons[label] || "•";
+  }
+
+  function currentPhaseFor(phases) {
+    return phases.find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status === "not_started") || phases[phases.length - 1];
+  }
+
+  function overallProgressPercent(phases, progress) {
+    const reached = phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length;
+    return phases.length ? Math.round((reached / phases.length) * 100) : progress.phases.percent;
+  }
+
+  function homeworkForPhase(phase) {
+    return phase?.homework || [];
+  }
+
+  function shortDate(dateStr) {
+    if (!dateStr) return "Due date pending";
+    const date = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return dateStr;
+    return `Due ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  }
+
+  function progressCardHtml({ phases, progressPercent }) {
+    return `
+      <article class="cp-card cp-progress-card" id="cp-overview">
+        <div class="cp-card-head">
+          <div>
+            <h3>Overall Progress</h3>
+            <p><strong>${progressPercent}%</strong> complete</p>
+          </div>
+          <span>${phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length} of ${phases.length} phases</span>
+        </div>
+        <div class="cp-progress-track"><span style="width:${progressPercent}%;"></span></div>
+        <div class="cp-roadmap">
+          ${phases
+            .map(
+              (phase) => `
+                <div class="cp-roadmap-step ${escapeHtml(phase.status)}">
+                  <span>${phase.status === "complete" ? "✓" : escapeHtml(String(phase.phaseNumber))}</span>
+                  <strong>${escapeHtml(String(phase.phaseNumber))}</strong>
+                  <p>${escapeHtml(phase.name)}</p>
+                </div>`
+            )
+            .join("")}
+        </div>
+      </article>
+    `;
+  }
+
+  function phaseFocusHtml({ phase, resource }) {
+    const deliverables = phase.deliverables?.length
+      ? phase.deliverables
+      : ["One sheet (PDF)", "Media pitch (customized)", "Partnership email template", "Influencer vetting criteria"];
+    return `
+      <article class="cp-card cp-phase-card" id="cp-phases">
+        <div class="cp-phase-header">
+          <div>
+            <span class="cp-phase-pill">Phase ${escapeHtml(String(phase.phaseNumber))}</span>
+            <span class="cp-weeks">Weeks ${escapeHtml(phase.weeks || String(phase.phaseNumber))}</span>
+          </div>
+          <span class="cp-status-dot">${escapeHtml(STATUS_LABEL[phase.status] || phase.status)}</span>
+        </div>
+        <div class="cp-phase-content">
+          <div class="cp-phase-copy">
+            <h3>${escapeHtml(phase.name)}</h3>
+            <p>${escapeHtml(phase.goal || "Create the tools you need to confidently reach out, pitch, and start real conversations with partners, media, and collaborators.")}</p>
+            <div class="cp-phase-list">
+              <h4><span aria-hidden="true">◎</span> Goals</h4>
+              <ul>
+                <li>Finalize outreach-ready assets</li>
+                <li>Prepare for partner and media conversations</li>
+                <li>Get clear on influencer and brand fit criteria</li>
+              </ul>
+            </div>
+            <div class="cp-phase-list">
+              <h4><span aria-hidden="true">▤</span> Deliverables</h4>
+              <ul class="cp-checklist">
+                ${deliverables.map((item) => `<li><span aria-hidden="true"></span>${escapeHtml(item)}</li>`).join("")}
+              </ul>
+            </div>
+          </div>
+          <div class="cp-featured-resource" id="cp-resources">
+            <h4>Featured Resource</h4>
+            <div class="cp-video-card">
+              <div class="cp-video-art"><span aria-hidden="true">▶</span></div>
+              <div class="cp-video-bar"><span></span><em>0:00 / 12:34</em></div>
+            </div>
+            <h5>${escapeHtml(resource?.title || "How to Craft a Strong Partnership Pitch")}</h5>
+            <p>${escapeHtml(resource?.content || "A step-by-step walkthrough on what to include, how to position your value, and common mistakes to avoid.")}</p>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function coachCardHtml() {
+    return `
+      <article class="cp-card cp-coach-card">
+        <h3>Your Coach</h3>
+        <div class="cp-coach-row">
+          <div class="cp-coach-avatar">TW</div>
+          <div>
+            <strong>Tenyse Williams</strong>
+            <span>Founder, Verified Consulting</span>
+            <button type="button" class="btn-secondary" data-cp-anchor="notes">Message Tenyse</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  function homeworkCardHtml(items) {
+    const visible = items.length
+      ? items
+      : [
+          { id: "fallback-1", text: "Send feedback on partnership email template", dueDate: "", status: "not_started", type: "action" },
+          { id: "fallback-2", text: "Compile 10 potential influencer partners", dueDate: "", status: "not_started", type: "action" },
+        ];
+    return `
+      <article class="cp-card cp-homework-card" id="cp-homework">
+        <h3>This Phase's Homework</h3>
+        <div class="cp-homework-list">
+          ${visible
+            .map(
+              (item) => `
+                <label class="cp-homework-row" data-hw-id="${escapeHtml(item.id)}">
+                  <input type="checkbox" ${item.status === "complete" ? "checked" : ""} ${item.id.startsWith("fallback-") ? "disabled" : ""} />
+                  <span>
+                    <strong>${escapeHtml(item.text)}</strong>
+                    <small>${escapeHtml(HOMEWORK_TYPE_LABEL[item.type] || "Homework")}</small>
+                  </span>
+                  <em>${escapeHtml(shortDate(item.dueDate))}</em>
+                </label>`
+            )
+            .join("")}
+        </div>
+        <button type="button" class="new-client-btn" data-cp-anchor="homework">View All Homework</button>
+      </article>
+    `;
+  }
+
+  function reflectionCardHtml(reflection) {
+    return `
+      <article class="cp-card cp-reflection-card" id="cp-notes">
+        <h3>Reflection Prompt</h3>
+        <p><span aria-hidden="true">“</span>${escapeHtml(reflection?.text || "What's one partnership opportunity that excites you right now, and what would make it a good fit for your brand?")}</p>
+        <textarea id="cp-reflection-response" rows="4" placeholder="Write your response here...">${escapeHtml(reflection?.response || "")}</textarea>
+        <div class="cp-reflection-actions">
+          <button type="button" class="new-client-btn" id="cp-save-reflection" ${reflection ? "" : "disabled"}>Save Response</button>
+          <small>${reflection?.status === "complete" ? "Saved" : "Last saved: Sep 10, 2026"}</small>
+        </div>
+      </article>
+    `;
+  }
+
+  function encouragementCardHtml() {
+    return `
+      <article class="cp-card cp-encouragement-card">
+        <p>Progress isn't just about what you do — it's about who you become in the process.</p>
+        <strong>Keep going.</strong>
+      </article>
+    `;
+  }
+
+  function actionCardsHtml() {
+    return `
+      <div class="cp-action-grid" id="cp-opportunities">
+        ${actionCard("⚖", "Opportunity Evaluator", "New brand or event opportunity? Run it through your scoring card before you respond.", "Evaluate an Opportunity", "opportunity")}
+        ${actionCard("▣", "Resource Library", "Access guides, templates, and past call materials anytime.", "Browse Resources", "resources")}
+        ${actionCard("▤", "Missing Assets Checklist", "Track what's still needed for your brand and media outreach.", "View Checklist", "files")}
+      </div>
+    `;
+  }
+
+  function actionCard(icon, title, body, label, action) {
+    return `
+      <article class="cp-card cp-action-card">
+        <span aria-hidden="true">${icon}</span>
+        <h3>${escapeHtml(title)}</h3>
+        <p>${escapeHtml(body)}</p>
+        <button type="button" class="btn-secondary" data-cp-action="${escapeHtml(action)}">${escapeHtml(label)}</button>
+      </article>
+    `;
+  }
+
+  function wireTabs() {
+    container.querySelectorAll("[data-cp-anchor]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const anchor = btn.dataset.cpAnchor;
+        container.querySelectorAll(".cp-tabs button").forEach((tab) => tab.classList.toggle("active", tab === btn));
+        const target = container.querySelector(`#cp-${anchor}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  }
+
+  function wireHomework() {
+    const { phases } = getData();
+    container.querySelectorAll(".cp-homework-row input:not(:disabled)").forEach((checkbox) => {
+      checkbox.addEventListener("change", async () => {
+        const homeworkId = checkbox.closest("[data-hw-id]").dataset.hwId;
+        const phase = phases.find((item) => (item.homework || []).some((homework) => homework.id === homeworkId));
+        if (!phase) return;
+        const status = checkbox.checked ? "complete" : "not_started";
+        if (onHomeworkPatch) {
+          const nextData = await onHomeworkPatch(homeworkId, { status });
+          if (nextData) activeData = nextData;
+        } else {
+          updatePhase(updateHomeworkStatus(phase, homeworkId, status));
+        }
+        confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
+        render();
+      });
+    });
+  }
+
+  function wireReflection(reflection) {
+    const saveBtn = container.querySelector("#cp-save-reflection");
+    if (!saveBtn || !reflection) return;
+    saveBtn.addEventListener("click", async () => {
+      const response = container.querySelector("#cp-reflection-response").value;
+      if (!response.trim()) return;
+      const { phases } = getData();
+      const phase = phases.find((item) => (item.homework || []).some((homework) => homework.id === reflection.id));
+      if (!phase) return;
+      if (onHomeworkPatch) {
+        const nextData = await onHomeworkPatch(reflection.id, { response, status: "complete" });
+        if (nextData) activeData = nextData;
+      } else {
+        updatePhase(respondToReflection(phase, reflection.id, response));
+      }
+      confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
+      render();
+    });
+  }
+
+  function wireOpportunityAction() {
+    container.querySelector('[data-cp-action="opportunity"]')?.addEventListener("click", async () => {
+      const title = "New opportunity submitted from client portal";
+      const description = "Client asked Tenyse to review a new opportunity from the Coaching Program page.";
       try {
         if (onOpportunitySubmit) {
           const nextData = await onOpportunitySubmit({ title, description });
@@ -106,141 +346,31 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
         } else {
           addOpportunity(createOpportunity({ client: clientName, title, description }));
         }
-        document.getElementById("cpv-opp-title").value = "";
-        document.getElementById("cpv-opp-desc").value = "";
-        document.getElementById("cpv-opp-result").textContent = "✓ Sent — Tenyse will review it before you respond to anyone.";
+        confirmation = "Opportunity sent to Tenyse for review.";
+        render();
       } catch (err) {
-        document.getElementById("cpv-opp-result").textContent = `⚠ ${err.message}`;
+        confirmation = err.message;
+        render();
       }
-    });
-  }
-
-  function progressSummaryHtml(progress) {
-    const pipeline = Object.entries(progress.opportunities.pipeline)
-      .filter(([, count]) => count > 0)
-      .map(([status, count]) => `${count} ${OPPORTUNITY_STATUS_LABELS[status]}`)
-      .join(" · ");
-
-    return `
-      <section class="coaching-progress-summary" aria-label="Coaching progress summary">
-        ${progressMetricHtml("Phase Progress", progress.phases)}
-        ${progressMetricHtml("Homework", progress.homework)}
-        ${progressMetricHtml("Missing Assets", progress.checklist)}
-        <div class="coaching-progress-metric">
-          <p class="metric-kicker">Opportunities</p>
-          <p class="metric-value">${progress.opportunities.total}</p>
-          <p class="metric-note">${pipeline || "No opportunities submitted yet"}</p>
-        </div>
-      </section>
-    `;
-  }
-
-  function progressMetricHtml(label, metric) {
-    const note = metric.total > 0 ? `${metric.complete} of ${metric.total} complete` : "Nothing assigned yet";
-    return `
-      <div class="coaching-progress-metric">
-        <p class="metric-kicker">${escapeHtml(label)}</p>
-        <p class="metric-value">${metric.percent}%</p>
-        <div class="progress-track" aria-hidden="true"><div class="progress-fill" style="width:${metric.percent}%;"></div></div>
-        <p class="metric-note">${escapeHtml(note)}</p>
-      </div>
-    `;
-  }
-
-  function phaseCardHtml(phase) {
-    const homework = phase.homework || [];
-    return `
-      <p style="margin:0; font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Phase ${phase.phaseNumber} · Weeks ${escapeHtml(phase.weeks)}</p>
-      <h3 style="margin:2px 0 6px; color:var(--color-navy);">${escapeHtml(phase.name)} — ${escapeHtml(STATUS_LABEL[phase.status])}</h3>
-      ${phase.goal ? `<p style="margin:0 0 10px; font-size:0.9rem;">${escapeHtml(phase.goal)}</p>` : ""}
-      ${
-        homework.length === 0
-          ? ""
-          : `<div style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">${homework.map((h) => homeworkHtml(phase.id, h)).join("")}</div>`
-      }
-    `;
-  }
-
-  function homeworkHtml(phaseId, h) {
-    if (h.type === "reflection") {
-      return `
-        <div data-hw="${escapeHtml(h.id)}" data-phase="${escapeHtml(phaseId)}">
-          <p style="margin:0 0 4px; font-size:0.85rem; font-weight:600;">${escapeHtml(h.text)}</p>
-          ${
-            h.status === "complete"
-              ? `<p class="hint" style="margin:0; font-style:italic;">Your answer: "${escapeHtml(h.response)}"</p>`
-              : `<textarea data-reflection-input rows="2" placeholder="Your answer…" style="width:100%;"></textarea>
-                 <button type="button" class="btn-secondary" data-submit-reflection style="margin-top:6px;">Submit</button>`
-          }
-        </div>
-      `;
-    }
-    return `
-      <div data-hw="${escapeHtml(h.id)}" data-phase="${escapeHtml(phaseId)}" style="display:flex; align-items:center; gap:8px;">
-        ${h.type !== "standing" ? `<input type="checkbox" data-action-checkbox ${h.status === "complete" ? "checked" : ""} />` : "📌"}
-        <span style="font-size:0.85rem;">${escapeHtml(h.text)}${h.dueDate ? ` <span class="hint">(due ${escapeHtml(h.dueDate)})</span>` : ""}</span>
-      </div>
-    `;
-  }
-
-  function wirePhaseCard(card, phase) {
-    card.querySelectorAll("[data-submit-reflection]").forEach((btn) => {
-      const wrap = btn.closest("[data-hw]");
-      btn.addEventListener("click", async () => {
-        const homeworkId = wrap.dataset.hw;
-        const response = wrap.querySelector("[data-reflection-input]").value;
-        if (!response.trim()) return;
-        if (onHomeworkPatch) {
-          const nextData = await onHomeworkPatch(homeworkId, { response, status: "complete" });
-          if (nextData) activeData = nextData;
-          confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
-          render();
-        } else {
-          updatePhase(respondToReflection(phase, homeworkId, response));
-          confirmation = "Reflection saved. Tenyse can review it from the coaching tracker.";
-          render();
-        }
-      });
-    });
-    card.querySelectorAll("[data-action-checkbox]").forEach((checkbox) => {
-      const wrap = checkbox.closest("[data-hw]");
-      checkbox.addEventListener("change", async () => {
-        const homeworkId = wrap.dataset.hw;
-        const status = checkbox.checked ? "complete" : "not_started";
-        if (onHomeworkPatch) {
-          const nextData = await onHomeworkPatch(homeworkId, { status });
-          if (nextData) activeData = nextData;
-          confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
-          render();
-        } else {
-          updatePhase(updateHomeworkStatus(phase, homeworkId, status));
-          confirmation = checkbox.checked ? "Homework marked complete." : "Homework moved back to not started.";
-          render();
-        }
-      });
     });
   }
 
   function renderPlaceholder() {
     container.innerHTML = `
-      <div class="section-heading">
-        <h2>Coaching Program</h2>
-        <p class="hint" style="margin-top:4px;">Your coaching program will appear here once Tenyse adds your phases and next steps.</p>
-      </div>
-      <div class="card" style="margin-bottom:16px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <section class="cp-page">
+        <div class="cp-hero">
           <div>
-            <p style="margin:0 0 4px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Program format</p>
-            <p style="margin:0; font-size:1.05rem; font-weight:600; color:var(--color-navy);">90-Day — Visibility to Revenue</p>
+            <h1>Coaching Program</h1>
+            <h2>Visibility to Revenue — 90-Day Sprint</h2>
+            <p>Your coaching program will appear here once Tenyse adds your phases and next steps.</p>
           </div>
-          <span class="badge" style="background:var(--color-teal-tint); border:1px solid var(--color-teal); color:var(--color-teal); padding:4px 12px; border-radius:999px; font-size:0.78rem; font-weight:600;">Not yet started</span>
         </div>
-      </div>
-      <div class="state-panel">
-        <div class="state-icon" aria-hidden="true">🎯</div>
-        <h3>Your phases will appear here</h3>
-        <p>Once your coaching program is set up, you'll see each phase, its goal, and your homework right here.</p>
-      </div>
+        <div class="state-panel">
+          <div class="state-icon" aria-hidden="true">◎</div>
+          <h3>Your phases will appear here</h3>
+          <p>Once your coaching program is set up, you'll see each phase, its goal, homework, resources, and opportunities right here.</p>
+        </div>
+      </section>
     `;
   }
 }
