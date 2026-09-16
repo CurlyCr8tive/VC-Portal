@@ -4,15 +4,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verified Consulting — Owner Dashboard</title>
-  <link rel="stylesheet" href="portal-styles.css?v=20260915-owner-qa" />
+  <link rel="stylesheet" href="portal-styles.css?v=20260916-owner-runtime-4" />
 </head>
 <body>
   <div class="client-shell">
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
-    <aside class="client-sidebar" id="owner-sidebar" aria-label="Owner dashboard navigation sidebar"></aside>
+    <aside class="client-sidebar" id="owner-sidebar" aria-label="Owner dashboard navigation sidebar">
+      <div class="sidebar-brand">
+        <span class="logo-mark" aria-hidden="true">V</span>
+        <span class="brand-name">Verified Consulting</span>
+      </div>
+      <div class="sidebar-client-name">
+        Owner dashboard
+        <strong>Loading...</strong>
+      </div>
+    </aside>
 
     <main class="client-main">
-      <header class="client-header" id="owner-header"></header>
+      <header class="client-header" id="owner-header">
+        <div>
+          <h1>Loading owner portal...</h1>
+          <p class="header-sub">If this stays here, refresh the page once.</p>
+        </div>
+      </header>
 
       <div id="view-dashboard" class="client-view active">
         <div id="dashboard-content"></div>
@@ -57,6 +71,29 @@
   </div>
 
   <script src="src/supabaseConfig.js"></script>
-  <script type="module" src="src/owner/app.js?v=20260915-owner-dashboard"></script>
+  <script>
+    window.addEventListener("error", (event) => {
+      const sidebar = document.getElementById("owner-sidebar");
+      const header = document.getElementById("owner-header");
+      if (!sidebar || !header || sidebar.querySelector("[data-nav]")) return;
+      sidebar.innerHTML = `
+        <div class="sidebar-brand">
+          <span class="logo-mark" aria-hidden="true">V</span>
+          <span class="brand-name">Verified Consulting</span>
+        </div>
+        <div class="sidebar-client-name">
+          Owner dashboard
+          <strong>App did not finish loading</strong>
+        </div>
+      `;
+      header.innerHTML = `
+        <div>
+          <h1>Owner portal needs a refresh</h1>
+          <p class="header-sub">The dashboard script did not load cleanly. Refresh this page, then sign in again if prompted.</p>
+        </div>
+      `;
+    }, true);
+  </script>
+  <script type="module" src="src/owner/app.js?v=20260916-polish-qa-1"></script>
 </body>
 </html>

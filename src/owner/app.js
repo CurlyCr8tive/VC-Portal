@@ -29,7 +29,7 @@ import { renderInsightCard } from "../client/components/CampaignInsightCard.js";
 import { renderReportCard } from "../client/components/LatestReportCard.js";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
-import { renderOwnerSidebar } from "./components/OwnerSidebar.js";
+import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
 import { renderClientsList } from "./components/ClientsListCard.js";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js";
 import { renderPlacementForm } from "./components/PlacementForm.js";
@@ -50,8 +50,8 @@ import { loadSummary, saveSummary, approveSummary } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js";
 import { seedSamplePlacements } from "./seedSampleData.js";
-import { seedRealCaseStudyData } from "./seedRealCaseStudyData.js";
-import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js";
+import { seedRealCaseStudyData, backfillAveDataQuality } from "./seedRealCaseStudyData.js?v=20260916-ave-quality";
+import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260916-polish-2";
 
 // ---------------------------------------------------------------------------
 // The owner side. Every getter below reads across ALL clients in mockData —
@@ -75,6 +75,10 @@ const OWNER_API_BASE = window.OWNER_API_BASE_URL || "http://localhost:4001";
 
 function shouldUseOwnerApi() {
   return state.dataSource === "real" && Boolean(session?.real);
+}
+
+function showDevTools() {
+  return new URLSearchParams(location.search).get("dev") === "1";
 }
 
 function ownerApiAuthHint() {
@@ -359,8 +363,8 @@ function dashboardSkeletonHTML() {
       <section class="section" style="margin-bottom:0;">
         <div class="owner-panel-card">
           <div class="section-heading">
-            <h2>Recent Press Placements</h2>
-            <button class="link-btn" data-goto="placements">View All</button>
+            <h2 id="dashboard-primary-title">Recent Press Placements</h2>
+            <button class="link-btn" id="dashboard-primary-action" data-goto="placements">View All</button>
           </div>
           <div id="dashboard-placements"></div>
         </div>
@@ -447,13 +451,173 @@ function getCoachingOverviewRows() {
   });
 }
 
+function getDashboardCoachingRows() {
+  const rows = getCoachingOverviewRows();
+  if (!state.dashboardClientFilter) return rows;
+  return rows.filter((row) => row.client === state.dashboardClientFilter);
+}
+
+function renderDashboardCoachingState(container, rows) {
+  const clientName = state.dashboardClientFilter;
+  if (!rows.length) {
+    container.innerHTML = `
+      <div class="state-panel compact">
+        <h3>${clientName ? `No coaching program for ${escapeHtml(clientName)}` : "No coaching programs yet"}</h3>
+        <p>${
+          clientName
+            ? "This client has no coaching enrollment or phase data yet. Set the client's engagement type to Coaching or PR + Coaching, then add phases in the Coaching Program hub."
+            : "Set a client's engagement type to Coaching or PR + Coaching, then add phases in the Coaching Program hub."
+        }</p>
+        <button type="button" class="btn-secondary" data-goto="coaching">Go to Coaching Hub</button>
+      </div>
+    `;
+    return;
+  }
+
+  const selected = rows[0];
+  const clientData = coachingDataForClient(selected.client);
+  const phases = clientData.phases?.length ? clientData.phases : loadPhasesForClient(selected.client);
+  const resources = clientData.resources?.length ? clientData.resources : loadResourcesForClient(selected.client);
+  const opportunities = clientData.opportunities?.length ? clientData.opportunities : loadOpportunitiesForClient(selected.client);
+  const progress = calculateCoachingProgress({ phases, resources, opportunities });
+  const nextPhase = [...phases].reverse().find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status !== "complete") || phases[0];
+  const homework = phases.flatMap((phase) =>
+    (phase.homework || []).map((item) => ({ ...item, phaseName: phase.name, phaseNumber: phase.phaseNumber }))
+  );
+  const openHomework = homework.filter((item) => item.type !== "standing" && item.status !== "complete").slice(0, 4);
+  const checklist = resources.filter((item) => item.kind === "checklist");
+  const uniqueByTitle = (items) => [...new Map(items.map((item) => [item.title, item])).values()];
+  const missingAssets = uniqueByTitle(checklist.filter((item) => !item.completed)).slice(0, 4);
+  const quickResources = uniqueByTitle(resources.filter((item) => item.kind === "resource")).slice(0, 4);
+  const featuredOpportunity = opportunities.find((item) => item.decisionStatus === "pursuing") || opportunities[0];
+  const opportunityScores = featuredOpportunity?.scores || {};
+  const scoreEntries = Object.entries(opportunityScores).slice(0, 4);
+  const scoreValues = Object.values(opportunityScores).filter((value) => Number.isFinite(Number(value))).map(Number);
+  const averageScore = scoreValues.length ? (scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length).toFixed(1) : null;
+  const programPercent = selected.progress || progress.phases.percent || progress.homework.percent || 0;
+
+  container.innerHTML = `
+    <div class="owner-coaching-detail-grid">
+      <article class="owner-coaching-detail-card wide">
+        <div class="section-heading">
+          <div>
+            <h3>${escapeHtml(selected.client)}</h3>
+            <p>${escapeHtml(selected.program)} · ${programPercent}% complete</p>
+          </div>
+          <button type="button" class="btn-secondary" data-coaching-client="${escapeHtml(selected.client)}">Manage</button>
+        </div>
+        <div class="roadmap-overall">
+          <span>Overall Progress</span>
+          <strong>${programPercent}%</strong>
+          <div class="progress-track" aria-hidden="true"><div class="progress-fill" style="width:${programPercent}%;"></div></div>
+        </div>
+        ${
+          phases.length
+            ? `<div class="roadmap-steps compact-roadmap">
+          ${phases
+            .map(
+              (phase) => `
+            <div class="roadmap-step ${escapeHtml(phase.status)}">
+              <span class="roadmap-node">${phase.status === "complete" ? "✓" : phase.phaseNumber}</span>
+              <strong>${escapeHtml(String(phase.phaseNumber || ""))}</strong>
+              <small>${escapeHtml(phase.name)}</small>
+              ${phase.weeks ? `<em>${escapeHtml(phase.weeks)}</em>` : ""}
+            </div>`
+            )
+            .join("")}
+        </div>`
+            : `<div class="state-panel compact"><h3>No phases loaded</h3><p>Load a program template or add phases in the Coaching Program hub.</p></div>`
+        }
+        <div class="client-card-footer">
+          <p><strong>Next milestone:</strong> ${escapeHtml(selected.nextMilestone || nextPhase?.name || "Set first phase")}</p>
+          <button type="button" class="link-btn" data-goto="coaching">Open hub</button>
+        </div>
+      </article>
+
+      <article class="owner-coaching-detail-card">
+        <div class="section-heading"><h3>Homework & Action Items</h3></div>
+        ${
+          openHomework.length
+            ? `<div class="homework-list">
+          ${openHomework
+            .map(
+              (item) => `
+            <div class="homework-item">
+              <input type="checkbox" disabled ${item.status === "complete" ? "checked" : ""} />
+              <div>
+                <strong>${escapeHtml(item.text)}</strong>
+                <small>Phase ${escapeHtml(String(item.phaseNumber || ""))}${item.dueDate ? ` · Due ${escapeHtml(item.dueDate)}` : ""}</small>
+              </div>
+              <span class="client-status-badge ${item.status === "complete" ? "success" : "medium"}">${escapeHtml(item.status === "complete" ? "Done" : "Open")}</span>
+            </div>`
+            )
+            .join("")}
+        </div>`
+            : `<div class="state-panel compact"><h3>No open homework</h3><p>Assigned action items and reflections will appear here.</p></div>`
+        }
+      </article>
+
+      <article class="owner-coaching-detail-card">
+        <div class="section-heading"><h3>Opportunity Scorecard</h3></div>
+        ${
+          featuredOpportunity
+            ? `<p class="hint" style="margin-top:0;">${escapeHtml(featuredOpportunity.title)}</p>
+        <div class="scorecard-rows">
+          ${scoreEntries
+            .map(
+              ([label, score]) => `
+            <div>
+              <span>${escapeHtml(label.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()))}</span>
+              <span class="stars">${"★".repeat(Number(score) || 0)}${"☆".repeat(Math.max(0, 5 - (Number(score) || 0)))}</span>
+            </div>`
+            )
+            .join("")}
+        </div>
+        <div class="scorecard-summary">
+          <span>Overall Score</span>
+          <strong>${averageScore || "—"} / 5</strong>
+          <small>${escapeHtml(selected.client)}</small>
+        </div>`
+            : `<div class="state-panel compact"><h3>No opportunities logged</h3><p>Partnership or visibility opportunities will appear here after they are added.</p></div>`
+        }
+      </article>
+
+      <article class="owner-coaching-detail-card">
+        <div class="section-heading"><h3>Resources & Checklist</h3></div>
+        ${
+          missingAssets.length
+            ? `<p class="hint" style="margin-top:0;">Missing assets</p><div class="quick-resource-list">
+          ${missingAssets.map((item) => `<div><span>□</span><span>${escapeHtml(item.title)}</span></div>`).join("")}
+        </div>`
+            : `<p class="hint" style="margin-top:0;">No missing checklist items.</p>`
+        }
+        ${
+          quickResources.length
+            ? `<p class="hint" style="margin:12px 0 6px;">Quick resources</p><div class="quick-resource-list">
+          ${quickResources.map((item) => `<div><span>▤</span><span>${escapeHtml(item.title)}</span></div>`).join("")}
+        </div>`
+            : ""
+        }
+      </article>
+    </div>
+  `;
+
+  container.querySelectorAll("[data-coaching-client]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.coachingSelectedClient = btn.dataset.coachingClient;
+      navigate("coaching");
+    });
+  });
+}
+
 function renderOwnerMetrics(container, metrics) {
   const coachingCount = getCoachingClients().length;
+  const aveNote = metrics.aveDelta != null ? `${metrics.aveDelta > 0 ? "+" : ""}${metrics.aveDelta}% vs prior period` : "Confirmed placements only";
   container.innerHTML = `
     ${ownerMetricCard({
       label: "Total Publicity Value (AVE)",
       value: formatCompactCurrency(metrics.totalAVE),
-      note: metrics.aveDelta != null ? `${metrics.aveDelta > 0 ? "+" : ""}${metrics.aveDelta}% vs prior period` : "Confirmed placements only",
+      note: aveNote,
       icon: "$",
       iconBg: "#fbe2da",
       tooltip: "Estimated equivalent paid-media value for confirmed coverage.",
@@ -736,16 +900,32 @@ function renderDashboard() {
   renderOwnerMetrics(document.getElementById("dashboard-metrics"), metrics);
 
   const filterSummaryEl = document.getElementById("dashboard-filter-summary");
-  filterSummaryEl.textContent = filterActive
-    ? `Showing ${state.dashboardClientFilter || "all clients"}${state.dashboardDateFrom || state.dashboardDateTo ? `, ${state.dashboardDateFrom || "any date"} to ${state.dashboardDateTo || "any date"}` : ""} — ${filteredPlacements.length} placement${filteredPlacements.length === 1 ? "" : "s"} match.`
-    : "";
+  const coachingRows = getDashboardCoachingRows();
+  filterSummaryEl.textContent =
+    state.dashboardMode === "coaching"
+      ? `Showing ${state.dashboardClientFilter || "all coaching clients"}${state.dashboardDateFrom || state.dashboardDateTo ? " — date range does not apply to coaching program setup yet" : ""} — ${coachingRows.length} coaching program${coachingRows.length === 1 ? "" : "s"} match.`
+      : filterActive
+        ? `Showing ${state.dashboardClientFilter || "all clients"}${state.dashboardDateFrom || state.dashboardDateTo ? `, ${state.dashboardDateFrom || "any date"} to ${state.dashboardDateTo || "any date"}` : ""} — ${filteredPlacements.length} placement${filteredPlacements.length === 1 ? "" : "s"} match.`
+        : "";
 
   const basePlacements = filterActive ? filteredPlacements : getAllPlacements();
   const recentPlacements = filterPlacements(basePlacements, state.searchTerm)
     .slice()
     .sort((a, b) => (a.publicationDate < b.publicationDate ? 1 : -1))
     .slice(0, 4);
-  renderCompactPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements);
+  const primaryTitle = document.getElementById("dashboard-primary-title");
+  const primaryAction = document.getElementById("dashboard-primary-action");
+  if (state.dashboardMode === "coaching") {
+    primaryTitle.textContent = "Coaching Program";
+    primaryAction.textContent = "Go to Coaching Hub";
+    primaryAction.dataset.goto = "coaching";
+    renderDashboardCoachingState(document.getElementById("dashboard-placements"), coachingRows);
+  } else {
+    primaryTitle.textContent = "Recent Press Placements";
+    primaryAction.textContent = "View All";
+    primaryAction.dataset.goto = "placements";
+    renderCompactPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements);
+  }
   renderCoachingOverview(document.getElementById("dashboard-coaching-overview"));
   renderDashboardRollup(document.getElementById("dashboard-rollup-strip"), metrics);
 
@@ -1098,8 +1278,8 @@ async function deleteRealPlacement(id) {
   await ownerApi(`/api/placements/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-async function inviteClient({ clientName, email }) {
-  const resolved = await resolveRealClientId(clientName);
+async function inviteClient({ clientId, clientName, email }) {
+  const resolved = clientId ? { ok: true, id: clientId } : await resolveRealClientId(clientName);
   if (!resolved.ok) return resolved;
   try {
     const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(resolved.id)}/invite`, {
@@ -1528,6 +1708,7 @@ function renderPlacementsView() {
 
   renderPlacementsTable(document.getElementById("placements-full-table"), filterPlacements(getAllPlacements(), state.searchTerm), {
     showClient: true,
+    showDataQuality: false,
     onEdit: canSavePlacements
       ? (id) => {
           state.editingPlacementId = id;
@@ -1925,6 +2106,7 @@ function renderAnalyticsView() {
 }
 
 function renderSettingsView() {
+  const devTools = showDevTools();
   document.getElementById("settings-content").innerHTML = `
     <div class="section-heading"><h2>Settings</h2></div>
     <div class="card">
@@ -1934,67 +2116,53 @@ function renderSettingsView() {
     <div class="card">
       <div id="outlet-rates-wrap"></div>
     </div>
-    <div class="section-heading" style="margin-top:24px;"><h2>Error Log</h2></div>
-    <div class="card">
-      <p class="hint" style="margin:0 0 12px;">
-        Client-side failures (corrupted local data, a failed calculation) land here today. Once Supabase is live, the
-        <code>errors</code> table (in <code>db/schema.sql</code>) becomes the production version of this same log —
-        same relationship every other real/localStorage pair in this app already has.
-      </p>
-      <div id="error-log-wrap"></div>
-    </div>
+    ${
+      devTools
+        ? `<div class="section-heading" style="margin-top:24px;"><h2>Error Log</h2></div>
+          <div class="card">
+            <p class="hint" style="margin:0 0 12px;">
+              Client-side failures and calculation errors land here during testing.
+            </p>
+            <div id="error-log-wrap"></div>
+          </div>`
+        : ""
+    }
     <div class="section-heading" style="margin-top:24px;"><h2>Google Workspace</h2></div>
     <div class="card">
-      <p style="margin:0 0 10px;">Gmail and Calendar are real backend integrations in this build once Google OAuth is configured under Tenyse's account.</p>
-      <p class="hint" style="margin:0 0 10px;">Until GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN are set, these controls return a clear not-connected message instead of opening workaround links or fabricating dates/events.</p>
+      <p style="margin:0 0 10px;">Connect Tenyse's Google Workspace account to support Gmail-based pitch-date lookup, client note notifications, and Calendar scheduling.</p>
+      <p class="hint" style="margin:0 0 10px;">If Google Workspace is not connected yet, the portal will show a clear connection status before anyone tries to search Gmail or schedule a meeting.</p>
       <p id="google-workspace-status" class="hint" style="margin:0 0 10px;">Checking Google Workspace connection...</p>
       <ul style="margin:0; padding-left:18px; color:var(--text-secondary); font-size:0.86rem;">
-        <li>Client note notification email: backend support exists; requires Gmail OAuth env values.</li>
-        <li>Client meeting scheduling: Clients -> Schedule Meeting creates a Google Calendar event and invites the saved contact email.</li>
-        <li>Lead time: Press Placements -> Find in Gmail searches for pitch evidence and fills Pitch Sent Date when it finds a match.</li>
+        <li>Client note notifications: sends Tenyse an email when a client leaves a campaign note.</li>
+        <li>Client meeting scheduling: creates a Google Calendar event and invites the saved client contact.</li>
+        <li>Lead time support: searches Gmail for pitch evidence and fills the placement's Pitch Sent Date when a match is found.</li>
       </ul>
     </div>
-    <div class="section-heading" style="margin-top:24px;"><h2>Real Case Study Data</h2></div>
-    <div class="card">
-      <p style="margin:0 0 12px;">Not a demo/mock fixture — these are Tenyse's own real numbers, sent directly by her: PR
-        clients VeganHood, SNAP Co., and Vegan Dining Month (placements, a completed Campaign record, and a reviewed +
-        approved AI-generated executive summary each), plus a real Client profile for every one of them — status,
-        engagement type, contact, industry. VeganHood is marked <strong>Past / Portfolio</strong> (confirmed closed by
-        Tenyse directly); SNAP Co. and Vegan Dining Month are marked <strong>Unconfirmed</strong> rather than guessed
-        either way, since she named other past clients but not these two specifically. Also adds <strong>Greyz Bistro</strong>
-        (Chef Garth) as a real Active coaching client — her first genuine active engagement.</p>
-      <p class="hint" style="margin:0 0 12px;">Two honest gaps, disclosed on each row's Notes field: none of the source
-        material gives an exact landing/campaign-start date, so dates shown are recording-date placeholders, not sourced
-        facts — and while Audience Reach now has a real per-placement field (Sentiment always did), none of this source
-        material gives a per-article figure for either, only campaign-level totals, so nothing is entered here rather
-        than guessed. Called out directly in each summary rather than smoothed over.</p>
-      <button class="btn-secondary" id="seed-real-case-study-btn">Load Real Case Study Data</button>
-      <span id="seed-real-case-study-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
-    </div>
-    <div class="section-heading" style="margin-top:24px;"><h2>Greyz Bistro Coaching Program Data</h2></div>
-    <div class="card">
-      <p style="margin:0 0 12px;">Chef Garth's real program: 6 phases (status inferred from what's confirmed built — flagged per phase,
-        not presented as exact), the LinkedIn Audit &amp; Fix Plan resource, and both active partnerships (WIADCA Carnival, Brooklyn
-        Roasting Co.) as real Opportunity Evaluator entries. Opportunity scores and the missing-assets checklist item are clearly
-        marked mock/placeholder — swap for Tenyse's real evaluation once she gives it. Safe to click more than once.</p>
-      <button class="btn-secondary" id="seed-greyz-coaching-btn">Load Greyz Bistro Coaching Data</button>
-      <span id="seed-greyz-coaching-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
-    </div>
-    <div class="section-heading" style="margin-top:24px;"><h2>Developer Tools</h2></div>
-    <div class="card">
-      <p style="margin:0 0 12px;">Not a real product feature — a shortcut for testing. Adds 5 fictional but complete placements
-        across two clients (via the same Add Placement path the form uses), so there's something to try the
-        Press Placements table, campaigns, and Canva export against without typing them in by hand.</p>
-      <button class="btn-secondary" id="seed-sample-data-btn">Load Sample Placements</button>
-      <span id="seed-sample-data-result" style="margin-left:10px; font-size:0.85rem; color:var(--text-secondary);"></span>
-    </div>
+    ${
+      devTools
+        ? `<div class="section-heading" style="margin-top:24px;"><h2>Data Seeding Tools</h2></div>
+          <div class="card">
+            <p class="hint" style="margin:0 0 12px;">Testing-only tools for loading case-study and coaching records into the local dataset.</p>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+              <button class="btn-secondary" id="seed-real-case-study-btn">Load Real Case Study Data</button>
+              <button class="btn-secondary" id="seed-greyz-coaching-btn">Load Greyz Bistro Coaching Data</button>
+              <button class="btn-secondary" id="seed-sample-data-btn">Load Sample Placements</button>
+            </div>
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:6px; font-size:0.85rem; color:var(--text-secondary);">
+              <span id="seed-real-case-study-result"></span>
+              <span id="seed-greyz-coaching-result"></span>
+              <span id="seed-sample-data-result"></span>
+            </div>
+          </div>`
+        : ""
+    }
   `;
 
   renderOutletRatesView(document.getElementById("outlet-rates-wrap"));
-  renderErrorLogPanel(document.getElementById("error-log-wrap"));
+  if (devTools) renderErrorLogPanel(document.getElementById("error-log-wrap"));
   loadGoogleWorkspaceStatus();
 
-  document.getElementById("seed-real-case-study-btn").addEventListener("click", () => {
+  document.getElementById("seed-real-case-study-btn")?.addEventListener("click", () => {
     const { placementsAdded, campaignsAdded, summariesApproved, clientsAdded } = seedRealCaseStudyData();
     document.getElementById("seed-real-case-study-result").textContent =
       placementsAdded > 0 || campaignsAdded > 0 || clientsAdded > 0
@@ -2002,7 +2170,7 @@ function renderSettingsView() {
         : `Already loaded — refreshed ${summariesApproved} executive summar${summariesApproved === 1 ? "y" : "ies"}.`;
   });
 
-  document.getElementById("seed-greyz-coaching-btn").addEventListener("click", () => {
+  document.getElementById("seed-greyz-coaching-btn")?.addEventListener("click", () => {
     if (!findClientByName("Greyz Bistro")) {
       alert('Load "Real Case Study Data" first (adds Greyz Bistro as a client) before loading its coaching program data.');
       return;
@@ -2014,7 +2182,7 @@ function renderSettingsView() {
         : "Already loaded — nothing new to add.";
   });
 
-  document.getElementById("seed-sample-data-btn").addEventListener("click", () => {
+  document.getElementById("seed-sample-data-btn")?.addEventListener("click", () => {
     if (!confirm("This adds 5 sample placements to your real placement data. Continue?")) return;
     const count = seedSamplePlacements();
     document.getElementById("seed-sample-data-result").textContent = `Added ${count} sample placements.`;
@@ -2163,6 +2331,7 @@ function renderSidebarComponent() {
     currentView: state.view,
     demoState: state.demoState,
     dataSource: state.dataSource,
+    showDevControls: new URLSearchParams(location.search).get("dev") === "1",
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
     onDataSourceChange: setDataSource,
@@ -2275,6 +2444,14 @@ if (session) {
   }
 
   autoSeedRealCaseStudyDataOnce();
+  if (state.dataSource === "real" && findClientByName("Greyz Bistro")) {
+    seedGreyzBistroCoachingData();
+  }
+  // Runs every load, unlike the seed above — it only attaches warnings to
+  // rows that already exist, never creates them, so there's nothing for it
+  // to resurrect. See backfillAveDataQuality()'s own comment for why it
+  // can't live inside the once-only seed.
+  if (state.dataSource === "real") backfillAveDataQuality();
 
   renderSidebarComponent();
   renderHeaderComponent();

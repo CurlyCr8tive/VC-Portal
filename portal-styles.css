@@ -944,6 +944,47 @@ table.placements-table {
   min-height: 118px;
 }
 
+.owner-coaching-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.owner-coaching-detail-card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 16px;
+  min-width: 0;
+}
+
+.owner-coaching-detail-card.wide {
+  grid-column: 1 / -1;
+}
+
+.owner-coaching-detail-card .section-heading {
+  margin-bottom: 10px;
+}
+
+.owner-coaching-detail-card .section-heading h3 {
+  color: var(--color-navy);
+  font-size: 1rem;
+}
+
+.owner-coaching-detail-card .section-heading p {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.compact-roadmap {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+
+.owner-coaching-detail-card .homework-item {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+}
+
 .metric-kicker,
 .metric-note {
   margin: 0;
@@ -1646,6 +1687,15 @@ table.placements-table {
   font-weight: 600;
 }
 
+.owner-coaching-detail-card .quick-resource-list div {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.owner-coaching-detail-card .quick-resource-list div:last-child {
+  border-bottom: 0;
+}
+
 .quick-resource-list span,
 .resource-icon {
   color: var(--color-coral-dark);
@@ -2052,6 +2102,10 @@ table.placements-table {
 
   .owner-rollup-item:nth-child(2) {
     border-right: none;
+  }
+
+  .owner-coaching-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
 

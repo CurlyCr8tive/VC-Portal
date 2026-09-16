@@ -225,7 +225,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
     container.innerHTML = `
       <div class="section-heading">
         <h2>Coaching Program</h2>
-        <p class="hint" style="margin-top:4px;">This program hasn't started yet. Everything below is a preview, not live content.</p>
+        <p class="hint" style="margin-top:4px;">Your coaching program will appear here once Tenyse adds your phases and next steps.</p>
       </div>
       <div class="card" style="margin-bottom:16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">

@@ -23,9 +23,8 @@ export function renderOutletRatesView(container) {
     const rates = listAllRates();
     container.innerHTML = `
       <p class="hint" style="margin:0 0 12px;">
-        <code>AVE = rate × multiplier</code>. Multiplier defaults to 1 (equal to advertising) — no industry-standard
-        multiplier exists, so only raise it with a real reason. Saving a rate for an outlet that's already on file
-        overwrites it (the edit path — same outlet name, new numbers).
+        <code>AVE = rate × multiplier</code>. Multiplier defaults to 1. Save a rate for each outlet Tenyse wants to reuse;
+        saving the same outlet again updates the existing rate.
       </p>
       <div class="card" style="margin-bottom:16px;">
         <form class="entry-form" id="outlet-rate-form">
@@ -78,7 +77,7 @@ export function renderOutletRatesView(container) {
         <div class="state-panel">
           <div class="state-icon" aria-hidden="true">💲</div>
           <h3>No outlet rates on file yet</h3>
-          <p>Rates you save here are what the AVE Calculation Agent's "Calculate" button looks up — nothing is seeded or guessed.</p>
+          <p>Rates saved here power the AVE calculator on new press placements.</p>
         </div>
       `;
       return;

@@ -13,6 +13,8 @@
 
 import { OUTLET_REFERENCE, KNOWN_OUTLETS_NO_RATE_YET } from "../../outletReference.js";
 import { calculateAVE } from "../../aveCalculation.js";
+import { estimateAVE, formatEstimateRange } from "../../aveEstimation.js";
+import { findOutletTraffic } from "../../outletTrafficReference.js";
 import { saveRate } from "../../outletRatesStorage.js";
 import { logError } from "../../errorLog.js";
 import { escapeHtml } from "../../client/utils.js";
@@ -230,11 +232,56 @@ export function renderPlacementForm(
   });
 
   function renderFallback(outlet) {
+    // No saved rate, but we may still have a sourced audience figure for
+    // this outlet — in which case the two published industry formulas can
+    // bracket a value. This is an ESTIMATE with its inputs shown, not a
+    // rate: the owner still has to decide, and nothing is written to the
+    // AVE field on her behalf.
+    const traffic = findOutletTraffic(outlet);
+    const estimate = traffic ? estimateAVE(traffic.value, traffic.metric) : null;
+    const estimateBlock = estimate
+      ? `<div style="margin:0 0 10px; padding:10px 12px; background:#fff; border:1px solid #e4d9bd; border-radius:var(--radius-sm);">
+        <p style="margin:0 0 6px; font-size:0.85rem; font-weight:600;">Industry-formula estimate: ${escapeHtml(
+             formatEstimateRange(estimate)
+           )}</p>
+           <p style="margin:0 0 6px; font-size:0.78rem; color:var(--text-secondary);">
+             Muck Rack method ${escapeHtml(`$${Math.round(estimate.muckRack).toLocaleString("en-US")}`)} ·
+             Agility PR method ${escapeHtml(`$${Math.round(estimate.agility).toLocaleString("en-US")}`)}.
+             Review the range and choose the value that best fits this placement before saving.
+           </p>
+           <p style="margin:0; font-size:0.75rem; color:var(--text-secondary);">
+             Based on ${escapeHtml(estimate.audience.toLocaleString("en-US"))}
+             ${escapeHtml(estimate.audienceMetric === "monthly_visits" ? "monthly visits" : "monthly unique visitors")}
+             — ${escapeHtml(traffic.source)}${traffic.sourceDate ? ` (${escapeHtml(traffic.sourceDate)})` : ""}.
+             ${
+               estimate.overstated
+                 ? "<strong>Note:</strong> this estimate uses total visits because unique visitors are not available for this outlet."
+                 : ""
+             }
+           </p>
+           ${
+             // No one-click fill when the input is the wrong metric. An
+             // overstating figure shouldn't be one button away from a
+             // client-facing number — she can still type it, but she has
+             // to decide to. (Sanity check on how far off this can get:
+             // the Muck Rack formula on Forbes' visits count returns
+             // ~$665K for one placement, while Forbes charges ~$12,500
+             // for a BrandVoice sponsored article covering the same
+             // space.)
+             estimate.overstated
+               ? `<p style="margin:8px 0 0; font-size:0.75rem; color:var(--text-secondary);">Enter a final value manually after reviewing the estimate.</p>`
+               : `<button type="button" class="btn-secondary" id="op-ave-use-estimate" style="margin-top:8px;">Use ${escapeHtml(
+                   `$${Math.round(estimate.muckRack).toLocaleString("en-US")}`
+                 )} (Muck Rack method)</button>`
+           }
+         </div>`
+      : "";
     fallbackEl.innerHTML = `
       <div style="margin:10px 0 14px; padding:12px 14px; background:#fff8e6; border:1px solid #f0ddab; border-radius:var(--radius-md);">
         <p style="margin:0 0 8px; font-size:0.85rem; font-weight:600;">No saved rate for "${escapeHtml(
           outlet
-        )}" — this never guesses. Enter a value in AVE ($) above by hand.</p>
+        )}". ${estimate ? "Review the estimate below, or enter" : "Enter"} a value in AVE ($) above by hand.</p>
+        ${estimateBlock}
         <details style="margin-bottom:10px;">
           <summary style="cursor:pointer; font-size:0.8rem;">General industry benchmarks (not a confirmed rate)</summary>
           <ul style="margin:8px 0 0; padding-left:18px; font-size:0.78rem; color:var(--text-secondary);">
@@ -256,6 +303,17 @@ export function renderPlacementForm(
     container.querySelector("#op-ave-save-rate").addEventListener("change", (e) => {
       pendingRateSave = e.target.checked ? { outlet } : null;
     });
+
+    const useEstimateBtn = container.querySelector("#op-ave-use-estimate");
+    if (useEstimateBtn) {
+      // Fills the field; deliberately does NOT save or submit. The owner
+      // still reviews the number and decides — an estimate that wrote
+      // itself into a client-facing figure would be the same class of
+      // problem as the unflagged duplicate.
+      useEstimateBtn.addEventListener("click", () => {
+        aveInput.value = estimate.muckRack.toFixed(2);
+      });
+    }
 
     if (onResearchRate) {
       const researchBtn = container.querySelector("#op-ave-research");

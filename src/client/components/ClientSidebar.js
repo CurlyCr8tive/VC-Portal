@@ -38,7 +38,21 @@ const COACHING_VIEW_IDS = new Set(COACHING_NAV_ITEMS.map((item) => item.id));
  * PR-only regardless of what's passed in (see client/app.js's fallback).
  */
 export function renderSidebar(container, opts) {
-  const { client, sessionEmail, currentView, demoState, dataSource, engagementType, programView, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
+  const {
+    client,
+    sessionEmail,
+    currentView,
+    demoState,
+    dataSource,
+    engagementType,
+    programView,
+    showDevControls = false,
+    onNavigate,
+    onDemoStateChange,
+    onDataSourceChange,
+    onLogout,
+    onClose,
+  } = opts;
 
   const showPr = engagementType !== "coaching";
   const showCoaching = engagementType === "coaching" || engagementType === "pr_and_coaching";
@@ -74,28 +88,32 @@ export function renderSidebar(container, opts) {
     <div class="sidebar-footer">
       <button data-action="logout">Log Out</button>
     </div>
-    <div class="demo-controls">
-      <label for="data-source-select">Data source</label>
-      <select id="data-source-select">
-        <option value="real" ${dataSource === "real" ? "selected" : ""}>Real (your actual placements)</option>
-        <option value="mock" ${dataSource === "mock" ? "selected" : ""}>Mock (demo preview)</option>
-      </select>
-      <label for="demo-state-select" style="margin-top:8px;">Demo: data state</label>
-      <select id="demo-state-select">
-        <option value="normal" ${demoState === "normal" ? "selected" : ""}>Normal</option>
-        <option value="loading" ${demoState === "loading" ? "selected" : ""}>Loading</option>
-        <option value="empty" ${demoState === "empty" ? "selected" : ""}>Empty (new client)</option>
-        <option value="error" ${demoState === "error" ? "selected" : ""}>Error</option>
-      </select>
-    </div>
+    ${
+      showDevControls
+        ? `<div class="demo-controls">
+            <label for="data-source-select">Data source</label>
+            <select id="data-source-select">
+              <option value="real" ${dataSource === "real" ? "selected" : ""}>Real (your actual placements)</option>
+              <option value="mock" ${dataSource === "mock" ? "selected" : ""}>Mock (demo preview)</option>
+            </select>
+            <label for="demo-state-select" style="margin-top:8px;">Demo: data state</label>
+            <select id="demo-state-select">
+              <option value="normal" ${demoState === "normal" ? "selected" : ""}>Normal</option>
+              <option value="loading" ${demoState === "loading" ? "selected" : ""}>Loading</option>
+              <option value="empty" ${demoState === "empty" ? "selected" : ""}>Empty (new client)</option>
+              <option value="error" ${demoState === "error" ? "selected" : ""}>Error</option>
+            </select>
+          </div>`
+        : ""
+    }
   `;
 
   container.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => onNavigate(btn.dataset.nav));
   });
   container.querySelector('[data-action="logout"]').addEventListener("click", onLogout);
-  container.querySelector("#data-source-select").addEventListener("change", (e) => onDataSourceChange(e.target.value));
-  container.querySelector("#demo-state-select").addEventListener("change", (e) => onDemoStateChange(e.target.value));
+  container.querySelector("#data-source-select")?.addEventListener("change", (e) => onDataSourceChange(e.target.value));
+  container.querySelector("#demo-state-select")?.addEventListener("change", (e) => onDemoStateChange(e.target.value));
   const closeBtn = container.querySelector(".sidebar-close");
   if (onClose) closeBtn.addEventListener("click", onClose);
 }

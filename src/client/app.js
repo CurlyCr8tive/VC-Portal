@@ -764,7 +764,7 @@ function renderMessagesView() {
     <div class="client-message-layout">
       <article class="card">
         <h3>Message Tenyse</h3>
-        <p class="hint">For this demo build, this panel captures the client-facing path for questions, meeting follow-ups, and coaching check-ins. The production version can connect this to Gmail notifications once Tenyse authorizes Google Workspace.</p>
+        <p class="hint">Use this space for questions, meeting follow-ups, coaching check-ins, and asset updates for Tenyse.</p>
         <div class="entry-form">
           <div class="field-row">
             <label for="client-message-subject">Subject</label>
@@ -788,7 +788,7 @@ function renderMessagesView() {
     </div>
   `;
   document.getElementById("client-message-submit").addEventListener("click", () => {
-    document.getElementById("client-message-result").textContent = "Ready to connect to Gmail notifications in production.";
+    document.getElementById("client-message-result").textContent = "Message prepared for Tenyse.";
   });
 }
 
@@ -812,7 +812,7 @@ function renderFilesView() {
             </article>`
               )
               .join("")
-          : `<article class="card resource-library-card"><span class="resource-icon" aria-hidden="true">▧</span><h3>Shared files will appear here</h3><p>Media kits, contracts, proposals, and client assets can be surfaced from this section as the backend storage is connected.</p></article>`
+          : `<article class="card resource-library-card"><span class="resource-icon" aria-hidden="true">▧</span><h3>Shared files will appear here</h3><p>Media kits, contracts, proposals, and client assets from Tenyse will appear in this section.</p></article>`
       }
     </div>
   `;
@@ -916,6 +916,7 @@ function renderSidebarComponent() {
     dataSource: state.dataSource,
     engagementType: getEngagementType(),
     programView: activeProgramView(),
+    showDevControls: new URLSearchParams(location.search).get("dev") === "1",
     onNavigate: navigate,
     onDemoStateChange: setDemoState,
     onDataSourceChange: setDataSource,

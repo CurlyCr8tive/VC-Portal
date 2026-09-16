@@ -15,6 +15,7 @@ export const PLACEMENT_FIELDS = [
   "campaign",
   "sentiment",
   "audienceReach",
+  "aveDataQuality",
 ];
 
 export const SENTIMENT_OPTIONS = ["positive", "neutral", "negative"];
@@ -53,6 +54,21 @@ function normalizeFields(raw) {
     audienceReach: raw.audienceReach !== "" && raw.audienceReach != null && Number.isFinite(Number(raw.audienceReach))
       ? Number(raw.audienceReach)
       : null,
+    // Why this figure should not be treated as settled, when that applies —
+    // null (the normal case) means "no known problem," NOT "verified." The
+    // app has no verification step to assert the positive claim, so this
+    // deliberately only records doubt, never confidence.
+    //
+    // Exists because a known-suspect number was being seeded and displayed
+    // as ordinary real data: the $492,198/14.2M pair that appears under both
+    // VeganHood-CPG and Candlelit Care (see outletReference.js's
+    // CAMPAIGN_BENCHMARKS notes — almost certainly a reused Canva template
+    // stat block, not two independently-calculated figures). The benchmark
+    // rows carried `verified: false`, but the seeded placements carried
+    // nothing, so the dashboard presented the figure with full confidence.
+    // A caveat that lives only in a source comment isn't a caveat the owner
+    // ever sees.
+    aveDataQuality: raw.aveDataQuality?.trim() || null,
   };
 }
 
@@ -75,9 +91,19 @@ export function createPlacement(raw) {
  * instead of creating a duplicate.
  */
 export function applyPlacementEdit(existing, raw) {
+  const normalized = normalizeFields(raw);
   return {
     id: existing.id,
     createdAt: existing.createdAt,
-    ...normalizeFields(raw),
+    ...normalized,
+    // The placement form has no input for aveDataQuality, so a plain edit
+    // would otherwise wipe an existing flag just by saving the row — the
+    // warning would vanish with no one having decided anything about it.
+    // Carried forward instead, EXCEPT when the AVE figure itself changed:
+    // typing a new number is the owner resolving the doubt, and leaving a
+    // "this figure is unconfirmed" warning attached to a figure she just
+    // corrected would be worse than dropping it.
+    aveDataQuality:
+      normalized.aveDataQuality ?? (normalized.aveValue === existing.aveValue ? existing.aveDataQuality ?? null : null),
   };
 }

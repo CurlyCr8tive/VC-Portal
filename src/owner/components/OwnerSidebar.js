@@ -18,7 +18,7 @@ const NAV_ITEMS = [
  * allowed to exist — none of it is reachable from client.html.
  */
 export function renderOwnerSidebar(container, opts) {
-  const { ownerName, sessionEmail, currentView, demoState, dataSource, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
+  const { ownerName, sessionEmail, currentView, demoState, dataSource, showDevControls = false, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
 
   container.innerHTML = `
     <button class="sidebar-close" aria-label="Close menu">✕ Close</button>
@@ -48,7 +48,9 @@ export function renderOwnerSidebar(container, opts) {
     <div class="sidebar-footer">
       <button data-action="logout">Log Out</button>
     </div>
-    <div class="demo-controls">
+    ${
+      showDevControls
+        ? `<div class="demo-controls">
       <label for="owner-data-source-select">Data source</label>
       <select id="owner-data-source-select">
         <option value="real" ${dataSource === "real" ? "selected" : ""}>Real (actual placements)</option>
@@ -61,15 +63,17 @@ export function renderOwnerSidebar(container, opts) {
         <option value="empty" ${demoState === "empty" ? "selected" : ""}>Empty (no clients yet)</option>
         <option value="error" ${demoState === "error" ? "selected" : ""}>Error</option>
       </select>
-    </div>
+    </div>`
+        : ""
+    }
   `;
 
   container.querySelectorAll("[data-nav]").forEach((btn) => {
     btn.addEventListener("click", () => onNavigate(btn.dataset.nav));
   });
   container.querySelector('[data-action="logout"]').addEventListener("click", onLogout);
-  container.querySelector("#owner-data-source-select").addEventListener("change", (e) => onDataSourceChange(e.target.value));
-  container.querySelector("#owner-demo-state-select").addEventListener("change", (e) => onDemoStateChange(e.target.value));
+  container.querySelector("#owner-data-source-select")?.addEventListener("change", (e) => onDataSourceChange(e.target.value));
+  container.querySelector("#owner-demo-state-select")?.addEventListener("change", (e) => onDemoStateChange(e.target.value));
   const closeBtn = container.querySelector(".sidebar-close");
   if (onClose) closeBtn.addEventListener("click", onClose);
 }

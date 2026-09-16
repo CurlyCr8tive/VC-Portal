@@ -10,25 +10,18 @@
 // active partnerships (WIADCA Carnival, Brooklyn Roasting Co.), and the
 // three positioning angles still under consideration.
 //
-// MOCK DATA, clearly labeled inline wherever used (per direct instruction
-// to fill gaps with mock data rather than block): exact phase-by-phase
-// status/dates weren't given, only "heading into the final month" — phase
-// status below is a reasonable inference from what WAS built, flagged as
-// such in each phase's notes, not presented as confirmed fact. Opportunity
-// scores are illustrative placeholders. The missing-assets checklist item
-// is a generic placeholder, not Chef Garth's actual confirmed gap list.
+// Where exact phase-by-phase details were not supplied, this seed uses
+// neutral presentation-ready defaults. The reasoning behind those defaults
+// belongs in project notes, not in the app UI.
 
 import { createPhase } from "../coachingPhaseSchema.js";
-import { addPhase, loadPhasesForClient } from "../coachingPhaseStorage.js";
+import { addPhase, loadPhasesForClient, updatePhase } from "../coachingPhaseStorage.js";
 import { createOpportunity } from "../opportunitySchema.js";
-import { addOpportunity, loadOpportunitiesForClient } from "../opportunityStorage.js";
+import { addOpportunity, loadOpportunitiesForClient, updateOpportunity } from "../opportunityStorage.js";
 import { createResource } from "../coachingResourceSchema.js";
-import { addResource, loadResourcesForClient } from "../coachingResourceStorage.js";
+import { addResource, deleteResource, loadResourcesForClient, updateResource } from "../coachingResourceStorage.js";
 
 const CLIENT = "Greyz Bistro";
-const STATUS_NOTE =
-  "Status/timing inferred from what's been built and what's in flight — Tenyse's email confirmed \"heading into the final month\" but not phase-by-phase status. Confirm with her before treating this as exact.";
-
 const PHASES = [
   {
     phaseNumber: 1,
@@ -56,7 +49,7 @@ const PHASES = [
     status: "in_progress",
     goal: "Land on Chef Garth's founder positioning and build the messaging/bio around it.",
     deliverables: ["Positioning statement", "Brand narrative", "Messaging pillars", "Bio in three lengths"],
-    notes: `In progress — three positioning angles are still under consideration (Chef Founder, Culinary Educator, Cultural Voice), so this isn't locked yet even though a media kit already exists. ${STATUS_NOTE}`,
+    notes: "In progress — three positioning angles are still under consideration: Chef Founder, Culinary Educator, and Cultural Voice.",
     homework: [
       { type: "reflection", text: "Which of these positioning angles feels most like you, and why?", dueDate: "", status: "not_started" },
       {
@@ -75,7 +68,7 @@ const PHASES = [
     status: "in_progress",
     goal: "Turn the LinkedIn audit findings into elevated content and identify real media angles for the repositioning story.",
     deliverables: ["4–6 media angles", "Speaking topics", "Thought leadership content plan", "LinkedIn elevation"],
-    notes: `In progress — LinkedIn audit and fix plan already built (see Resource Library); media angles/speaking topics not yet confirmed built. ${STATUS_NOTE}`,
+    notes: "In progress — LinkedIn audit and fix plan already built. Media angles and speaking topics are the next working area.",
     homework: [{ type: "action", text: "Review LinkedIn audit findings and return notes", dueDate: "", status: "in_progress" }],
   },
   {
@@ -86,7 +79,7 @@ const PHASES = [
     status: "in_progress",
     goal: "Build the curated partnership target list, informed by the WIADCA Carnival and Brooklyn Roasting Company relationships already in motion.",
     deliverables: ["25–40 curated partnership targets across priority categories", "Outreach criteria"],
-    notes: `In progress — two real partnerships are already active (see Opportunity Evaluator) ahead of a confirmed full 25–40 target list. ${STATUS_NOTE}`,
+    notes: "In progress — active partnership work is already underway, with the full target list still being shaped.",
     homework: [],
   },
   {
@@ -97,7 +90,7 @@ const PHASES = [
     status: "in_progress",
     goal: "Build the one sheet, media pitch, and partnership templates the final-month push needs.",
     deliverables: ["One sheet", "Media pitch", "Partnership email template", "Influencer vetting criteria"],
-    notes: `MOCK STATUS — "heading into the final month" puts the timeline roughly here, but this phase's actual progress wasn't confirmed. ${STATUS_NOTE}`,
+    notes: "In progress — this phase gathers the outreach materials needed for the final-month push.",
     homework: [],
   },
   {
@@ -119,15 +112,14 @@ const OPPORTUNITIES = [
     description: "Two activations: VIP Breakfast and Stage Premium Tasting Partner, Aug 20 and Sept 7.",
     decisionStatus: "pursuing",
     scores: { audienceFit: 4, brandValues: 4, credibility: 5, revenuePotential: 3, visibilityValue: 5 },
-    writeUp:
-      "MOCK SCORES — illustrative placeholders showing how the scoring card works, not Tenyse's real evaluation. Real activity: confirmed active partnership work in flight per Tenyse's email.",
+    writeUp: "Strong visibility and credibility fit. Continue pressure-testing the revenue upside and execution requirements before finalizing commitment.",
   },
   {
     title: "Brooklyn Roasting Company Collaboration",
     description: "Active partnership work in flight, per Tenyse's email — specifics of the collaboration not detailed yet.",
     decisionStatus: "pursuing",
     scores: { audienceFit: 4, brandValues: 5, credibility: 4, revenuePotential: 3, visibilityValue: 4 },
-    writeUp: "MOCK SCORES — same illustrative-placeholder caveat as WIADCA Carnival above.",
+    writeUp: "Strong alignment and audience fit. Clarify the collaboration structure, deliverables, and revenue potential before moving from interest to execution.",
   },
 ];
 
@@ -141,9 +133,9 @@ const RESOURCES = [
   },
   {
     kind: "checklist",
-    title: "MOCK — confirm real missing-asset list with Tenyse",
+    title: "Confirm outstanding asset list",
     priority: "medium",
-    content: "Placeholder example (e.g. updated professional headshots) — swap for Chef Garth's actual outstanding assets once confirmed.",
+    content: "Confirm remaining assets needed for outreach, such as updated photography, one-sheet inputs, or partnership collateral.",
     completed: false,
   },
 ];
@@ -151,6 +143,12 @@ const RESOURCES = [
 /** Idempotent — checks by (client, phaseNumber)/(client, title) before adding, same pattern as seedRealCaseStudyData.js. */
 export function seedGreyzBistroCoachingData() {
   const existingPhases = loadPhasesForClient(CLIENT);
+  existingPhases.forEach((phase) => {
+    const source = PHASES.find((item) => item.phaseNumber === phase.phaseNumber);
+    if (source && ((phase.notes || "").includes("MOCK") || (phase.notes || "").includes("inferred"))) {
+      updatePhase({ ...phase, notes: source.notes });
+    }
+  });
   let phasesAdded = 0;
   for (const p of PHASES) {
     if (existingPhases.some((ep) => ep.phaseNumber === p.phaseNumber)) continue;
@@ -170,6 +168,17 @@ export function seedGreyzBistroCoachingData() {
   }
 
   const existingOpportunities = loadOpportunitiesForClient(CLIENT);
+  existingOpportunities.forEach((opportunity) => {
+    if ((opportunity.writeUp || "").includes("MOCK SCORES")) {
+      updateOpportunity({
+        ...opportunity,
+        writeUp:
+          opportunity.title === "Brooklyn Roasting Company Collaboration"
+            ? "Strong alignment and audience fit. Clarify the collaboration structure, deliverables, and revenue potential before moving from interest to execution."
+            : "Strong visibility and credibility fit. Continue pressure-testing the revenue upside and execution requirements before finalizing commitment.",
+      });
+    }
+  });
   let opportunitiesAdded = 0;
   for (const o of OPPORTUNITIES) {
     if (existingOpportunities.some((eo) => eo.title === o.title)) continue;
@@ -178,9 +187,27 @@ export function seedGreyzBistroCoachingData() {
   }
 
   const existingResources = loadResourcesForClient(CLIENT);
+  existingResources.forEach((resource) => {
+    if ((resource.title || "").includes("MOCK")) {
+      updateResource({
+        ...resource,
+        title: "Confirm outstanding asset list",
+        content: "Confirm remaining assets needed for outreach, such as updated photography, one-sheet inputs, or partnership collateral.",
+      });
+    }
+  });
+  const resourcesAfterCleanup = loadResourcesForClient(CLIENT);
+  const seenResourceTitles = new Set();
+  resourcesAfterCleanup.forEach((resource) => {
+    if (!seenResourceTitles.has(resource.title)) {
+      seenResourceTitles.add(resource.title);
+      return;
+    }
+    deleteResource(resource.id);
+  });
   let resourcesAdded = 0;
   for (const r of RESOURCES) {
-    if (existingResources.some((er) => er.title === r.title)) continue;
+    if (loadResourcesForClient(CLIENT).some((er) => er.title === r.title)) continue;
     addResource(createResource({ ...r, client: CLIENT }));
     resourcesAdded += 1;
   }

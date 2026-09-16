@@ -60,7 +60,7 @@
 // in notes so nobody mistakes it for a sourced fact.
 
 import { createPlacement } from "../schema.js";
-import { addPlacement, loadPlacements, deletePlacement } from "../storage.js";
+import { addPlacement, loadPlacements, deletePlacement, updatePlacement } from "../storage.js";
 import { createCampaign } from "../campaignSchema.js";
 import { addCampaign, loadCampaigns } from "../campaignStorage.js";
 import { saveSummary, approveSummary } from "../summaryStorage.js";
@@ -90,6 +90,8 @@ const REAL_CASE_STUDY_PLACEMENTS = [
     notes: `${DATE_DISCLOSURE} Independently re-confirmed Aug 25 directly from VeganHood's own "CPG Campaign Results" deck slide — same $492,198/14.2M figures, not just inferred from the earlier cross-client comparison.`,
     campaign: "CPG Product Line Launch",
     audienceReach: "14200000",
+    aveDataQuality:
+      "Identical $492,198 / 14.2M figure to Candlelit Care's National Press Push, despite a completely different outlet list — almost certainly a reused Canva template stat block, not two separately-calculated results. Unconfirmed until Tenyse checks the original Meltwater/Coverage Books export.",
   },
   {
     publication: "Samsung USA (837 NYC brand activation) + Times Square billboard",
@@ -133,6 +135,8 @@ const REAL_CASE_STUDY_PLACEMENTS = [
     notes:
       `${DATE_DISCLOSURE} DUPLICATE-FIGURE FLAG: this $492,198/14.2M figure is IDENTICAL to VeganHood's CPG campaign figure above, despite entirely different outlet lists (VeganHood: VegOut/QSR/VegWorld/Patch/PIX11/NBC; Candlelit Care: Essence/21Ninety/Yahoo News/Parents/SELF+1). AVE is a sum of per-outlet ad-rate equivalents — two independently-calculated campaigns landing on the exact same dollar AND reach figure isn't plausible. Confirmed directly from each client's own separate deck slide as of Aug 25 (not just the earlier cross-reference note), plus a leftover "Candlelit Therapy" terminology label found under Vegan Dining Month's section of the same overall deck (see that placement's notes) — strong evidence Tenyse's Canva template reuses this exact stat block across clients without updating it. Do not treat either number as confirmed for either client until she confirms from the original Meltwater/Coverage Books export which (if either) is real.`,
     campaign: "National Press Push",
+    aveDataQuality:
+      "Identical $492,198 / 14.2M figure to VeganHood's CPG Product Line Launch, despite a completely different outlet list — almost certainly a reused Canva template stat block, not two separately-calculated results. Unconfirmed until Tenyse checks the original Meltwater/Coverage Books export.",
   },
   {
     publication: "Blavity News",
@@ -455,6 +459,46 @@ UPCOMING (as of the Jan 2022 snapshot, not confirmed as materialized): interview
 ];
 
 /**
+ * Adds the `aveDataQuality` warning to placements that already exist in a
+ * browser from an earlier version of this seed.
+ *
+ * Deliberately separate from seedRealCaseStudyData() and safe to call on
+ * every load. The auto-seed runs at most once per browser
+ * (AUTO_SEED_FLAG_KEY in owner/app.js) specifically so that a client or
+ * placement Tenyse deletes stays deleted instead of reappearing. That
+ * guard is right — but it means the browsers that already show the
+ * unverified $492,198 figure are precisely the ones the seed will never
+ * touch again, so a flag added only inside the seed would reach everyone
+ * except the people who need it.
+ *
+ * This writes no new rows and creates nothing: it only attaches a caveat
+ * to a figure already on screen, matching on (publication, client,
+ * headline) like the seed's own dedup check. A row Tenyse deleted stays
+ * deleted — there's nothing to match. An edit she's made survives, since
+ * this updates in place rather than replacing the record. Rows that
+ * already carry a flag are left alone, so this never overwrites a
+ * resolution.
+ */
+export function backfillAveDataQuality() {
+  let updated = 0;
+  for (const existing of loadPlacements()) {
+    if (existing.aveDataQuality) continue;
+    const source = REAL_CASE_STUDY_PLACEMENTS.find(
+      (row) =>
+        row.aveDataQuality &&
+        row.publication === existing.publication &&
+        row.client === existing.client &&
+        row.headline === existing.headline
+    );
+    if (source) {
+      updatePlacement({ ...existing, aveDataQuality: source.aveDataQuality });
+      updated += 1;
+    }
+  }
+  return updated;
+}
+
+/**
  * Idempotent by design: re-running this after it's already run won't create
  * duplicate rows, checked by (publication, client, headline) for
  * placements, (name, client) for campaigns, and name for client profiles —
@@ -480,6 +524,8 @@ export function seedRealCaseStudyData() {
       deletePlacement(p.id);
     }
   }
+
+  backfillAveDataQuality();
 
   const placementsAfterMigration = loadPlacements();
   const isDuplicatePlacement = (row) =>

@@ -27,7 +27,11 @@ export function renderTable(placements, tbodyEl, emptyStateEl, countEl, onDelete
       <td>${escapeHtml(p.client)}</td>
       <td>${escapeHtml(p.campaign) || "—"}</td>
       <td>${formatDate(p.publicationDate)}</td>
-      <td class="numeric">${formatCurrency(p.aveValue)}</td>
+      <td class="numeric">${formatCurrency(p.aveValue)}${
+        p.aveDataQuality
+          ? ` <span title="${escapeHtml(p.aveDataQuality)}" style="cursor:help; color:#b8860b;">⚠</span>`
+          : ""
+      }</td>
       <td>${formatDate(p.pitchSentDate)}</td>
       <td>${formatDate(p.landedDate)}</td>
       <td class="numeric">${leadTime == null ? "—" : leadTime}</td>

@@ -17,8 +17,20 @@ import { renderEmptyState } from "./EmptyState.js";
  * them, and neither does the compact "Recent Press Placements" preview on
  * either dashboard's overview, so there's no edit/delete control anywhere
  * outside the one screen meant to manage data.
+ *
+ * `showDataQuality` controls whether an unconfirmed AVE figure gets a ⚠
+ * next to it. Off by default on purpose: this table renders on the CLIENT
+ * dashboard too, and "this number might be wrong" is Tenyse's internal
+ * working note, not something to show VeganHood over her shoulder. The
+ * owner views opt in. If Tenyse would rather clients saw the caveat too —
+ * a defensible call, just a different one — turning it on for the client
+ * dashboard is a one-word change at that call site.
  */
-export function renderPlacementsTable(container, placements, { showClient = false, onEdit, onDelete } = {}) {
+export function renderPlacementsTable(
+  container,
+  placements,
+  { showClient = false, showDataQuality = false, onEdit, onDelete } = {}
+) {
   if (!placements || placements.length === 0) {
     renderEmptyState(container, {
       icon: "📰",
@@ -29,6 +41,15 @@ export function renderPlacementsTable(container, placements, { showClient = fals
   }
 
   const showActions = Boolean(onEdit || onDelete);
+
+  // Renders the AVE cell with a hover-explained warning when the figure has
+  // a known data-quality problem (schema.js's aveDataQuality). The reason
+  // goes in the title attribute rather than inline — the table is already
+  // dense, and the mark is only useful to someone asking "why that one?"
+  const aveCell = (p) =>
+    showDataQuality && p.aveDataQuality
+      ? `${formatCurrency(p.aveValue)} <span class="ave-flag" title="${escapeHtml(p.aveDataQuality)}" style="cursor:help; color:#b8860b;">\u26a0</span>`
+      : formatCurrency(p.aveValue);
 
   const rows = placements.map((p) => {
     const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate);
@@ -71,7 +92,7 @@ export function renderPlacementsTable(container, placements, { showClient = fals
         <td>${headlineCell}</td>
         ${clientTd(p)}
         <td>${formatDate(p.publicationDate)}</td>
-        <td>${formatCurrency(p.aveValue)}</td>
+        <td>${aveCell(p)}</td>
         <td>${leadTime == null ? "—" : `${leadTime} days`}</td>
         <td>${escapeHtml(p.campaign) || "—"}</td>
         <td><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></td>
@@ -89,7 +110,7 @@ export function renderPlacementsTable(container, placements, { showClient = fals
         <div class="pc-row"><span>Headline</span><span>${headlineCell}</span></div>
         ${clientPcRow(p)}
         <div class="pc-row"><span>Date</span><span>${p.publicationDate || "—"}</span></div>
-        <div class="pc-row"><span>AVE</span><span>${formatCurrency(p.aveValue)}</span></div>
+        <div class="pc-row"><span>AVE</span><span>${aveCell(p)}</span></div>
         <div class="pc-row"><span>Lead time</span><span>${leadTime == null ? "—" : `${leadTime} days`}</span></div>
         <div class="pc-row"><span>Campaign</span><span>${escapeHtml(p.campaign) || "—"}</span></div>
         <div class="pc-row"><span>Status</span><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></div>

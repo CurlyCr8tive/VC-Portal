@@ -60,6 +60,7 @@ function discoveryTermsCount(keywordConfig = {}) {
 
 export function renderClientsList(
   container,
+  clients,
   { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan, onViewCoaching, onScheduleMeeting } = {}
 ) {
   if (!clients || clients.length === 0) {

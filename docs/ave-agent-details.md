@@ -87,10 +87,52 @@ who she's actively working with now).
 
 ---
 
-## 5. Known real per-outlet rates
+## 5. Per-outlet rates — now derivable, no longer blocked
 
-🔴 **NEEDS REAL DATA — currently empty.** No real per-outlet rate has been
-confirmed for any outlet. What exists instead: campaign-level AVE *totals*
+**Status changed Sept 15, 2026.** Still no *confirmed* per-outlet rate from
+Tenyse. But the blocker turned out to be soluble without one: the two major
+PR platforms publish their AVE formulas, so a rate can be derived from an
+outlet's audience size rather than waiting on a rate card.
+
+    Muck Rack:  MUV × 0.025 × $0.37
+    Agility PR: $25 × (average daily visitors ÷ 1,000)
+
+Implemented in `src/aveEstimation.js`, with sourced audience figures in
+`src/outletTrafficReference.js`. Both are computed and shown as a RANGE —
+Tenyse's explicit choice — because the two formulas disagree by 11.1x on
+every outlet. That spread is the honest finding, not a defect to average away.
+
+**Why these formulas and not a house method:** her Vegan Dining Month
+campaign reports $400,000, less $100,000 the deck attributes to the Times
+Square billboard, leaving $300,000 across 8 news clips = **$37,500 per
+clip**. Muck Rack's formula returns **$37,913** for a Blavity-sized outlet
+(4.1M). A ~1% gap on an independently calculated campaign is strong
+evidence her real figures came from a Muck Rack-style model, most likely
+Meltwater's. Reproducing it keeps new placements consistent with the case
+studies she already shows clients. Asserted in `npm run check` so the
+agreement can't silently drift.
+
+### 🔴 Two open problems with the derived figures
+
+**1. The input metric is wrong for most outlets.** Both formulas take
+monthly UNIQUE VISITORS. SimilarWeb's public pages publish TOTAL VISITS,
+a larger number — Muck Rack and Agility read uniques through a paid API.
+Estimates built on visits are marked `overstated` and get no one-click
+fill in the UI. Fixing this means sourcing uniques per outlet, usually
+from the outlet's own media kit.
+
+**2. The formula breaks down on very large outlets.** Muck Rack's formula
+on Forbes' traffic returns ~$665,000 for a single placement. Forbes charges
+about **$12,500** for a BrandVoice sponsored article covering the same
+space — the estimate overshoots a real, published price by ~53x. Even
+substituting the ~36M uniques figure leaves it ~26x high. Do not report a
+derived Forbes-scale figure to a client without a sanity check against
+what the outlet actually charges. Collecting real sponsored-content prices
+per outlet is the obvious next step, and would give a genuine upper bound.
+
+### Still true
+
+No real per-outlet rate has been *confirmed by Tenyse* for any outlet. What exists instead: campaign-level AVE *totals*
 ($492,198 for one VeganHood campaign, $18M cumulative, $400K for Vegan
 Dining Month) — these cannot be reverse-engineered into per-outlet rates
 without knowing how the total was split.
@@ -137,3 +179,8 @@ not something to integrate with.
   (`verified: true`) and `docs/agents/ave-calculation-agent.md`. This does
   not supply a per-outlet rate (section 5 below is still empty); it only
   changes which campaign-level totals a future agent may treat as real.
+- **Sept 15, 2026** — Section 5 substantially rewritten: per-outlet rates
+  are now derivable from published Muck Rack / Agility PR formulas rather
+  than blocked on Tenyse. Both are computed and shown as a range. Two open
+  problems documented: the visits-vs-uniques metric mismatch, and the
+  formula overshooting real sponsored-content prices at Forbes scale.

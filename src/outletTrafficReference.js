@@ -1,0 +1,119 @@
+// src/outletTrafficReference.js
+//
+// Audience figures per outlet, each carrying where it came from — the
+// input side of aveEstimation.js. Separate from outletReference.js (which
+// holds campaign-level benchmarks from Tenyse's decks) because these serve
+// a different job: they feed a calculation, so each one has to be
+// defensible on its own.
+//
+// THE RULE THIS FILE EXISTS TO ENFORCE: every figure records what it
+// actually measures and where it came from. The $492,198 duplicate got as
+// far as it did because a number arrived without provenance and nothing
+// downstream could tell it apart from a confirmed one. Rates derived from
+// these figures will be shown to Tenyse's clients, so the same mistake
+// here would be worse, not better.
+//
+// `metric` is the important field:
+//   monthly_unique_visitors — what both AVE formulas actually call for
+//   monthly_visits          — a LARGER number (one person visiting four
+//                             times counts four times). Usable, but it
+//                             overstates, and aveEstimation.js marks any
+//                             estimate built on it.
+//
+// `confidence`:
+//   owner_source  — from Tenyse's own case-study decks. Highest standing
+//                   for this app's purpose: these are the numbers already
+//                   underpinning figures she has shown clients.
+//   third_party   — a traffic-analytics estimate (SimilarWeb, Semrush).
+//                   Real and citable, but modelled, not measured.
+//   self_reported — the outlet's own media kit. Advertiser-facing, which
+//                   is arguably the right basis for an ad-equivalence
+//                   figure, but it's marketing material.
+//
+// Nothing here is auto-loaded into outletRatesStorage. These are
+// candidates for a rate, not rates. A figure becomes a rate only when
+// somebody chooses to save it.
+
+export const OUTLET_TRAFFIC_REFERENCE = [
+  // --- From Tenyse's own SNAP Co. "Deeper Than Visibility" deck ---------
+  {
+    outlet: "Blavity News",
+    value: 4098693,
+    metric: "monthly_unique_visitors",
+    confidence: "owner_source",
+    source: "SNAP Co. 'Deeper Than Visibility' case study (Canva deck)",
+    sourceDate: "2026-08-25",
+    notes:
+      "Deck labels it 'Monthly readers & Viewers'. NOTE the scope conflict before substituting anything else: Blavity Media Group's own media kit claims 32M total network reach, but that covers the whole network (Blavity, Travel Noire, 21Ninety, AfroTech, Shadow & Act), not blavity.com. Don't swap the 32M in — it would inflate this ~8x for a placement that ran on one site.",
+  },
+  {
+    outlet: "NewsOne",
+    value: 1168000,
+    metric: "monthly_unique_visitors",
+    confidence: "owner_source",
+    source: "SNAP Co. 'Deeper Than Visibility' case study (Canva deck)",
+    sourceDate: "2026-08-25",
+  },
+  {
+    outlet: "LGBTQ Nation",
+    value: 995689,
+    metric: "monthly_unique_visitors",
+    confidence: "owner_source",
+    source: "SNAP Co. 'Deeper Than Visibility' case study (Canva deck)",
+    sourceDate: "2026-08-25",
+    notes:
+      "Deck reads '995,689 K Monthly readers & viewers'. The 'K' is read as a column-header artifact, not a x1,000 multiplier — 995,689 is already plausible next to Blavity (4.1M) and NewsOne (1.17M), while x1,000 would put it above Blavity. Same reading applied to KIIS FM below. Still unconfirmed with Tenyse — see docs/tenyse-open-data-questions.md question 3.",
+  },
+  {
+    outlet: "102.7 KIIS FM (iHeart)",
+    value: 108477,
+    metric: "monthly_unique_visitors",
+    confidence: "owner_source",
+    source: "SNAP Co. 'Deeper Than Visibility' case study (Canva deck)",
+    sourceDate: "2026-08-25",
+    notes:
+      "Same 'K' ambiguity as LGBTQ Nation. Reading it as x1,000 would give a single-market radio station 108M monthly — far above Blavity's national digital reach, which isn't credible. Also worth noting this is a radio brand's website figure, not its broadcast audience; the AVE formulas here are digital-only and don't price airtime.",
+  },
+
+  // --- Researched third-party figures -----------------------------------
+  // Recorded as monthly_visits where that's what the source actually
+  // publishes. SimilarWeb's free pages do not expose unique visitors —
+  // Muck Rack and Agility read uniques through a paid API — so these
+  // overstate, and any estimate built on them is marked accordingly.
+  {
+    outlet: "Forbes",
+    value: 71970000,
+    metric: "monthly_visits",
+    confidence: "third_party",
+    source: "SimilarWeb, forbes.com — https://www.similarweb.com/website/forbes.com/",
+    sourceDate: "2026-07",
+    notes:
+      "71.97M VISITS for July 2026, not uniques. Third-party ad-sales pages cite ~36M monthly unique visitors for Forbes.com — roughly half, which is a plausible visits-to-uniques ratio for a news site, but that figure is secondhand and wasn't confirmed against Forbes' own media kit. Prefer the uniques figure once sourced directly. Separately, Forbes BrandVoice sponsored articles are widely reported around $12,500 each — a real paid-placement price and a useful sanity check on any derived estimate for Forbes.",
+  },
+  {
+    outlet: "Essence",
+    value: 1980000,
+    metric: "monthly_visits",
+    confidence: "third_party",
+    source: "Semrush, essence.com",
+    sourceDate: "2026-01",
+    notes:
+      "Visits, not uniques. Essence's own 2025 media kit would be the better source but is behind a 403 — worth retrieving directly. A frequently-quoted $80,500 full-page print rate circulates for the magazine, but the source that carries it explicitly disclaims its own accuracy, so it is NOT recorded here as a figure.",
+  },
+  {
+    outlet: "Black Enterprise",
+    value: 641610,
+    metric: "monthly_visits",
+    confidence: "third_party",
+    source: "Semrush, blackenterprise.com",
+    sourceDate: "2026-01",
+    notes: "Visits, not uniques. Black Enterprise publishes a media kit at bemediakit.com — not yet retrieved.",
+  },
+];
+
+/** Case-insensitive lookup, matching outletRatesStorage's behavior. */
+export function findOutletTraffic(outletName) {
+  const key = String(outletName || "").trim().toLowerCase();
+  if (!key) return null;
+  return OUTLET_TRAFFIC_REFERENCE.find((o) => o.outlet.toLowerCase() === key) || null;
+}
