@@ -15,7 +15,7 @@ import { renderLoadingState } from "./components/LoadingState.js";
 import { renderErrorState } from "./components/ErrorState.js";
 import { renderCampaignDetail } from "./components/CampaignDetailView.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
-import { renderCoachingProgramView } from "./components/CoachingProgramView.js";
+import { renderCoachingProgramView } from "./components/CoachingProgramView.js?v=20260917-coaching-polish-1";
 import { loadPhasesForClient } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient } from "../coachingResourceStorage.js";
 import { loadOpportunitiesForClient } from "../opportunityStorage.js";
@@ -690,7 +690,10 @@ function renderResourcesView() {
   const allResources = snapshot?.coaching?.resources || (clientName ? loadResourcesForClient(clientName) : []);
   const resources = allResources.filter((resource) => resource.kind === "resource");
   document.getElementById("resources-content").innerHTML = `
-    <div class="section-heading"><h2>Resources</h2></div>
+    <div class="section-heading">
+      <h2>Resource Library</h2>
+      <p>Guides, templates, and shared materials from Tenyse for this coaching program.</p>
+    </div>
     ${
       resources.length
         ? `<div class="resource-library-grid">${resources
@@ -713,6 +716,7 @@ function renderCoachingView() {
   const snapshot = apiSnapshot();
   renderCoachingProgramView(document.getElementById("coaching-content"), clientName, {
     data: snapshot?.coaching || null,
+    onNavigate: navigate,
     onHomeworkPatch: shouldUseClientApi()
       ? async (homeworkId, patch) => {
           await updateClientApiHomework(homeworkId, patch);

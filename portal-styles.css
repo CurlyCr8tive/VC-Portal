@@ -1313,6 +1313,494 @@ table.placements-table {
   padding: 16px;
 }
 
+/* ---------- Client coaching program page ---------- */
+
+.cp-page {
+  max-width: 1580px;
+}
+
+.cp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr) minmax(280px, 0.55fr);
+  gap: 24px;
+  align-items: start;
+  margin-bottom: 22px;
+}
+
+.cp-hero h1 {
+  color: var(--color-navy);
+  font-size: clamp(2rem, 3vw, 2.7rem);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.cp-hero h2 {
+  color: var(--color-navy);
+  font-family: var(--font-sans);
+  font-size: 1.08rem;
+  line-height: 1.25;
+  margin-bottom: 8px;
+}
+
+.cp-hero p,
+.cp-hero cite,
+.cp-program-meta p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.cp-program-meta span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 16px;
+  border: 1px solid #9acac5;
+  border-radius: var(--radius-sm);
+  background: var(--color-teal-tint);
+  color: var(--color-navy);
+  font-size: 0.85rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.cp-program-meta strong {
+  color: var(--color-navy);
+}
+
+.cp-hero blockquote {
+  margin: 0;
+  padding: 18px 22px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #fff7f3, #f9e5dc);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 12px;
+}
+
+.cp-hero blockquote span {
+  color: var(--color-coral);
+  font-family: var(--font-serif);
+  font-size: 2.2rem;
+  line-height: 0.9;
+}
+
+.cp-hero blockquote p,
+.cp-hero blockquote cite {
+  grid-column: 2;
+  color: var(--text-primary);
+}
+
+.cp-tabs {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.cp-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cp-tabs button.active {
+  border-bottom-color: var(--color-coral);
+  color: var(--color-coral-dark);
+}
+
+.cp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.1fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.cp-main-column,
+.cp-side-column {
+  display: grid;
+  gap: 18px;
+}
+
+.cp-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 20px;
+}
+
+.cp-card h3 {
+  color: var(--color-navy);
+  font-size: 1.05rem;
+  margin-bottom: 8px;
+}
+
+.cp-card p,
+.cp-card li,
+.cp-card small,
+.cp-card em {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.cp-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.cp-card-head p {
+  margin: 0;
+}
+
+.cp-card-head strong {
+  color: var(--color-navy);
+  font-size: 1rem;
+}
+
+.cp-card-head > span {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.cp-progress-track,
+.cp-video-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #eee9e4;
+}
+
+.cp-progress-track span,
+.cp-video-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #18a957;
+}
+
+.cp-roadmap {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.cp-roadmap-step {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  text-align: center;
+  position: relative;
+}
+
+.cp-roadmap-step span {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-light);
+  background: #f3f0ec;
+  color: var(--text-secondary);
+  font-weight: 800;
+}
+
+.cp-roadmap-step.complete span,
+.cp-roadmap-step.in_progress span {
+  background: #18a957;
+  border-color: #18a957;
+  color: #fff;
+}
+
+.cp-roadmap-step.in_progress span {
+  background: #fff8f4;
+  border-color: var(--color-coral);
+  color: var(--color-coral-dark);
+}
+
+.cp-roadmap-step strong {
+  color: #18a957;
+  font-size: 0.78rem;
+}
+
+.cp-roadmap-step p {
+  max-width: 110px;
+  min-height: 36px;
+  margin: 0;
+  color: var(--color-navy);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.cp-phase-header,
+.cp-reflection-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cp-phase-pill,
+.cp-status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-coral);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.cp-weeks {
+  color: var(--color-navy);
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin-left: 12px;
+}
+
+.cp-status-dot {
+  background: #f7fbf8;
+  color: var(--color-navy);
+  border: 1px solid var(--border-light);
+}
+
+.cp-phase-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.95fr);
+  gap: 24px;
+}
+
+.cp-phase-copy h3 {
+  color: var(--color-navy);
+  font-size: 1.35rem;
+}
+
+.cp-phase-list {
+  border-top: 1px solid var(--border-light);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.cp-phase-list h4,
+.cp-featured-resource h4,
+.cp-featured-resource h5 {
+  color: var(--color-navy);
+  margin: 0 0 8px;
+}
+
+.cp-phase-list ul {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.cp-checklist {
+  list-style: none;
+  padding-left: 0;
+}
+
+.cp-checklist li {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cp-checklist span {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #9caaa9;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.cp-featured-resource {
+  background: #fbf7f3;
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.cp-video-card {
+  min-height: 170px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(31, 42, 82, 0.16), rgba(31, 42, 82, 0.45)),
+    linear-gradient(135deg, #dac7bd, #806c63);
+  display: grid;
+  align-content: end;
+  margin-bottom: 10px;
+}
+
+.cp-video-art {
+  min-height: 130px;
+  display: grid;
+  place-items: center;
+}
+
+.cp-video-art span {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  padding-left: 3px;
+}
+
+.cp-video-bar {
+  height: 22px;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.cp-video-bar span {
+  width: 35%;
+  height: 4px;
+}
+
+.cp-video-bar em {
+  color: #fff;
+  font-size: 0.7rem;
+  font-style: normal;
+}
+
+.cp-coach-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.cp-coach-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--color-navy);
+  color: #fff;
+  border: 3px solid var(--color-coral);
+  font-family: var(--font-serif);
+  font-weight: 800;
+}
+
+.cp-coach-row strong,
+.cp-coach-row span {
+  display: block;
+}
+
+.cp-coach-row strong {
+  color: var(--color-navy);
+}
+
+.cp-coach-row span {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  margin-bottom: 10px;
+}
+
+.cp-homework-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cp-homework-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.cp-homework-row input {
+  margin-top: 2px;
+  accent-color: #18a957;
+}
+
+.cp-homework-row strong {
+  color: var(--color-navy);
+  display: block;
+  font-size: 0.82rem;
+}
+
+.cp-homework-row em {
+  white-space: nowrap;
+  font-style: normal;
+}
+
+.cp-reflection-card p {
+  color: var(--color-navy);
+  font-weight: 700;
+}
+
+.cp-reflection-card textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.cp-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.cp-action-card {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.cp-action-card > span {
+  color: var(--color-navy);
+  font-size: 1.4rem;
+}
+
+.cp-action-card .btn-secondary {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.cp-encouragement-card {
+  background: linear-gradient(135deg, #fff7f3, #f9e5dc);
+  text-align: center;
+}
+
+.cp-encouragement-card strong {
+  color: var(--color-coral-dark);
+}
+
 .client-dashboard-grid .section-heading {
   align-items: flex-start;
   margin-bottom: 10px;
@@ -2090,6 +2578,16 @@ table.placements-table {
       "scorecard resources";
   }
 
+  .cp-hero,
+  .cp-layout,
+  .cp-phase-content {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-action-grid {
+    grid-template-columns: 1fr;
+  }
+
   .client-message-layout {
     grid-template-columns: 1fr;
   }
@@ -2189,6 +2687,29 @@ table.placements-table {
 
   .roadmap-steps {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cp-hero h1 {
+    font-size: 2rem;
+  }
+
+  .cp-roadmap {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cp-card-head,
+  .cp-phase-header,
+  .cp-reflection-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cp-homework-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cp-homework-row em {
+    grid-column: 2;
   }
 
   .client-card-footer,

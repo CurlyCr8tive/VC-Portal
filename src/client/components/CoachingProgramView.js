@@ -10,7 +10,7 @@ const STATUS_LABEL = { not_started: "Not Started", in_progress: "In Progress", c
 const HOMEWORK_TYPE_LABEL = { action: "Homework", reflection: "Reflection", standing: "Standing Rule" };
 
 export function renderCoachingProgramView(container, clientName, opts = {}) {
-  const { data = null, onHomeworkPatch = null, onOpportunitySubmit = null } = opts;
+  const { data = null, onNavigate = null, onHomeworkPatch = null, onOpportunitySubmit = null } = opts;
   let activeData = data;
   let confirmation = "";
 
@@ -89,7 +89,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
     wireTabs();
     wireHomework();
     wireReflection(reflection);
-    wireOpportunityAction();
+    wireProgramActions();
   }
 
   function tabButton(label, anchor, active = false) {
@@ -102,7 +102,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
   }
 
   function currentPhaseFor(phases) {
-    return phases.find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status === "not_started") || phases[phases.length - 1];
+    return [...phases].reverse().find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status === "not_started") || phases[phases.length - 1];
   }
 
   function overallProgressPercent(phases, progress) {
@@ -122,6 +122,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
   }
 
   function progressCardHtml({ phases, progressPercent }) {
+    const reached = phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length;
     return `
       <article class="cp-card cp-progress-card" id="cp-overview">
         <div class="cp-card-head">
@@ -129,19 +130,21 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
             <h3>Overall Progress</h3>
             <p><strong>${progressPercent}%</strong> complete</p>
           </div>
-          <span>${phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length} of ${phases.length} phases</span>
+          <span>${reached} of ${phases.length} phases</span>
         </div>
         <div class="cp-progress-track"><span style="width:${progressPercent}%;"></span></div>
         <div class="cp-roadmap">
           ${phases
-            .map(
-              (phase) => `
-                <div class="cp-roadmap-step ${escapeHtml(phase.status)}">
-                  <span>${phase.status === "complete" ? "✓" : escapeHtml(String(phase.phaseNumber))}</span>
+            .map((phase) => {
+              const displayStatus =
+                phase.phaseNumber < reached ? "complete" : phase.phaseNumber === reached ? "in_progress" : "not_started";
+              return `
+                <div class="cp-roadmap-step ${displayStatus}">
+                  <span>${displayStatus === "complete" ? "✓" : escapeHtml(String(phase.phaseNumber))}</span>
                   <strong>${escapeHtml(String(phase.phaseNumber))}</strong>
                   <p>${escapeHtml(phase.name)}</p>
-                </div>`
-            )
+                </div>`;
+            })
             .join("")}
         </div>
       </article>
@@ -335,7 +338,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
     });
   }
 
-  function wireOpportunityAction() {
+  function wireProgramActions() {
     container.querySelector('[data-cp-action="opportunity"]')?.addEventListener("click", async () => {
       const title = "New opportunity submitted from client portal";
       const description = "Client asked Tenyse to review a new opportunity from the Coaching Program page.";
@@ -352,6 +355,14 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
         confirmation = err.message;
         render();
       }
+    });
+
+    container.querySelector('[data-cp-action="resources"]')?.addEventListener("click", () => {
+      if (onNavigate) onNavigate("resources");
+    });
+
+    container.querySelector('[data-cp-action="files"]')?.addEventListener("click", () => {
+      if (onNavigate) onNavigate("files");
     });
   }
 
