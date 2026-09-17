@@ -1121,6 +1121,10 @@ app.post(
 // (which pulls from Supabase itself), the caller is responsible for
 // assembling and sending the real data in the request body; this route
 // only builds the prompt and calls the model.
+// Types whose output is a multi-paragraph document rather than a line or
+// two — these are the ones that hit a token ceiling in practice.
+const LONG_FORM_TYPES = new Set(["report-narrative", "executive-summary", "campaign-activity-summary"]);
+
 const PROMPT_BUILDERS = {
   "executive-summary": buildExecutiveSummaryPrompt,
   "campaign-activity-summary": buildCampaignActivitySummaryPrompt,
@@ -1147,7 +1151,17 @@ app.post(
       return res.status(400).json({ error: "invalid_body", message: err.message });
     }
 
-    const result = await generateText({ prompt });
+    // Long-form types get an explicit, larger budget rather than the
+    // 2048 default. Two reasons: a full report narrative legitimately
+    // runs long, and Claude's extended thinking counts its thinking
+    // tokens against max_tokens — so a budget sized for the visible
+    // answer alone can be consumed before the answer starts. aiClient
+    // now throws on a max_tokens stop rather than returning a truncated
+    // string, so getting this wrong is loud instead of silent.
+    const result = await generateText({ prompt, maxTokens: LONG_FORM_TYPES.has(req.params.type) ? 4096 : 2048 });
+    if (result.fellBackFrom) {
+      console.warn(`[generate/${req.params.type}] answered by ${result.providerUsed} after: ${result.fellBackFrom.join("; ")}`);
+    }
     res.status(200).json(result);
   })
 );

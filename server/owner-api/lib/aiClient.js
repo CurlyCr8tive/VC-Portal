@@ -41,7 +41,18 @@ export async function generateText({ prompt, maxTokens = 2048 }) {
     }
     try {
       const text = await provider.call({ prompt, maxTokens, apiKey });
-      return { text, providerUsed: provider.name };
+      // `fellBackFrom` is the point of this: a provider failing and the
+      // next one quietly succeeding looks identical to everything working.
+      // That is exactly how an invalid ANTHROPIC_API_KEY went unnoticed —
+      // every writing function silently downgraded to GPT while still
+      // returning perfectly good text. Success now carries the failures
+      // that preceded it, so a caller or log can say which provider
+      // answered AND why the preferred one didn't.
+      return {
+        text,
+        providerUsed: provider.name,
+        fellBackFrom: attempted.length ? [...attempted] : null,
+      };
     } catch (err) {
       attempted.push(`${provider.name}: ${err.message}`);
     }
