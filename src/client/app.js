@@ -111,7 +111,7 @@ function renderApiGate(target) {
   if (state.apiStatus === "loaded" && state.apiData) return false;
   if (state.apiStatus === "error") {
     renderErrorState(target, {
-      message: state.apiError || "We had trouble loading your client data from Supabase.",
+      message: state.apiError || "We had trouble loading your client data.",
       onRetry: refreshClientApiData,
     });
     return true;

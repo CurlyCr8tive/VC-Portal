@@ -14,7 +14,7 @@
 // actually run yet.
 
 import { formatCurrency } from "../calculations.js";
-import { HIGH_CONFIDENCE_FIELDS, MEDIUM_CONFIDENCE_FIELDS, LOW_CONFIDENCE_FIELDS } from "./canvaColumnMapping.js";
+import { HIGH_CONFIDENCE_FIELDS, MEDIUM_CONFIDENCE_FIELDS, LOW_CONFIDENCE_FIELDS } from "./canvaColumnMapping.js?v=20260917-demo-qa-1";
 
 const HIGH_CONFIDENCE_COLUMNS = Object.values(HIGH_CONFIDENCE_FIELDS);
 // Medium + low confidence columns are handled identically: optional, and
@@ -162,7 +162,7 @@ function withinRange(dateStr, startDate, endDate) {
  */
 export function generateCanvaExport(allPlacements, { clientName, startDate, endDate, approvedSummary = null }) {
   const eligible = allPlacements.filter(
-    (p) => p.client === clientName && p.landedDate && withinRange(p.publicationDate, startDate, endDate)
+    (p) => (p.client || p.clientName) === clientName && p.landedDate && withinRange(p.publicationDate, startDate, endDate)
   );
 
   if (eligible.length === 0) {

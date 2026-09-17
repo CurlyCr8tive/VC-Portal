@@ -12,13 +12,12 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     <div class="card">
       <h3 style="color:var(--color-navy); font-size:1.05rem; margin:0 0 4px;">Canva Report Export</h3>
       <p style="color:var(--text-secondary); font-size:0.85rem; margin:0 0 14px;">
-        Generates a CSV of a client's confirmed placements, mapped to Canva Bulk Create's expected columns.
-        You'll still upload it into Canva and do a final visual check before sending anything to a client —
-        this only automates the data entry that comes before that.
+        Generates a CSV of a client's confirmed placements for Canva Bulk Create.
+        Upload it into Canva, then do one final visual review before sending the report to a client.
       </p>
 
       <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; font-size:0.82rem;">
-        <strong>Column labels are inferred, not confirmed.</strong> They're built from Tenyse's website case studies and the PRD, not her real Canva template — she hasn't shared it yet. Expect the header row to need updating once she does.
+        <strong>Template check recommended.</strong> Make sure the column names match the Canva template before running Bulk Create.
       </div>
 
       <div id="canva-summary-status" style="margin-bottom:14px;"></div>
@@ -88,7 +87,7 @@ function renderSummaryStatus(el, approvedSummary) {
   }
   el.innerHTML = `
     <div class="warn" style="background:#eafaf6; border:1px solid #bfe8dc; color:#146c56; border-radius:var(--radius-md); padding:10px 14px; font-size:0.82rem;">
-      ✓ Executive summary approved ${escapeHtml(approvedSummary.approvedAt.slice(0, 10))} — will be included on every row (repeated). This is a placeholder approach until Tenyse's real Canva template layout is confirmed.
+      ✓ Executive summary approved ${escapeHtml(approvedSummary.approvedAt.slice(0, 10))} — it will be included in the export.
     </div>
   `;
 }

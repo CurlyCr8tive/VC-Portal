@@ -35,7 +35,7 @@ import { renderReviewQueue } from "./components/ReviewQueueCard.js";
 import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
-import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js";
+import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260917-demo-qa-1";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
 import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260917-client-name-fix-1";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
@@ -48,7 +48,7 @@ import { calculateCoachingProgress } from "../coachingProgress.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
-import { generateCanvaExport, downloadCsv } from "./canvaExport.js";
+import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260917-demo-qa-1";
 import { seedSamplePlacements } from "./seedSampleData.js";
 import { seedRealCaseStudyData, backfillAveDataQuality } from "./seedRealCaseStudyData.js?v=20260916-ave-quality";
 import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260916-polish-2";
@@ -85,9 +85,8 @@ function ownerApiAuthHint() {
   if (state.dataSource !== "real" || shouldUseOwnerApi()) return "";
   return `
     <p class="hint" style="margin-bottom:12px;">
-      You are previewing real-data screens with the mock owner login. Sign in with the real Supabase
-      owner account to run Discovery scans, invite clients, use AI writing helpers, research AVE rates,
-      and save live database changes.
+      Sign in with the live owner account to run Discovery scans, invite clients, use AI writing helpers,
+      research AVE rates, and save live changes.
     </p>
   `;
 }
@@ -1675,11 +1674,11 @@ function renderPlacementsView() {
       onSuggestHeadline: shouldUseOwnerApi() ? suggestHeadline : undefined,
       onAnalyzeSentiment: shouldUseOwnerApi() ? analyzeSentiment : undefined,
       onFindPitchDate: shouldUseOwnerApi() ? findPitchDateInGmail : undefined,
-      submitDisabledReason: shouldUseOwnerApi() ? "" : "Sign in with the real Supabase owner account to save placements to the live database.",
+      submitDisabledReason: shouldUseOwnerApi() ? "" : "Sign in with the live owner account to save placements.",
       knownClients: getRealClients().map((c) => c.name),
       onSubmit: async (rawData) => {
         if (!canSavePlacements) {
-          alert("Sign in with the real Supabase owner account to save placements to the live database.");
+          alert("Sign in with the live owner account to save placements.");
           return false;
         }
         try {
@@ -1740,9 +1739,8 @@ function renderReviewQueueView() {
     target.innerHTML = `
       <div class="section-heading"><h2>Review Queue</h2></div>
       <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
-        Preview only — these rows are hand-authored to show the confirm/reject workflow described in the
-        PRD, including a same-name false positive to reject. Switch the sidebar's data source to "Real"
-        to see (and trigger) the actual Discovery Agent.
+        Preview only — these rows show the confirm/reject workflow, including a same-name false positive
+        to reject. Sign in with the live owner account to run the Discovery Agent.
       </p>
       <div class="card" id="review-queue-list"></div>
     `;
@@ -1755,8 +1753,8 @@ function renderReviewQueueView() {
       <div class="section-heading"><h2>Review Queue</h2></div>
       ${ownerApiAuthHint()}
       <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
-        The live Review Queue is fed by the Discovery Agent, so it needs a real Supabase owner session.
-        The preview below shows the confirm/reject workflow without making live changes.
+        The live Review Queue is fed by the Discovery Agent. The preview below shows the confirm/reject
+        workflow without making live changes.
       </p>
       <div class="card" id="review-queue-list"></div>
     `;
@@ -2089,8 +2087,7 @@ function renderReportsView() {
   } else {
     exportWrap.innerHTML = `
       <p style="color:var(--text-secondary); font-size:0.85rem;">
-        Switch the sidebar's data source to "Real" to generate a Canva export — the mock demo data isn't
-        real coverage, so exporting it wouldn't produce anything you'd actually send to a client.
+        Sign in with the live owner account to generate a Canva export from confirmed placement data.
       </p>
     `;
   }
@@ -2110,7 +2107,7 @@ function renderSettingsView() {
   document.getElementById("settings-content").innerHTML = `
     <div class="section-heading"><h2>Settings</h2></div>
     <div class="card">
-      <p>Platform preferences, API connection health, and admin tools live here. Google Workspace status appears below once the owner is signed in with a real Supabase session.</p>
+      <p>Platform preferences and connected services live here. Google Workspace status appears below once the owner is signed in with the live owner account.</p>
     </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Outlet Rates</h2></div>
     <div class="card">
@@ -2359,7 +2356,7 @@ function renderHeaderComponent() {
       label: "+ New Client",
       onClick: () => {
         if (!shouldUseOwnerApi()) {
-          alert("Sign in with Tenyse's real Supabase owner account to add a live client.");
+          alert("Sign in with Tenyse's live owner account to add a client.");
           return;
         }
         state.editingClient = true;

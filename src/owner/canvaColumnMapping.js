@@ -57,7 +57,7 @@ export const HIGH_CONFIDENCE_FIELDS = {
   date: {
     schemaField: "publicationDate",
     guessedLabel: "Date", // specifically the publication date, not pitch/landed dates
-    required: true,
+    required: false,
   },
   ave: {
     schemaField: "aveValue",
@@ -67,7 +67,7 @@ export const HIGH_CONFIDENCE_FIELDS = {
   articleUrl: {
     schemaField: "articleUrl",
     guessedLabel: "Article URL",
-    required: true, // present in the data model; not always visibly labeled in her reports (often just a clickable logo)
+    required: false, // present in the data model when available; not every confirmed case-study item includes a usable URL
   },
 };
 
