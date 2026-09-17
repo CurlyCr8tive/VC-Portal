@@ -278,7 +278,7 @@ function numberedBadge(slide, n, x, y, fill = CORAL) {
     isTextBox: true, margin: 0,
   });
   s.addNotes(
-    "DEMO ORDER — rehearse this exact path:\n1. Owner dashboard, real data source selected.\n2. Open a client with several placements (Houston Housing Authority has the most).\n3. Press Placements — add one, click Calculate, show the AVE agent.\n4. Log in as a client and show the same coverage from their side.\n\nIf the network is unreliable, fall back to screenshots — have them open in a tab before you start."
+    "DEMO ORDER — rehearse this exact path:\n1. Owner dashboard, real data source selected. SIGN IN WITH THE REAL SUPABASE OWNER ACCOUNT, not the demo link — the AVE research and discovery features are hidden on the mock login.\n2. Open SNAP Co. Use SNAP Co. specifically: all four of its outlets have sourced audience figures, so Calculate returns a real range. Houston Housing Authority has more placements but none of its outlets have figures yet, so the calculator falls through there.\n3. Press Placements — add one for Blavity News, click Calculate: it returns $3,416 – $37,913 with the source named. Then try QSR Magazine, which has no figure, and use Research this rate — it comes back with a sourced estimate from the outlet's own published ad rates.\n4. Tick 'save this rate for next time' — the next placement at that outlet returns the saved rate instantly. That arc is the whole feature.\n5. Log in as a client and show the same coverage from their side.\n\nIf the network is unreliable, fall back to screenshots — have them open in a tab before you start."
   );
 }
 

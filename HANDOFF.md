@@ -1,5 +1,7 @@
 # VC-Portal IDE Transition Prompt
 
+_Last regenerated: Sep 17, 2026._
+
 Paste everything below as the first message to the next coding assistant, opened at the root of this repo:
 
 `/Users/chericeheron/Desktop/VC Dashboard`
@@ -26,10 +28,12 @@ The app intentionally keeps a localStorage fallback for demo/local work. Do not 
 
 Recent local commits:
 
-- `30fd811 Fix owner dashboard compact table visibility`
-- `6d04dbe Wire owner coaching UI to Supabase`
-- `2a36c4e Add Supabase coaching API slice`
-- `1a39b4b Checkpoint VC portal owner and client workflows`
+- `958c3da Carry AVE data-quality flags into Supabase and seed live case-study data`
+- `8d02671 Surface silent AI-provider fallback and raise long-form token budget`
+- `d46870c Seed agent-ready client data`
+- `2128db9 Update live feature verification status`
+- `8f0dded Document live feature activation requirements`
+- `c661989 Polish demo QA copy and Canva export`
 
 Before making changes, run:
 
@@ -83,26 +87,34 @@ It passed.
 
 ## Next Work
 
-1. Push any local commits if they are still ahead of `origin/main`.
-2. Visually QA the owner portal at:
-   `http://localhost:8420/owner.html`
-3. Test owner coaching end to end:
-   - Select a coaching client.
-   - Load a program template.
-   - Edit a phase.
-   - Add homework.
-   - Change homework status.
-   - Add/edit/delete an opportunity.
-   - Add/edit/delete a resource/checklist item.
-4. Test the client portal sees owner-created coaching updates.
-5. Continue validating real Supabase flows:
-   - Owner login.
-   - Client login.
-   - Invite flow.
-   - Placements.
-   - AVE/publicity value.
-   - Lead time.
-   - Google Workspace/Gmail/Calendar status.
+Ordered. Items 1-3 block the rest.
+
+### Blocking setup
+
+1. Run `db/migrations/2026-09-17-placement-ave-data-quality.sql` in the Supabase SQL editor. PostgREST cannot do DDL, so this is a manual paste.
+2. Seed the live database: `node scripts/seed-supabase-from-case-studies.mjs` (dry run), then `--write`. The live `placements` table had 4 rows against 15 in the browser — without this a deployed portal looks almost empty. Must run AFTER step 1 or the flagged rows land without their warnings.
+3. Replace `ANTHROPIC_API_KEY` in **both** `server/owner-api/.env` and `server/client-api/.env`. It returns 401 in the first and is absent from the second, so every AI writing helper is silently running on the GPT fallback.
+
+### Real-owner QA pass (the main outstanding work)
+
+4. Sign in as a **real Supabase owner**, not the demo link, and click every live path: dashboard filters, client list/detail/edit, invite, placements add/edit/delete, Calculate to research to save-rate, discovery scan, review queue, campaigns, reports, Canva export, coaching admin, schedule meeting.
+5. Finish the client portal walkthrough (started against Greyz Bistro, never completed): dashboard, placements, all six coaching tabs, homework check-off, reflection save, opportunity submit, resources, notes, messages.
+6. Fix whatever fails.
+
+### Deployment
+
+7. Netlify (static frontend) plus Render (both Express APIs). No deploy config exists yet.
+8. Move secrets into host env vars; nothing from `.env` is committed.
+9. Set `APP_BASE_URL` to the deployed domain — unset today, so invite emails point at `localhost:8420`.
+10. Lock CORS down from `*` to the deployed origin.
+
+### Known open questions
+
+11. Google Workspace needs `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` from a one-time OAuth authorization against Tenyse's own Google account. Use Workspace "Internal" user type or refresh tokens expire every 7 days.
+12. Supabase project ownership is unverified — a `profiles` row with her email is not proof the project sits in her account. Check the dashboard org and billing.
+13. Demo vs live divergence: ~15 interactive features are hidden behind `shouldUseOwnerApi()` on the mock login, so demo mode shows a materially different product. This has already caused a working feature to be reported as broken.
+14. Data questions only Tenyse can answer are tracked in `docs/tenyse-open-data-questions.md`.
+15. Two test rows still sit in the live `clients` table: `VC Test Client` and `VC Portal API Test 1788193670371`.
 
 ## Working Rules
 

@@ -278,9 +278,13 @@ export function renderPlacementForm(
       : "";
     fallbackEl.innerHTML = `
       <div style="margin:10px 0 14px; padding:12px 14px; background:#fff8e6; border:1px solid #f0ddab; border-radius:var(--radius-md);">
-        <p style="margin:0 0 8px; font-size:0.85rem; font-weight:600;">No saved rate for "${escapeHtml(
-          outlet
-        )}". ${estimate ? "Review the estimate below, or enter" : "Enter"} a value in AVE ($) above by hand.</p>
+        <p style="margin:0 0 8px; font-size:0.85rem; font-weight:600;">No saved rate for "${escapeHtml(outlet)}" yet. ${
+          estimate
+            ? "Review the estimate below, or enter a value in AVE ($) above by hand."
+            : onResearchRate
+              ? "Looking up an estimate from this outlet's published ad rates — review it before using it."
+              : "Enter a value in AVE ($) above by hand."
+        }</p>
         ${estimateBlock}
         <details style="margin-bottom:10px;">
           <summary style="cursor:pointer; font-size:0.8rem;">General industry benchmarks (not a confirmed rate)</summary>
@@ -318,17 +322,17 @@ export function renderPlacementForm(
     if (onResearchRate) {
       const researchBtn = container.querySelector("#op-ave-research");
       const resultEl = container.querySelector("#op-ave-research-result");
-      researchBtn.addEventListener("click", async () => {
+      const runResearch = async () => {
         researchBtn.disabled = true;
         resultEl.textContent = "Researching…";
         try {
           const result = await onResearchRate(outlet);
           if (result.available) {
-            resultEl.innerHTML = `<strong>Perplexity suggestion</strong> (${escapeHtml(
+            resultEl.innerHTML = `<strong>Researched estimate</strong> (${escapeHtml(
               result.source || "not a confirmed rate"
             )}):<br>${escapeHtml(result.suggestion)}`;
           } else {
-            resultEl.textContent = result.error || "Perplexity isn't connected yet — no PERPLEXITY_API_KEY set.";
+            resultEl.textContent = result.error || "Rate research isn't connected yet — no PERPLEXITY_API_KEY set.";
           }
         } catch (err) {
           logError({ source: "AVE research (Perplexity)", message: err.message });
@@ -336,7 +340,19 @@ export function renderPlacementForm(
         } finally {
           researchBtn.disabled = false;
         }
-      });
+      };
+      researchBtn.addEventListener("click", runResearch);
+
+      // Run it automatically when there's nothing else to show. Clicking
+      // "Calculate" is already the owner asking for a number — making her
+      // click a second button to get one, under a panel that says "enter a
+      // value by hand", read as though the agent had nothing to offer. It
+      // does: for an outlet with no audience figure on file this path
+      // returns an estimate grounded in the outlet's own published ad
+      // rates. When a local estimate IS available it's shown instantly and
+      // for free, so research stays on the button rather than firing an
+      // API call nobody asked for.
+      if (!estimate) runResearch();
     }
   }
 

@@ -41,10 +41,14 @@ These must be true before invites, Discovery scans, AI helpers, AVE research, Go
 - Tenyse owner profile: present with `role = owner`.
 - Test client keyword config: updated and verified.
 - Discovery Agent: verified through the authenticated owner API.
-- AI writing helpers: verified through the authenticated owner API.
+- AI writing helpers: verified through the authenticated owner API — **but via the GPT fallback, not Claude.** `ANTHROPIC_API_KEY` returns `401 API key is invalid` (re-confirmed live Sep 17). All five prompt types return real content, so the feature works; it is simply not running on the intended provider. `generateText()` now returns `fellBackFrom` and the route logs a warning when this happens, so the downgrade is visible instead of silent. Replace the key in **both** `server/owner-api/.env` and `server/client-api/.env` (it is missing entirely from the latter).
 - AVE rate research: verified through the authenticated owner API.
 - Campaign/placement live saves: verified through authenticated create/read/delete API smoke test.
 - Google Workspace: not activated yet because the Google OAuth client ID, client secret, and refresh token are not connected.
+- `APP_BASE_URL`: unset in both API `.env` files, so it silently falls back to `localhost:8420`. Client invite emails will point at localhost until this is set to the deployed domain.
+- Live data gap (Sep 17): the `placements` table held 4 rows while the browser held 15 — the case-study coverage lived in localStorage only. `scripts/seed-supabase-from-case-studies.mjs` migrates it, and also seeds `outlet_rates`, which was empty. Requires `db/migrations/2026-09-17-placement-ave-data-quality.sql` to be run first.
+- Supabase project ownership is **unverified**. Foundation requirement #1 above ("Tenyse's Supabase project is the active project") has never been confirmed — a `profiles` row carrying her email proves data, not account ownership. Check the Supabase dashboard org and billing to settle it.
+- Demo vs live divergence: ~15 interactive features are hidden behind `shouldUseOwnerApi()` on the mock login (invite, discovery scan, schedule meeting, rate research, headline suggestions, sentiment analysis, Gmail pitch lookup, coaching saves, campaign/placement saves). Demo mode therefore shows a materially different product than the live one — this has already caused a working feature to be misdiagnosed as broken.
 
 ## Client Invites
 
