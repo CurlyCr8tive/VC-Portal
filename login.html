@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verified Consulting — Log In</title>
-  <link rel="stylesheet" href="portal-styles.css" />
+  <link rel="stylesheet" href="portal-styles.css?v=20260916-direct-login-1" />
 </head>
 <body>
   <div class="login-shell">
@@ -36,14 +39,59 @@
       </div>
 
       <div class="demo-accounts">
-        <p>Mock demo accounts (any password):</p>
-        <ul id="demo-account-list"></ul>
-        <p style="margin-top:10px; font-weight:400;">These preview the portal with local demo data. Agent buttons, invites, web research, and live Supabase saves require the real account above.</p>
+        <p>Demo portals:</p>
+        <ul id="demo-account-list">
+          <li><a class="demo-login-link" href="owner.html?demo=owner&v=20260916-direct-login-3" data-email="tenyse@verifiedconsulting.com">Open owner demo — Tenyse</a></li>
+          <li><a class="demo-login-link" href="client.html?demo=greyz-bistro&view=coaching&v=20260917-coaching-entry-1" data-email="hello@greyzbistro.com">Open client demo — Greyz Bistro</a></li>
+          <li><a class="demo-login-link" href="client.html?demo=veganhood&v=20260916-direct-login-3" data-email="hello@veganhood.com">Open client demo — VeganHood</a></li>
+          <li><a class="demo-login-link" href="client.html?demo=vegan-dining-month&v=20260916-direct-login-3" data-email="hello@vegandiningmonth.com">Open client demo — Vegan Dining Month</a></li>
+          <li><a class="demo-login-link" href="client.html?demo=snap-co&v=20260916-direct-login-3" data-email="hello@snapco.com">Open client demo — SNAP Co.</a></li>
+          <li><a class="demo-login-link" href="client.html?demo=sunny-sparkling&v=20260916-direct-login-3" data-email="hello@sunnysparkling.com">Open client demo — Sunny Sparkling Co.</a></li>
+        </ul>
+        <p style="margin-top:10px; font-weight:400;">Use these for the walkthrough. They open directly with demo data and do not need a password.</p>
       </div>
     </div>
   </div>
 
   <script src="src/supabaseConfig.js"></script>
-  <script type="module" src="src/loginApp.js"></script>
+  <script>
+    (() => {
+      const demoAccounts = {
+        "tenyse@verifiedconsulting.com": { email: "tenyse@verifiedconsulting.com", role: "owner", name: "Tenyse Williams" },
+        "hello@veganhood.com": { email: "hello@veganhood.com", role: "pr_client", clientId: "veganhood", name: "VeganHood" },
+        "hello@vegandiningmonth.com": { email: "hello@vegandiningmonth.com", role: "pr_client", clientId: "vegan-dining-month", name: "VegansBaby — Vegan Dining Month" },
+        "hello@snapco.com": { email: "hello@snapco.com", role: "pr_client", clientId: "snap-co", name: "SNAP Co." },
+        "hello@sunnysparkling.com": { email: "hello@sunnysparkling.com", role: "pr_client", clientId: "sunny-sparkling", name: "Sunny Sparkling Co." },
+        "hello@greyzbistro.com": { email: "hello@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
+        "chefgarth@greyzbistro.com": { email: "chefgarth@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
+        "chefgarth@greyz.com": { email: "chefgarth@greyz.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
+      };
+
+      document.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-email]");
+        if (!btn) return;
+        document.getElementById("email").value = btn.dataset.email;
+        document.getElementById("password").value = "demo";
+      });
+
+      document.getElementById("login-form").addEventListener("submit", (event) => {
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const account = demoAccounts[email];
+        if (!account) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        try {
+          localStorage.setItem("vc_session", JSON.stringify(account));
+        } catch {}
+        try {
+          sessionStorage.setItem("vc_session", JSON.stringify(account));
+        } catch {}
+        window.location.href = account.role === "owner"
+          ? "owner.html?demo=owner"
+          : `client.html?demo=${encodeURIComponent(account.clientId || account.email)}`;
+      }, true);
+    })();
+  </script>
+  <script type="module" src="src/loginApp.js?v=20260916-direct-login-2"></script>
 </body>
 </html>

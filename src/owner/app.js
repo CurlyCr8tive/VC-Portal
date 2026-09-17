@@ -12,7 +12,7 @@ import {
   getRealReport,
 } from "../realDataSource.js";
 import { computeLeadTimeDays, formatCurrency } from "../calculations.js";
-import { requireSession, logout } from "../auth.js";
+import { requireSession, logout } from "../auth.js?v=20260916-demo-route-2";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
 import { addPlacement, updatePlacement, deletePlacement, upsertPlacement } from "../storage.js";
@@ -37,7 +37,7 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
-import { renderCoachingAdminView } from "./components/CoachingAdminView.js";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260917-client-name-fix-1";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
@@ -2216,6 +2216,10 @@ function renderCurrentView() {
 
 function renderCoachingView() {
   syncOwnerCoachingFromSupabase();
+  const greyzProfile = findClientByName("Greyz Bistro");
+  if (state.dataSource === "real" && greyzProfile && loadPhasesForClient("Greyz Bistro").length === 0) {
+    seedGreyzBistroCoachingData();
+  }
   const coachingClients =
     state.dataSource === "real"
       ? getClientsWithMetrics()

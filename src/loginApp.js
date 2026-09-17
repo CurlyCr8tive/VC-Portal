@@ -1,11 +1,9 @@
-import { login, getSession, landingPageFor, setSession, MOCK_ACCOUNTS } from "./auth.js";
+import { demoLandingPageFor, login, landingPageFor, setSession, MOCK_ACCOUNTS } from "./auth.js?v=20260916-demo-route-2";
 import { isRealAuthConfigured, signInReal } from "./supabaseAuthClient.js";
 
-// Already logged in? Skip the form and go straight to the right dashboard.
-const existing = getSession();
-if (existing) {
-  window.location.href = landingPageFor(existing);
-}
+// Keep login.html stable even when a previous owner/client demo session exists.
+// Demo Day walkthroughs often switch roles; auto-redirecting away from the
+// login screen made the page look broken before users could choose an account.
 
 // Real Supabase accounts are deliberately NOT paired with passwords here,
 // unlike the mock list below. The owner types the password created in
@@ -30,15 +28,24 @@ if (isRealAuthConfigured()) {
 }
 
 const listEl = document.getElementById("demo-account-list");
-listEl.innerHTML = MOCK_ACCOUNTS.map(
-  (a) => `<li><button type="button" data-email="${a.email}">${a.email}</button> — ${a.role === "owner" ? "owner" : `client (${a.name})`}</li>`
-).join("");
+let selectedDemoEmail = "";
 
-listEl.querySelectorAll("[data-email]").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.getElementById("email").value = btn.dataset.email;
-    document.getElementById("password").value = "demo";
-  });
+function selectDemoAccount(email) {
+  selectedDemoEmail = email;
+  document.getElementById("email").value = email;
+  document.getElementById("password").value = "demo";
+}
+
+if (!listEl.children.length) {
+  listEl.innerHTML = MOCK_ACCOUNTS.map(
+    (a) => `<li><button type="button" data-email="${a.email}">${a.email}</button> — ${a.role === "owner" ? "owner" : `client (${a.name})`}</li>`
+  ).join("");
+}
+
+listEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-email]");
+  if (!btn) return;
+  selectDemoAccount(btn.dataset.email);
 });
 
 const form = document.getElementById("login-form");
@@ -48,7 +55,7 @@ const submitBtn = form.querySelector('button[type="submit"]');
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   errorEl.classList.remove("visible");
-  const email = document.getElementById("email").value.trim();
+  const email = document.getElementById("email").value.trim() || selectedDemoEmail;
   const password = document.getElementById("password").value;
   const mockAccount = MOCK_ACCOUNTS.find((a) => a.email.toLowerCase() === email.toLowerCase());
 
@@ -80,5 +87,5 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
-  window.location.href = landingPageFor(account);
+  window.location.href = account.real ? landingPageFor(account) : demoLandingPageFor(account);
 });

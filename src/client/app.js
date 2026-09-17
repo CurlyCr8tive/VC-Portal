@@ -1,6 +1,6 @@
 import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getClientById } from "./mockData.js";
 import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js";
-import { requireSession, logout, landingPageFor } from "../auth.js";
+import { requireSession, logout, landingPageFor } from "../auth.js?v=20260916-demo-route-2";
 import { signOutReal } from "../supabaseAuthClient.js";
 import { buildClientApiChartSeries, loadClientApiData, loadClientApiNotes, postClientApiNote, postClientApiOpportunity, updateClientApiHomework } from "../clientApiDataSource.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
@@ -19,6 +19,7 @@ import { renderCoachingProgramView } from "./components/CoachingProgramView.js";
 import { loadPhasesForClient } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient } from "../coachingResourceStorage.js";
 import { loadOpportunitiesForClient } from "../opportunityStorage.js";
+import { seedGreyzBistroCoachingData } from "../owner/seedGreyzBistroCoachingData.js?v=20260917-client-demo-1";
 import { averageScore, EVALUATION_CRITERIA } from "../opportunitySchema.js";
 import { calculateCoachingProgress, OPPORTUNITY_STATUS_LABELS } from "../coachingProgress.js";
 import { escapeHtml } from "./utils.js";
@@ -46,7 +47,7 @@ const state = {
   clientId: session ? session.clientId : "veganhood",
   view: "dashboard",
   demoState: "normal", // normal | loading | empty | error
-  dataSource: "real", // real | mock — real reads storage.js placements filtered by session.name
+  dataSource: session?.real ? "real" : "mock", // real | mock — mock client logins open the polished demo dataset
   chartRange: "30d",
   searchTerm: "",
   selectedCampaignId: null,
@@ -128,18 +129,20 @@ function renderApiGate(target) {
 function getEngagementType() {
   const snapshot = apiSnapshot();
   if (snapshot) return snapshot.client.engagementType;
+  if (state.clientId === "greyz-bistro" || /greyz/i.test(clientName)) return "coaching";
   if (state.dataSource !== "real") return "pr";
   return getClientProfile(clientName).engagementType;
 }
 
 function getMetrics(clientId) {
+  const emptyMetrics = { totalAVE: 0, totalPlacements: 0, avgLeadTime: null, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
   if (state.demoState === "empty") {
-    return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
+    return emptyMetrics;
   }
   const snapshot = apiSnapshot();
   if (snapshot) return snapshot.metrics;
   if (state.dataSource === "real") return getRealMetrics(clientName);
-  return METRICS[clientId]["1y"];
+  return METRICS[clientId]?.["1y"] || emptyMetrics;
 }
 
 function getPlacements(clientId) {
@@ -1023,6 +1026,18 @@ if (session) {
   const dataParam = new URLSearchParams(location.search).get("data");
   if (["real", "mock"].includes(dataParam)) {
     state.dataSource = dataParam;
+  }
+  const viewParam = new URLSearchParams(location.search).get("view");
+  if (viewParam && document.getElementById(`view-${viewParam}`)) {
+    state.view = viewParam;
+  }
+
+  if (state.clientId === "greyz-bistro" || /greyz/i.test(clientName)) {
+    try {
+      seedGreyzBistroCoachingData();
+    } catch (err) {
+      console.warn("Could not seed Greyz Bistro coaching demo data.", err);
+    }
   }
 
   // A coaching-only client (e.g. Greyz Bistro) has no PR data worth

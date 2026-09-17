@@ -29,6 +29,7 @@ const HOMEWORK_TYPE_LABEL = { action: "Action Item", reflection: "Reflection Pro
 
 export function renderPhaseTrackerView(
   container,
+  clientName,
   { phases: apiPhases = null, onLoadTemplate = null, onSavePhase = null, onAddHomework = null, onSaveHomework = null, onRemoveHomework = null } = {}
 ) {
   let expandedPhaseId = null;

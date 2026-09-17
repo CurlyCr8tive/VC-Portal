@@ -23,7 +23,62 @@ export const MOCK_ACCOUNTS = [
   { email: "hello@snapco.com", role: "pr_client", clientId: "snap-co", name: "SNAP Co." },
   { email: "hello@sunnysparkling.com", role: "pr_client", clientId: "sunny-sparkling", name: "Sunny Sparkling Co." },
   { email: "hello@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
+  { email: "chefgarth@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
+  { email: "chefgarth@greyz.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
 ];
+
+function storageCandidates() {
+  return [window.localStorage, window.sessionStorage].filter(Boolean);
+}
+
+function safeReadSession() {
+  for (const storage of storageCandidates()) {
+    try {
+      const raw = storage.getItem(SESSION_KEY);
+      if (raw) return raw;
+    } catch {
+      // Some browser surfaces block storage; URL demo fallback below still works.
+    }
+  }
+  return null;
+}
+
+function safeWriteSession(account) {
+  for (const storage of storageCandidates()) {
+    try {
+      storage.setItem(SESSION_KEY, JSON.stringify(account));
+    } catch {
+      // Best effort only. Demo URLs keep the portals usable without storage.
+    }
+  }
+}
+
+function safeRemoveSession() {
+  for (const storage of storageCandidates()) {
+    try {
+      storage.removeItem(SESSION_KEY);
+    } catch {
+      // Ignore blocked storage.
+    }
+  }
+}
+
+function sessionFromDemoParams() {
+  const params = new URLSearchParams(window.location.search);
+  const demo = params.get("demo");
+  if (!demo) return null;
+  if (demo === "owner") return MOCK_ACCOUNTS.find((a) => a.role === "owner") || null;
+  return MOCK_ACCOUNTS.find(
+    (a) => a.role === "pr_client" && (a.clientId === demo || a.email.toLowerCase() === demo.toLowerCase())
+  ) || null;
+}
+
+export function demoLandingPageFor(account) {
+  if (!account) return "login.html";
+  if (account.role === "owner") return "owner.html?demo=owner";
+  if (account.role === "pr_client") return `client.html?demo=${encodeURIComponent(account.clientId || account.email)}`;
+  return "login.html";
+}
 
 export function login(email) {
   const account = MOCK_ACCOUNTS.find((a) => a.email.toLowerCase() === String(email || "").trim().toLowerCase());
@@ -40,7 +95,7 @@ export function login(email) {
  * call site keeps working unchanged, real or mock.
  */
 export function setSession(account) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(account));
+  safeWriteSession(account);
 }
 
 const VALID_ROLES = new Set(["owner", "pr_client"]);
@@ -59,24 +114,30 @@ const VALID_ROLES = new Set(["owner", "pr_client"]);
  * fixes it at the source instead of chasing every downstream symptom.
  */
 export function getSession() {
-  const raw = localStorage.getItem(SESSION_KEY);
+  const demoSession = sessionFromDemoParams();
+  if (demoSession) {
+    safeWriteSession(demoSession);
+    return demoSession;
+  }
+
+  const raw = safeReadSession();
   if (!raw) return null;
   let session;
   try {
     session = JSON.parse(raw);
   } catch {
-    localStorage.removeItem(SESSION_KEY);
+    safeRemoveSession();
     return null;
   }
   if (!session || !VALID_ROLES.has(session.role)) {
-    localStorage.removeItem(SESSION_KEY);
+    safeRemoveSession();
     return null;
   }
   return session;
 }
 
 export function logout() {
-  localStorage.removeItem(SESSION_KEY);
+  safeRemoveSession();
 }
 
 /**

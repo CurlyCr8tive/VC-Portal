@@ -9,7 +9,7 @@
 // has no reason to survive a navigation away and back.
 
 import { escapeHtml } from "../../client/utils.js";
-import { renderPhaseTrackerView } from "./PhaseTrackerView.js";
+import { renderPhaseTrackerView } from "./PhaseTrackerView.js?v=20260917-client-name-fix-1";
 import { renderOpportunityEvaluator } from "./OpportunityEvaluator.js";
 import { renderCoachingResourceLibrary } from "./CoachingResourceLibrary.js";
 
