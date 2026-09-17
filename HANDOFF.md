@@ -111,7 +111,7 @@ Ordered. Items 1-3 block the rest.
 ### Known open questions
 
 11. Google Workspace needs `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REFRESH_TOKEN` from a one-time OAuth authorization against Tenyse's own Google account. Use Workspace "Internal" user type or refresh tokens expire every 7 days.
-12. Supabase project ownership is unverified — a `profiles` row with her email is not proof the project sits in her account. Check the dashboard org and billing.
+12. Supabase project ownership: settled Sep 17, 2026 — `bjdzbyfxelshyxoswykk` is Tenyse's own project and every config point already matches it. Do not re-raise this; older notes calling it temporary were incorrect.
 13. Demo vs live divergence: ~15 interactive features are hidden behind `shouldUseOwnerApi()` on the mock login, so demo mode shows a materially different product. This has already caused a working feature to be reported as broken.
 14. Data questions only Tenyse can answer are tracked in `docs/tenyse-open-data-questions.md`.
 15. Two test rows still sit in the live `clients` table: `VC Test Client` and `VC Portal API Test 1788193670371`.
