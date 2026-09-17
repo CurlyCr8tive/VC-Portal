@@ -190,6 +190,10 @@ function placementRowToApi(row, { clientName = "", campaignName = null } = {}) {
     campaign: campaignName || null,
     sentiment: row.sentiment_tag || null,
     audienceReach: row.audience_reach == null ? null : Number(row.audience_reach),
+    // Null, never "" — the frontend treats a non-empty string as "there is a
+    // known problem with this figure", so an empty string would render a
+    // warning marker on every clean placement.
+    aveDataQuality: row.ave_data_quality || null,
   };
 }
 
@@ -327,6 +331,10 @@ async function normalizePlacementPayload(body) {
       sentiment_tag: sentiment,
       audience_reach: reachRaw !== "" && reachRaw != null && Number.isFinite(Number(reachRaw)) ? Number(reachRaw) : null,
       notes: String(body?.notes || "").trim() || null,
+      // Carried through so a known-bad figure keeps its warning across a
+      // round-trip. Without this the flag died at the API boundary and the
+      // number came back looking confirmed.
+      ave_data_quality: String(body?.aveDataQuality || body?.ave_data_quality || "").trim() || null,
       source: "manual",
     },
   };

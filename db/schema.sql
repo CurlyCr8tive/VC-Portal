@@ -163,6 +163,10 @@ create table placements (
 
   ave_value numeric(12, 2),
   ave_auto_calculated boolean not null default false, -- true if Agent 2 set this, false if Tenyse entered it manually
+  -- Why this AVE figure shouldn't be treated as settled, when that applies.
+  -- NULL means "no known problem" — never "verified"; nothing in this app
+  -- asserts that positive claim. See db/migrations/2026-09-17-placement-ave-data-quality.sql.
+  ave_data_quality text,
 
   pitch_sent_date date,
   landed_date date,
