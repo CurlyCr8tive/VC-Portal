@@ -6,9 +6,39 @@
 // view, behind a confirm() since it writes to real localStorage data.
 
 import { createPlacement } from "../schema.js";
-import { addPlacement } from "../storage.js";
+import { addPlacement, loadPlacements } from "../storage.js";
+import { createCampaign } from "../campaignSchema.js";
+import { addCampaign, loadCampaigns } from "../campaignStorage.js";
 
 const SAMPLE_PLACEMENTS = [
+  {
+    publication: "Brooklyn Daily Eagle",
+    headline: "Greyz Bistro Partners With WIADCA for Carnival 2026",
+    articleUrl: "https://example.com/greyz-wiadca-partnership",
+    publicationDate: "2026-09-12",
+    client: "Greyz Bistro",
+    aveValue: "6750",
+    audienceReach: "85000",
+    pitchSentDate: "2026-08-26",
+    landedDate: "2026-09-12",
+    sentiment: "positive",
+    notes: "Mock PR placement for demo/testing only. Added so AI writing helpers have campaign context while Tenyse's real Greyz Bistro press data is still missing.",
+    campaign: "Visibility to Revenue PR Preview",
+  },
+  {
+    publication: "QNS",
+    headline: "Crown Heights Chef Brings Global Flavors Home",
+    articleUrl: "https://example.com/greyz-crown-heights-profile",
+    publicationDate: "2026-09-10",
+    client: "Greyz Bistro",
+    aveValue: "4900",
+    audienceReach: "62000",
+    pitchSentDate: "2026-08-22",
+    landedDate: "2026-09-10",
+    sentiment: "positive",
+    notes: "Mock PR placement for demo/testing only. Represents the Chef Founder / Cultural Voice positioning Tenyse is developing with Chef Garth.",
+    campaign: "Visibility to Revenue PR Preview",
+  },
   {
     publication: "Forbes",
     headline: "VeganHood Is Redefining Soul Food in NYC",
@@ -71,7 +101,30 @@ const SAMPLE_PLACEMENTS = [
   },
 ];
 
+const SAMPLE_CAMPAIGNS = [
+  {
+    name: "Visibility to Revenue PR Preview",
+    client: "Greyz Bistro",
+    startDate: "2026-08-20",
+    duration: "4 weeks",
+    status: "active",
+  },
+];
+
 export function seedSamplePlacements() {
-  SAMPLE_PLACEMENTS.forEach((raw) => addPlacement(createPlacement(raw)));
-  return SAMPLE_PLACEMENTS.length;
+  const existingCampaigns = loadCampaigns();
+  for (const raw of SAMPLE_CAMPAIGNS) {
+    const exists = existingCampaigns.some((c) => c.name === raw.name && c.client === raw.client);
+    if (!exists) addCampaign(createCampaign(raw));
+  }
+
+  const existingPlacements = loadPlacements();
+  let added = 0;
+  for (const raw of SAMPLE_PLACEMENTS) {
+    const exists = existingPlacements.some((p) => p.publication === raw.publication && p.client === raw.client && p.headline === raw.headline);
+    if (exists) continue;
+    addPlacement(createPlacement(raw));
+    added += 1;
+  }
+  return added;
 }

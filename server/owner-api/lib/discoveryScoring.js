@@ -18,19 +18,37 @@ function normalize(text) {
 }
 
 /**
- * Builds a plain search-engine query string from a client's keyword_config
- * — every configured term OR'd together, so the search casts a wide net;
- * scoreArticleMatch below is what narrows results down afterward.
+ * Builds a plain search-engine query string from a client's keyword_config.
+ * NewsData.io rejects queries over 100 characters, so keep the structured
+ * layer short and focused: client/company first, then only aliases that fit.
+ * scoreArticleMatch still uses the full keyword_config after results return.
  */
 export function buildSearchQuery(keywordConfig) {
   const terms = collectTerms(keywordConfig);
   if (terms.length === 0) return null;
-  return terms.map((t) => `"${t}"`).join(" OR ");
+  const queryTerms = [];
+  for (const term of terms) {
+    const candidateTerms = [...queryTerms, term];
+    const candidate = candidateTerms.map((t) => `"${t}"`).join(" OR ");
+    if (candidate.length > 96 && queryTerms.length > 0) continue;
+    queryTerms.push(term);
+  }
+  return queryTerms.map((t) => `"${t}"`).join(" OR ");
 }
 
 function collectTerms(keywordConfig) {
   const { clientName, companyName, aliases } = keywordConfig || {};
-  return [clientName, companyName, ...(Array.isArray(aliases) ? aliases : [])].filter(Boolean).map((t) => String(t).trim()).filter(Boolean);
+  const seen = new Set();
+  return [clientName, companyName, ...(Array.isArray(aliases) ? aliases : [])]
+    .filter(Boolean)
+    .map((t) => String(t).trim())
+    .filter(Boolean)
+    .filter((term) => {
+      const key = normalize(term);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 /**

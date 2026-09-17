@@ -389,6 +389,11 @@ const REAL_CLIENT_PROFILES = [
     contactEmail: "",
     engagementStartDate: "",
     notes: "Confirmed closed/portfolio-only by Tenyse directly (email correspondence). Never treat as an active engagement in the dashboard or a demo going forward.",
+    keywordConfig: {
+      clientName: "VeganHood",
+      companyName: "VeganHood",
+      aliases: ["Vegan Hood", "plant-based soul food", "Harlem vegan restaurant", "vegan CPG"],
+    },
   },
   {
     name: "SNAP Co.",
@@ -398,6 +403,11 @@ const REAL_CLIENT_PROFILES = [
     contactEmail: "",
     engagementStartDate: "",
     notes: 'Tenyse\'s email explicitly named YAMAAS!, VeganHood, El Pastor Cheese, and Candlelit Care as past/portfolio-only clients — SNAP Co. was not mentioned either way, so status is left honestly unconfirmed rather than assumed active or past. Full name confirmed via case-study deck: "Solutions Not Punishment Collaborative."',
+    keywordConfig: {
+      clientName: "SNAP Co.",
+      companyName: "Solutions Not Punishment Collaborative",
+      aliases: ["SNAP Co", "Solutions Not Punishment", "Deeper Than Visibility", "Toni-Michelle Williams"],
+    },
   },
   {
     name: "VegansBaby — Vegan Dining Month",
@@ -407,6 +417,11 @@ const REAL_CLIENT_PROFILES = [
     contactEmail: "",
     engagementStartDate: "",
     notes: "Same reasoning as SNAP Co. above — not named in Tenyse's past-clients list, but never explicitly confirmed current either. Founder confirmed via case-study deck: Diana Edelman.",
+    keywordConfig: {
+      clientName: "VegansBaby",
+      companyName: "Vegan Dining Month",
+      aliases: ["Vegans Baby", "Diana Edelman", "Vegan Dining Month NYC", "Vegan Dining Month Las Vegas"],
+    },
   },
   {
     name: "Candlelit Care",
@@ -417,6 +432,11 @@ const REAL_CLIENT_PROFILES = [
     engagementStartDate: "",
     notes:
       'Named directly by Tenyse in the same email that confirmed VeganHood as past/portfolio-only ("YAMAAS!, VeganHood, El Pastor Cheese, and Candlelit Care"). Formerly named Candlelit Therapy. Founder/CEO: Lauren Elliott, MPH. See the "National Press Push" campaign\'s DUPLICATE-FIGURE FLAG — its reported $492,198/14.2M matches VeganHood\'s CPG figure exactly, unresolved.',
+    keywordConfig: {
+      clientName: "Candlelit Care",
+      companyName: "Candlelit Care",
+      aliases: ["Candlelit Therapy", "Lauren Elliott", "perinatal coaching", "maternal health coaching"],
+    },
   },
   {
     name: "Houston Housing Authority",
@@ -435,6 +455,11 @@ PRESS COVERAGE, January 2022 (see the "Media Relations Coverage — January 2022
 WEBSITE TRAFFIC, January 2022 — three separate microsites reported, not the main HHA site: East End Microsite (22 visits, +144% MoM); "2100 Memorial Microsite" at thirdwardchoice.com (100 users, 1m21s avg engagement); "Third Ward Choice Microsite," ALSO at thirdwardchoice.com (45 users, 3m00s avg engagement) — two different user counts for what appears to be the same domain in the same month, not reconciled. The deck's own author flagged the Third Ward Choice country breakdown (US/China/Canada/Uganda) as ambiguous — could mean served population or just search-topic overlap — a good model for how this file handles its own uncertain figures.
 
 UPCOMING (as of the Jan 2022 snapshot, not confirmed as materialized): interviews pitched/secured with Houston Chronicle and Texas Multifamily & Affordable Housing Business Magazine; a requested Blavity byline on affordable housing policy.`,
+    keywordConfig: {
+      clientName: "Houston Housing Authority",
+      companyName: "Houston Housing Authority",
+      aliases: ["HHA", "David A. Northern", "affordable housing Houston", "OST South Union homes"],
+    },
   },
   {
     name: "Nude Barre",
@@ -445,6 +470,11 @@ UPCOMING (as of the Jan 2022 snapshot, not confirmed as materialized): interview
     engagementStartDate: "",
     notes:
       "Social media management engagement, not press placements — real results reported over a 90-day period (Instagram Analytics per the deck): 20% engagement rate, 34% profile visits, 35% follower increase. No AVE/reach dollar figures exist for this engagement; it's tracked as a Campaign record (\"Social Media Management\") with these numbers here since Campaign records have no free-text notes field to hold them.",
+    keywordConfig: {
+      clientName: "Nude Barre",
+      companyName: "Nude Barre",
+      aliases: ["nude hosiery", "inclusive hosiery", "skin tone hosiery"],
+    },
   },
   {
     name: "Greyz Bistro",
@@ -455,6 +485,11 @@ UPCOMING (as of the Jan 2022 snapshot, not confirmed as materialized): interview
     engagementStartDate: "",
     notes:
       "Founder/contact: Chef Garth D. Cheese. Confirmed by Tenyse directly as her first genuine active client (email correspondence) — in the Visibility to Revenue coaching program, 90-day cycle, monthly payment, currently heading into the final month, ~10 hrs/month from Tenyse. Built so far: proposal, contract, media kit, kickoff deck, LinkedIn audit and fix plan. Standing coaching rule: Chef Garth brings all incoming opportunities to Tenyse before responding to anyone. Active partnership work in flight: WIADCA Carnival (VIP Breakfast + Stage Premium Tasting Partner, Aug 20 and Sept 7 activations) and a Brooklyn Roasting Company collaboration. Positioning angles under consideration: Chef Founder, Culinary Educator, Cultural Voice. Full 6-phase VAAM program structure (Visibility/Authority/Alignment/Monetization), homework tracking, and the partnership-opportunity evaluator are scoped but not yet built — this record exists so Greyz Bistro shows up as a real client ahead of that work.",
+    keywordConfig: {
+      clientName: "Greyz Bistro",
+      companyName: "Greyz Bistro",
+      aliases: ["Grezys Bistro", "Chef Garth D. Cheese", "Chef Garth Cheese", "Crown Heights restaurant", "WIADCA Carnival"],
+    },
   },
 ];
 
