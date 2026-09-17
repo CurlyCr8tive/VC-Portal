@@ -153,7 +153,12 @@ for (const row of REAL_CASE_STUDY_PLACEMENTS) {
     sentiment_tag: ["positive", "neutral", "negative"].includes(row.sentiment) ? row.sentiment : null,
     notes: row.notes || null,
     ...(hasDataQualityColumn ? { ave_data_quality: row.aveDataQuality || null } : {}),
-    source: "case_study_seed",
+    // 'manual' not a new 'case_study_seed' value: the table constrains
+    // source to ('manual','discovery_agent'), and these rows ARE
+    // human-curated — a person read them off Tenyse's decks. No agent
+    // found them. Per-row provenance already lives in `notes`, so nothing
+    // is lost by not inventing a third source value.
+    source: "manual",
   });
 }
 
