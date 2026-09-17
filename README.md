@@ -54,6 +54,12 @@ The APIs start without Supabase credentials and expose `/health`, but protected
 routes return `503` until each service has a `.env` copied from its
 `.env.example` with real Supabase values.
 
+Live-only features such as client invites, Discovery scans, AI writing
+helpers, AVE rate research, Google Workspace, and live saves have their own
+activation requirements. Track those in
+[`docs/live-feature-activation-plan.md`](docs/live-feature-activation-plan.md)
+so "built in the repo" does not get confused with "connected to live accounts."
+
 ## Client Onboarding
 
 Tenyse should manage clients from the owner portal, not from Supabase. The
