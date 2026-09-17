@@ -34,6 +34,18 @@ These must be true before invites, Discovery scans, AI helpers, AVE research, Go
    - `npm run start:owner-api`
    - `npm run start:client-api`
 
+### Live Verification Status - Sep 17, 2026
+
+- Owner API health: verified live against Supabase.
+- Temporary owner test account: created, confirmed, and mapped to an owner `profiles` row for same-day testing.
+- Tenyse owner profile: present with `role = owner`.
+- Test client keyword config: updated and verified.
+- Discovery Agent: verified through the authenticated owner API.
+- AI writing helpers: verified through the authenticated owner API.
+- AVE rate research: verified through the authenticated owner API.
+- Campaign/placement live saves: verified through authenticated create/read/delete API smoke test.
+- Google Workspace: not activated yet because the Google OAuth client ID, client secret, and refresh token are not connected.
+
 ## Client Invites
 
 ### Current Build State
@@ -71,7 +83,7 @@ The owner UI, client search-term fields, backend scan route, structured news sea
 
 ### Demo Day Workaround
 
-Use the Review Queue preview to show the confirm/reject workflow. Say the live scan requires the connected owner account and search provider keys.
+Use the verified live scan path when logged in as a real owner. If the app is shown without real login, use the Review Queue preview and say live scanning requires owner auth plus the connected search keys.
 
 ## AI Writing Helpers
 
@@ -88,7 +100,7 @@ The backend prompt route exists for executive summaries, campaign activity summa
 
 ### Demo Day Workaround
 
-Show the saved/approved summary workflow and explain that generation activates once the model key is connected.
+Use the verified live generation path when logged in as a real owner. Still frame AI output as a draft that Tenyse reviews before saving or presenting to a client.
 
 ## AVE Calculation And AVE Rate Research
 
@@ -110,7 +122,7 @@ For live rate research:
 
 ### Demo Day Workaround
 
-Use the local estimate path. Show that the platform names the source and asks Tenyse to choose the final value instead of inventing one.
+Use the local estimate path for standard calculations and the verified live research helper when Tenyse needs a manual outlet-rate lookup. Show that the platform names the source and asks Tenyse to choose the final value instead of inventing one.
 
 ## Canva Bulk Create Export
 
@@ -181,7 +193,7 @@ Owner and client API routes exist for live saves, and demo/local storage remains
 
 ### Demo Day Workaround
 
-Use demo/local data for walkthroughs. Treat live saves as a handoff/activation milestone unless testing from a real authenticated account.
+Use verified live saves when logged in through a real Supabase account. Use demo/local data only when protecting the walkthrough from network/auth instability.
 
 ## Why This Belongs In The Build Plan
 
