@@ -384,6 +384,7 @@ function dashboardSkeletonHTML() {
         <div class="owner-panel-card">
           <div class="section-heading">
             <h2 id="dashboard-primary-title">Recent Press Placements</h2>
+            ${sectionInfoButton({ title: "Recent Press Placements", body: "The four most recently dated placements across every visible client, newest first. Switch to Coaching Program view mode above to see coaching activity here instead — this panel shows one or the other, not both at once." })}
             <button class="link-btn" id="dashboard-primary-action" data-goto="placements">View All</button>
           </div>
           <div id="dashboard-placements"></div>
@@ -398,6 +399,7 @@ function dashboardSkeletonHTML() {
       <section class="section" style="margin-bottom:0;">
         <div class="section-heading">
           <h2>Campaign Progress</h2>
+          ${sectionInfoButton({ title: "Campaign Progress", body: "Every real campaign across all visible clients, most recent first. Status is one of the three this app tracks (active, paused, completed) — see the full Campaigns page for filtering, search, and per-campaign publicity value." })}
           <button class="link-btn" data-goto="campaigns">View All</button>
         </div>
         <div class="campaigns-grid" id="dashboard-campaigns"></div>
@@ -787,7 +789,7 @@ function renderDashboardRollup(container, metrics) {
         <span><small>Coaching Programs</small><strong>${coachingCount}</strong></span>
       </div>
       <div class="owner-rollup-item wide">
-        <span><small>Total Revenue Impact Est.</small><strong>${formatCompactCurrency(metrics.totalAVE)}</strong><em>YTD (AVE)</em></span>
+        <span><small>Total Revenue Impact Est. ${sectionInfoButton({ title: "Total Revenue Impact Est. (AVE)", body: "AVE — advertising value equivalent — estimates what confirmed press coverage would have cost as paid advertising. There is no industry standard for this figure (see the AVE agent's own docs); this build shows a range from two published formulas rather than a single confident number, and any figure resting on an estimate rather than a sourced audience number is flagged on the placement itself. Only counts placements with a landed date — pitched-but-not-yet-published coverage doesn't count toward this total." })}</small><strong>${formatCompactCurrency(metrics.totalAVE)}</strong><em>YTD (AVE)</em></span>
       </div>
     </div>
   `;
