@@ -395,9 +395,13 @@ async function normalizePlacementPayload(body) {
 }
 
 // Owner sees everything — no client_id filter needed, unlike client-api.
+// Demo-capable: this is a read-only lookup that discovery-scan (already
+// demo-capable) depends on to resolve a client name to its real id. Gating
+// this more strictly than the write it feeds made that action unreachable
+// in preview mode.
 app.get(
   "/api/clients",
-  ownerRoute(async (req, res) => {
+  ownerOrLocalDemoAiRoute(async (req, res) => {
     const { data, error } = await supabase.from("clients").select("*").order("name");
     if (error) throw error;
     res.json(data.map(clientRowToApi));

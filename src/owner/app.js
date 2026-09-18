@@ -36,7 +36,7 @@ import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
 import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js";
-import { renderClientsList } from "./components/ClientsListCard.js";
+import { renderClientsList } from "./components/ClientsListCard.js?v=20260918-demo-scan-fix";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js";
 import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
@@ -1063,7 +1063,12 @@ async function demoCapableJsonHeaders() {
  */
 async function resolveRealClientId(clientName) {
   try {
-    const res = await fetch(`${OWNER_API_BASE}/api/clients`, { headers: await authedJsonHeaders() });
+    // Demo-capable, not authedJsonHeaders() — this lookup is a read-only
+    // stepping stone that discovery-scan (already demo-capable) depends on.
+    // Gating it more strictly than the action it feeds made Scan for
+    // Mentions unreachable in preview mode even though the server intended
+    // it to work there.
+    const res = await fetch(`${OWNER_API_BASE}/api/clients`, { headers: await demoCapableJsonHeaders() });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       return { ok: false, message: body.message || `Couldn't look up clients in Supabase (${res.status}).` };

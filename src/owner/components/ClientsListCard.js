@@ -52,6 +52,11 @@ import { renderEmptyState } from "../../client/components/EmptyState.js";
  */
 const STATUS_BADGE_CLASS = { active: "published", past: "client-past", unconfirmed: "in-progress" };
 const STATUS_LABEL = { active: "Active", past: "Past / Portfolio", unconfirmed: "Status Unconfirmed" };
+const STATUS_TOOLTIP = {
+  active: "Actively engaged — current PR and/or coaching work in progress.",
+  past: "A completed or portfolio-only engagement, shown as past work rather than an active client.",
+  unconfirmed: "Tenyse hasn't verified this client relationship or its figures yet. Not a data error — stays this way until she confirms it.",
+};
 const ENGAGEMENT_LABEL = { pr: "PR", coaching: "Coaching", pr_and_coaching: "PR + Coaching" };
 
 function discoveryTermsCount(keywordConfig = {}) {
@@ -78,9 +83,9 @@ export function renderClientsList(
       const termCount = discoveryTermsCount(profile.keywordConfig);
       return `
     <div class="card client-list-card">
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+      <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:8px;">
         <h3 style="margin:0;">${escapeHtml(c.name)}</h3>
-        <span class="status-badge ${STATUS_BADGE_CLASS[profile.status] || "in-progress"}">${escapeHtml(STATUS_LABEL[profile.status] || "Status Unconfirmed")}</span>
+        <span class="status-badge ${STATUS_BADGE_CLASS[profile.status] || "in-progress"}" title="${escapeHtml(STATUS_TOOLTIP[profile.status] || STATUS_TOOLTIP.unconfirmed)}">${escapeHtml(STATUS_LABEL[profile.status] || "Status Unconfirmed")}</span>
       </div>
       <p style="font-size:0.78rem; color:var(--text-secondary); margin:2px 0 10px;">${escapeHtml(ENGAGEMENT_LABEL[profile.engagementType] || "PR")}${profile.industry ? ` · ${escapeHtml(profile.industry)}` : ""}</p>
       <div class="client-mini-metrics">
