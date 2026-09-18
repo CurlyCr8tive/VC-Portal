@@ -17,6 +17,8 @@
 // surfaced in owner/app.js's renderSummaryForm) remains the only way an
 // approved summary actually gets created until that decision is made.
 
+import { PLAIN_PROSE_RULES } from "./outputFormat.js";
+
 export function buildExecutiveSummaryPrompt({ client, periodLabel, placements, totalAVE, totalReach, campaignContext }) {
   return `You are drafting a press coverage executive summary for ${client}, covering ${periodLabel}.
 
@@ -37,5 +39,6 @@ Real data for this period — use ONLY these numbers, never estimate or invent a
 
 Tone: confident and results-forward, the way a strategist reports to a client who's paying for outcomes — not generic marketing copy. Keep it to 3-4 short paragraphs.
 
-If any of the real data above is missing or zero, say so plainly rather than working around it — never smooth over a gap with vague language.`;
+If any of the real data above is missing or zero, say so plainly rather than working around it — never smooth over a gap with vague language.
+${PLAIN_PROSE_RULES}`;
 }

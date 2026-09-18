@@ -13,6 +13,8 @@
 //
 // NOT wired to an API call — same status as executiveSummaryPrompt.js.
 
+import { PLAIN_PROSE_RULES } from "./outputFormat.js";
+
 export function buildCampaignActivitySummaryPrompt({ client, campaignName, sinceDate, newPlacements, milestonesUpdated, recentNotes }) {
   return `You are drafting a short campaign activity update for ${client}'s "${campaignName}" campaign, covering activity since ${sinceDate}.
 
@@ -23,5 +25,6 @@ Real activity since ${sinceDate} — use ONLY what's listed here, never invent o
 - Milestones updated (${milestonesUpdated.length}): ${milestonesUpdated.length ? milestonesUpdated.map(m => m.text).join("; ") : "none"}
 - Recent notes exchanged (${recentNotes.length}): ${recentNotes.length ? recentNotes.map(n => `${n.authorRole}: "${n.body}"`).join(" | ") : "none"}
 
-If there is genuinely no activity to report, say that plainly and briefly — something like ongoing outreach continuing behind the scenes — rather than inventing progress or padding silence into false momentum. A quiet week described honestly is more trustworthy than a vague one dressed up as busy.`;
+If there is genuinely no activity to report, say that plainly and briefly — something like ongoing outreach continuing behind the scenes — rather than inventing progress or padding silence into false momentum. A quiet week described honestly is more trustworthy than a vague one dressed up as busy.
+${PLAIN_PROSE_RULES}`;
 }

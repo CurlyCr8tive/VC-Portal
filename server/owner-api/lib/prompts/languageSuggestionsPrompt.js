@@ -16,6 +16,8 @@
 // caller is expected to show suggestions next to the existing Headline
 // field, not overwrite it.
 
+import { PLAIN_PROSE_RULES } from "./outputFormat.js";
+
 export function buildLanguageSuggestionsPrompt({ mode, client, ...rest }) {
   if (mode === "pitch") {
     const { targetOutlet, campaignAngle, existingCoverage = [] } = rest;
@@ -38,7 +40,8 @@ Suggest 2-3 short pitch opening-line options a publicist could send cold or warm
 Current headline: "${headline}"
 ${articleExcerpt ? `Context: "${articleExcerpt}"` : "No article excerpt provided — work from the headline alone."}
 
-Suggest 2-3 alternate phrasings for a client-facing report — punchier, clearer, or more consistent with Verified Consulting's confident tone. Stay factually equivalent to the original; never invent a detail, stat, or claim the original headline doesn't already support. Label these clearly as suggested report copy, not the actual published headline.`;
+Suggest 2-3 alternate phrasings for a client-facing report — punchier, clearer, or more consistent with Verified Consulting's confident tone. Stay factually equivalent to the original; never invent a detail, stat, or claim the original headline doesn't already support. Label these clearly as suggested report copy, not the actual published headline.
+${PLAIN_PROSE_RULES}`;
   }
 
   throw new Error(`buildLanguageSuggestionsPrompt requires mode: "pitch" or "headline" — got ${JSON.stringify(mode)}.`);

@@ -19,6 +19,8 @@
 //
 // NOT wired to an API call — same status as the other four prompts here.
 
+import { PLAIN_PROSE_RULES } from "./outputFormat.js";
+
 export function buildReportNarrativePrompt({ client, periodLabel, placements, campaignContext, notableDetails }) {
   return `You are writing the fuller campaign narrative for ${client}'s report covering ${periodLabel} — this accompanies the report document itself, not the short dashboard summary card.
 
@@ -32,5 +34,6 @@ ${placements.map(p => `- ${p.publication}: "${p.headline}"${p.publicationDate ? 
 Notable details to weave in, if any (partnerships, events, named collaborators) — leave out entirely if none provided, do not invent a placeholder:
 ${notableDetails && notableDetails.length ? notableDetails.map(d => `- ${d}`).join("\n") : "(none provided)"}
 
-Tone: confident storytelling, not a sales pitch — let the real placements and details carry the narrative rather than adjectives doing the work.`;
+Tone: confident storytelling, not a sales pitch — let the real placements and details carry the narrative rather than adjectives doing the work.
+${PLAIN_PROSE_RULES}`;
 }

@@ -17,6 +17,8 @@
 //
 // NOT wired to an API call — same status as the other four prompts here.
 
+import { PLAIN_PROSE_RULES } from "./outputFormat.js";
+
 export function buildSentimentAnalysisPrompt({ publication, headline, articleExcerpt }) {
   return `You are tagging the tone of a single press placement for ${publication}, to help (not replace) Verified Consulting's own read on the coverage.
 
@@ -27,5 +29,6 @@ Classify the tone as exactly one of: positive, neutral, negative. Match Tenyse's
 
 If the headline alone doesn't give you enough to judge confidently — no article excerpt was provided, or the headline is genuinely ambiguous about how the client is portrayed — say so directly and suggest "neutral" only as a placeholder, explicitly flagged as low-confidence, not as a confident read. Never force a confident-sounding positive or negative tag from insufficient text just to avoid saying "not enough information."
 
-Respond with the classification and one sentence of reasoning tied to specific words or framing in the text above — not a generic justification.`;
+Respond with the classification and one sentence of reasoning tied to specific words or framing in the text above — not a generic justification.
+${PLAIN_PROSE_RULES}`;
 }
