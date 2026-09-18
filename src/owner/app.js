@@ -1535,7 +1535,7 @@ function renderClientsView() {
             navigate("campaigns");
           }
         : undefined,
-    onDiscoveryScan: shouldUseOwnerApi() ? discoveryScanClient : undefined,
+    onDiscoveryScan: discoveryScanClient,
     onScheduleMeeting: shouldUseOwnerApi() ? scheduleClientMeeting : undefined,
     onViewCoaching: (clientName) => {
       state.coachingSelectedClient = clientName;
@@ -1682,7 +1682,12 @@ function renderPlacementsView() {
   syncOwnerRecordsFromSupabase();
 
   const canManagePlacements = state.dataSource === "real";
-  const canSavePlacements = shouldUseOwnerApi();
+  // Matches the campaign fix earlier this session: local save/edit/delete
+  // works in preview mode, real Supabase save only when actually signed in.
+  // onSubmit and onDelete below already branch on shouldUseOwnerApi()
+  // internally for the real-vs-local write; this only controls whether the
+  // form/actions render at all.
+  const canSavePlacements = state.dataSource === "real";
   const editingPlacement =
     canManagePlacements && state.editingPlacementId ? getAllRealPlacements().find((p) => p.id === state.editingPlacementId) : null;
 
@@ -1708,27 +1713,33 @@ function renderPlacementsView() {
   if (canManagePlacements) {
     renderPlacementForm(document.getElementById("placement-form-wrap"), {
       initialData: editingPlacement,
-      onResearchRate: shouldUseOwnerApi() ? researchOutletRate : undefined,
-      onSuggestHeadline: shouldUseOwnerApi() ? suggestHeadline : undefined,
-      onAnalyzeSentiment: shouldUseOwnerApi() ? analyzeSentiment : undefined,
-      onFindPitchDate: shouldUseOwnerApi() ? findPitchDateInGmail : undefined,
+      onResearchRate: researchOutletRate,
+      onSuggestHeadline: suggestHeadline,
+      onAnalyzeSentiment: analyzeSentiment,
+      onFindPitchDate: findPitchDateInGmail,
       submitDisabledReason: shouldUseOwnerApi() ? "" : "Sign in with the live owner account to save placements.",
       knownClients: getRealClients().map((c) => c.name),
       onSubmit: async (rawData) => {
-        if (!canSavePlacements) {
-          alert("Sign in with the live owner account to save placements.");
-          return false;
-        }
         try {
-          if (editingPlacement) {
-            const saved = await saveRealPlacement({ raw: rawData, existingRecord: editingPlacement });
-            updatePlacement(saved);
-            state.editingPlacementId = null;
+          if (shouldUseOwnerApi()) {
+            if (editingPlacement) {
+              const saved = await saveRealPlacement({ raw: rawData, existingRecord: editingPlacement });
+              updatePlacement(saved);
+            } else {
+              const saved = await saveRealPlacement({ raw: rawData });
+              addPlacement(saved);
+            }
+            await syncOwnerRecordsFromSupabase({ force: true });
           } else {
-            const saved = await saveRealPlacement({ raw: rawData });
-            addPlacement(saved);
+            // Preview mode: same local-write path seedRealCaseStudyData.js
+            // and the campaign form already use — no Supabase round-trip.
+            if (editingPlacement) {
+              updatePlacement(applyPlacementEdit(editingPlacement, rawData));
+            } else {
+              addPlacement(createPlacement(rawData));
+            }
           }
-          await syncOwnerRecordsFromSupabase({ force: true });
+          state.editingPlacementId = null;
           renderPlacementsView();
           return true;
         } catch (err) {
