@@ -54,44 +54,6 @@
   </div>
 
   <script src="src/supabaseConfig.js"></script>
-  <script>
-    (() => {
-      const demoAccounts = {
-        "tenyse@verifiedconsulting.com": { email: "tenyse@verifiedconsulting.com", role: "owner", name: "Tenyse Williams" },
-        "hello@veganhood.com": { email: "hello@veganhood.com", role: "pr_client", clientId: "veganhood", name: "VeganHood" },
-        "hello@vegandiningmonth.com": { email: "hello@vegandiningmonth.com", role: "pr_client", clientId: "vegan-dining-month", name: "VegansBaby — Vegan Dining Month" },
-        "hello@snapco.com": { email: "hello@snapco.com", role: "pr_client", clientId: "snap-co", name: "SNAP Co." },
-        "hello@sunnysparkling.com": { email: "hello@sunnysparkling.com", role: "pr_client", clientId: "sunny-sparkling", name: "Sunny Sparkling Co." },
-        "hello@greyzbistro.com": { email: "hello@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
-        "chefgarth@greyzbistro.com": { email: "chefgarth@greyzbistro.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
-        "chefgarth@greyz.com": { email: "chefgarth@greyz.com", role: "pr_client", clientId: "greyz-bistro", name: "Greyz Bistro" },
-      };
-
-      document.addEventListener("click", (event) => {
-        const btn = event.target.closest("[data-email]");
-        if (!btn) return;
-        document.getElementById("email").value = btn.dataset.email;
-        document.getElementById("password").value = "demo";
-      });
-
-      document.getElementById("login-form").addEventListener("submit", (event) => {
-        const email = document.getElementById("email").value.trim().toLowerCase();
-        const account = demoAccounts[email];
-        if (!account) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        try {
-          localStorage.setItem("vc_session", JSON.stringify(account));
-        } catch {}
-        try {
-          sessionStorage.setItem("vc_session", JSON.stringify(account));
-        } catch {}
-        window.location.href = account.role === "owner"
-          ? "owner.html?demo=owner"
-          : `client.html?demo=${encodeURIComponent(account.clientId || account.email)}`;
-      }, true);
-    })();
-  </script>
   <script type="module" src="src/loginApp.js?v=20260918-real-auth-fix"></script>
 </body>
 </html>
