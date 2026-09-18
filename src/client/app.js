@@ -22,6 +22,7 @@ import { loadOpportunitiesForClient } from "../opportunityStorage.js";
 import { seedGreyzBistroCoachingData } from "../owner/seedGreyzBistroCoachingData.js?v=20260917-client-demo-1";
 import { averageScore, EVALUATION_CRITERIA } from "../opportunitySchema.js";
 import { calculateCoachingProgress, OPPORTUNITY_STATUS_LABELS } from "../coachingProgress.js";
+import { applyDemoMetricFallbacks } from "../demoFallbacks.js";
 import { escapeHtml } from "./utils.js";
 
 // ---------------------------------------------------------------------------
@@ -140,9 +141,9 @@ function getMetrics(clientId) {
     return emptyMetrics;
   }
   const snapshot = apiSnapshot();
-  if (snapshot) return snapshot.metrics;
-  if (state.dataSource === "real") return getRealMetrics(clientName);
-  return METRICS[clientId]?.["1y"] || emptyMetrics;
+  if (snapshot) return applyDemoMetricFallbacks(snapshot.metrics, { placements: snapshot.placements });
+  if (state.dataSource === "real") return applyDemoMetricFallbacks(getRealMetrics(clientName), { placements: getRealPlacements(clientName) });
+  return applyDemoMetricFallbacks(METRICS[clientId]?.["1y"] || emptyMetrics, { placements: PLACEMENTS[clientId] || [] });
 }
 
 function getPlacements(clientId) {

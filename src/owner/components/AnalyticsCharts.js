@@ -132,7 +132,9 @@ export function renderLeadTimeSection(container, leadTime) {
             max: Math.max(...byClient.map((x) => x.avgDays), 1),
             formatValue: (v) => `${v} day${v === 1 ? "" : "s"} avg`,
             color: "var(--color-navy)",
-            sublabel: `based on ${r.count} placement${r.count === 1 ? "" : "s"} with both a pitch and landed date`,
+            sublabel: r.sample
+              ? `Demo Day sample based on ${r.count} placement${r.count === 1 ? "" : "s"} missing pitch dates`
+              : `based on ${r.count} placement${r.count === 1 ? "" : "s"} with both a pitch and landed date`,
           })
         )
         .join("")}</div>`
@@ -141,11 +143,11 @@ export function renderLeadTimeSection(container, leadTime) {
   const gapNote = placementsMissingPitchDate
     ? `<div class="state-panel compact" style="margin-top:${byClient.length ? "16px" : "0"};">
          <h3>${placementsMissingPitchDate} of ${totalPlacements} placements have no pitch date on file</h3>
-         <p>Lead time can only be calculated where both a pitch date and a landed date exist. It is left blank rather than assumed for placements without one — an unknown turnaround is not the same as a fast one.</p>
+         <p>Google Workspace lead-time tracking is on hold until after Demo Day. The dashboard uses sample lead-time values where pitch dates are missing so every account can show the intended workflow.</p>
        </div>`
     : "";
 
-  container.innerHTML = rows || gapNote ? rows + gapNote : `<div class="state-panel compact"><h3>No lead time data yet</h3><p>Add a pitch date and a landed date to a placement to see turnaround time.</p></div>`;
+  container.innerHTML = rows || gapNote ? rows + gapNote : `<div class="state-panel compact"><h3>Demo lead time enabled</h3><p>Google Workspace tracking is deferred; sample lead-time values will appear once placements are available.</p></div>`;
 }
 
 // ---------------------------------------------------------------------------

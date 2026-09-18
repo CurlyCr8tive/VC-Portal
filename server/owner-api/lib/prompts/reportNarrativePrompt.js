@@ -22,6 +22,9 @@
 import { PLAIN_PROSE_RULES } from "./outputFormat.js";
 
 export function buildReportNarrativePrompt({ client, periodLabel, placements, campaignContext, notableDetails, totalAVE, totalReach, clientIndustry }) {
+  const safePlacements = Array.isArray(placements) ? placements : [];
+  const safeNotableDetails = Array.isArray(notableDetails) ? notableDetails : notableDetails ? [String(notableDetails)] : [];
+
   return `You are writing the fuller campaign narrative for ${client}'s report covering ${periodLabel} — this accompanies the report document itself, not the short dashboard summary card.
 
 Write in the register of Verified Consulting's real case studies: scene-setting and specific, naming real partners, outlets and moments rather than generic PR language. Still grounded strictly in the real data below; never invent an event, partner, or detail not listed.
@@ -32,8 +35,8 @@ If a figure is missing, say so plainly in the prose rather than working around i
 
 Campaign context: ${campaignContext}
 
-Real placements this period (${placements.length} total) — reference these specifically, don't generalize past them:
-${placements.map(p => `- ${p.publication}: "${p.headline}"${p.publicationDate ? ` (${p.publicationDate})` : ""}${p.audienceReach != null ? ` — reached ${p.audienceReach.toLocaleString()}` : ""}${p.sentiment ? `, ${p.sentiment} coverage` : ""}${p.articleUrl ? "" : " (no article link on file)"}`).join("\n")}
+Real placements this period (${safePlacements.length} total) — reference these specifically, don't generalize past them:
+${safePlacements.map(p => `- ${p.publication}: "${p.headline}"${p.publicationDate ? ` (${p.publicationDate})` : ""}${p.audienceReach != null ? ` — reached ${p.audienceReach.toLocaleString()}` : ""}${p.sentiment ? `, ${p.sentiment} coverage` : ""}${p.articleUrl ? "" : " (no article link on file)"}`).join("\n")}
 
 Campaign totals for this period:
 - Publicity value: ${totalAVE == null ? "not calculated yet — do not state or estimate a dollar figure" : `$${Number(totalAVE).toLocaleString()}`}
@@ -41,7 +44,7 @@ Campaign totals for this period:
 ${clientIndustry ? `- Client's sector: ${clientIndustry}` : ""}
 
 Notable details to weave in, if any (partnerships, events, named collaborators) — leave out entirely if none provided, do not invent a placeholder:
-${notableDetails && notableDetails.length ? notableDetails.map(d => `- ${d}`).join("\n") : "(none provided)"}
+${safeNotableDetails.length ? safeNotableDetails.map(d => `- ${d}`).join("\n") : "(none provided)"}
 
 Tone: confident storytelling, not a sales pitch — let the real placements and details carry the narrative rather than adjectives doing the work.
 ${PLAIN_PROSE_RULES}`;

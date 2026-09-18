@@ -16,14 +16,18 @@
 import { PLAIN_PROSE_RULES } from "./outputFormat.js";
 
 export function buildCampaignActivitySummaryPrompt({ client, campaignName, sinceDate, newPlacements, milestonesUpdated, recentNotes }) {
+  const safeNewPlacements = Array.isArray(newPlacements) ? newPlacements : [];
+  const safeMilestonesUpdated = Array.isArray(milestonesUpdated) ? milestonesUpdated : [];
+  const safeRecentNotes = Array.isArray(recentNotes) ? recentNotes : [];
+
   return `You are drafting a short campaign activity update for ${client}'s "${campaignName}" campaign, covering activity since ${sinceDate}.
 
 This is NOT the period-end executive summary — it's a brief, near-real-time check-in so a quiet week never reads as silence. Keep it to 2-3 sentences, conversational, not report-formal.
 
 Real activity since ${sinceDate} — use ONLY what's listed here, never invent outreach, pitches, or conversations not shown:
-- New placements landed (${newPlacements.length}): ${newPlacements.length ? newPlacements.map(p => `${p.publication} — ${p.headline}`).join("; ") : "none"}
-- Milestones updated (${milestonesUpdated.length}): ${milestonesUpdated.length ? milestonesUpdated.map(m => m.text).join("; ") : "none"}
-- Recent notes exchanged (${recentNotes.length}): ${recentNotes.length ? recentNotes.map(n => `${n.authorRole}: "${n.body}"`).join(" | ") : "none"}
+- New placements landed (${safeNewPlacements.length}): ${safeNewPlacements.length ? safeNewPlacements.map(p => `${p.publication} — ${p.headline}`).join("; ") : "none"}
+- Milestones updated (${safeMilestonesUpdated.length}): ${safeMilestonesUpdated.length ? safeMilestonesUpdated.map(m => m.text).join("; ") : "none"}
+- Recent notes exchanged (${safeRecentNotes.length}): ${safeRecentNotes.length ? safeRecentNotes.map(n => `${n.authorRole}: "${n.body}"`).join(" | ") : "none"}
 
 If there is genuinely no activity to report, say that plainly and briefly — something like ongoing outreach continuing behind the scenes — rather than inventing progress or padding silence into false momentum. A quiet week described honestly is more trustworthy than a vague one dressed up as busy.
 ${PLAIN_PROSE_RULES}`;

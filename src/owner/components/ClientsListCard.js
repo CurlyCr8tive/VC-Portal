@@ -168,7 +168,7 @@ export function renderClientsList(
         if (!startTime) return;
 
         btn.disabled = true;
-        statusEl.textContent = "Creating calendar event...";
+        statusEl.textContent = "Scheduling meeting...";
         try {
           const result = await onScheduleMeeting({
             clientName: client?.name,
@@ -177,9 +177,11 @@ export function renderClientsList(
             startDate,
             startTime,
           });
-          statusEl.innerHTML = result.ok && result.htmlLink
-            ? `Created: <a href="${escapeHtml(result.htmlLink)}" target="_blank" rel="noopener">open event</a>`
-            : `Could not create event: ${escapeHtml(result.message || "Google Calendar is not connected.")}`;
+          statusEl.innerHTML = result.ok
+            ? result.htmlLink
+              ? `Created: <a href="${escapeHtml(result.htmlLink)}" target="_blank" rel="noopener">open event</a>`
+              : escapeHtml(result.message || "Demo meeting scheduled.")
+            : `Could not schedule: ${escapeHtml(result.message || "Google Calendar is deferred until after Demo Day.")}`;
         } catch (err) {
           statusEl.textContent = `Could not create event: ${err.message || "Google Calendar failed."}`;
         } finally {

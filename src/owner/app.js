@@ -54,6 +54,7 @@ import { createPhase, applyPhaseEdit, addHomeworkItem, updateHomeworkStatus, res
 import { createOpportunity, applyOpportunityEdit } from "../opportunitySchema.js";
 import { createResource, applyResourceEdit } from "../coachingResourceSchema.js";
 import { calculateCoachingProgress } from "../coachingProgress.js";
+import { applyDemoMetricFallbacks } from "../demoFallbacks.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
@@ -211,24 +212,21 @@ function getAggregateMetrics() {
   if (state.demoState === "empty") {
     return { totalAVE: 0, totalPlacements: 0, avgLeadTime: 0, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
   }
-  if (state.dataSource === "real") return getAggregateRealMetrics();
+  if (state.dataSource === "real") return applyDemoMetricFallbacks(getAggregateRealMetrics(), { placements: getAllRealPlacements() });
   const perClient = CLIENTS.map((c) => METRICS[c.id]["1y"]);
   const totalAVE = perClient.reduce((sum, m) => sum + (m.totalAVE || 0), 0);
   const totalPlacements = perClient.reduce((sum, m) => sum + (m.totalPlacements || 0), 0);
   const activeCampaigns = perClient.reduce((sum, m) => sum + m.activeCampaigns, 0);
-  // Real case-study source material (see mockData.js) doesn't report a lead
-  // time for several clients — `avgLeadTime: null` there means "unknown,"
-  // not "zero days." Weighting null as 0 here would fabricate a false
-  // signal (dragging the aggregate toward "0 days" in proportion to real
-  // placement counts), so those clients are excluded from this average
-  // entirely rather than silently counted as instant turnaround.
+  // Case-study source material did not always report lead time. For Demo Day,
+  // applyDemoMetricFallbacks() fills those gaps with sample values after this
+  // aggregate preserves whatever real lead-time values do exist.
   const clientsWithLeadTime = perClient.filter((m) => m.avgLeadTime != null);
   const leadTimeWeight = clientsWithLeadTime.reduce((sum, m) => sum + m.totalPlacements, 0);
   const weightedLeadTime = leadTimeWeight
     ? clientsWithLeadTime.reduce((sum, m) => sum + m.avgLeadTime * m.totalPlacements, 0) / leadTimeWeight
     : null;
   const avg = (key) => perClient.reduce((sum, m) => sum + m[key], 0) / perClient.length;
-  return {
+  return applyDemoMetricFallbacks({
     totalAVE,
     totalPlacements,
     avgLeadTime: weightedLeadTime != null ? Math.round(weightedLeadTime) : null,
@@ -236,7 +234,7 @@ function getAggregateMetrics() {
     aveDelta: Math.round(avg("aveDelta")),
     placementsDelta: Math.round(avg("placementsDelta")),
     leadTimeDelta: Math.round(avg("leadTimeDelta")),
-  };
+  }, { placementCount: totalPlacements });
 }
 
 function getAggregateChartSeries(range) {
@@ -328,7 +326,8 @@ function getDashboardPlacements() {
  */
 function computeFilteredMetrics(placements) {
   const confirmed = placements.filter((p) => Boolean(p.landedDate));
-  const totalAVE = confirmed.reduce((sum, p) => sum + (p.aveValue || 0), 0);
+  const withAve = confirmed.filter((p) => p.aveValue != null);
+  const totalAVE = withAve.length ? withAve.reduce((sum, p) => sum + p.aveValue, 0) : null;
   const leadTimes = placements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
   const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : null;
 
@@ -337,7 +336,7 @@ function computeFilteredMetrics(placements) {
     return c.status === "active";
   }).length;
 
-  return {
+  return applyDemoMetricFallbacks({
     totalAVE,
     totalPlacements: placements.length,
     avgLeadTime,
@@ -349,7 +348,7 @@ function computeFilteredMetrics(placements) {
     aveDelta: null,
     placementsDelta: null,
     leadTimeDelta: null,
-  };
+  }, { placements });
 }
 
 /** Real placements grouped by publication month — no invented weekly/quarterly buckets, just what actually happened. */
@@ -654,7 +653,7 @@ function renderOwnerMetrics(container, metrics) {
     ${ownerMetricCard({
       label: "Avg. Lead Time",
       value: metrics.avgLeadTime != null ? `${metrics.avgLeadTime} days` : "—",
-      note: metrics.leadTimeDelta != null ? `${metrics.leadTimeDelta < 0 ? "" : "+"}${metrics.leadTimeDelta} days vs prior period` : "Needs pitch + landed dates",
+      note: metrics.leadTimeDelta != null ? `${metrics.leadTimeDelta < 0 ? "" : "+"}${metrics.leadTimeDelta} days vs prior period` : "Demo lead-time model",
       icon: "◷",
       iconBg: "#fdf0d8",
       tooltip: "Days between pitch sent date and landed date.",
@@ -1537,6 +1536,13 @@ async function findPitchDateInGmail({ clientName, publication, headline }) {
 }
 
 async function scheduleClientMeeting({ clientName, contactEmail, notes, startDate, startTime }) {
+  if (!shouldUseOwnerApi()) {
+    return {
+      ok: true,
+      demo: true,
+      message: `Demo meeting scheduled for ${clientName || "this client"} on ${startDate} at ${startTime}. Google Calendar connection is deferred until after Demo Day.`,
+    };
+  }
   try {
     const result = await ownerApi("/api/google/calendar/events", {
       method: "POST",
@@ -1554,7 +1560,7 @@ async function loadGoogleWorkspaceStatus() {
   if (!statusEl) return;
 
   if (!shouldUseOwnerApi()) {
-    statusEl.textContent = "Sign in with Tenyse's owner account to check the live Google Workspace connection.";
+    statusEl.textContent = "Deferred for Demo Day. Gmail, Calendar, and automated lead-time tracking will be connected after the presentation; sample lead-time data is active now.";
     return;
   }
 
@@ -1566,7 +1572,7 @@ async function loadGoogleWorkspaceStatus() {
       return;
     }
     statusEl.innerHTML =
-      "<strong>Not connected:</strong> add Google OAuth credentials with Gmail read, Gmail send, and Calendar event scopes before using Gmail search or scheduling.";
+      "<strong>Deferred until after Demo Day:</strong> sample lead-time data is active now. Add Google OAuth credentials later for Gmail search, note notifications, and Calendar scheduling.";
   } catch (err) {
     statusEl.textContent = `Could not check Google Workspace status: ${err.message}`;
   }
@@ -1660,7 +1666,7 @@ function renderClientsView() {
           }
         : undefined,
     onDiscoveryScan: discoveryScanClient,
-    onScheduleMeeting: shouldUseOwnerApi() ? scheduleClientMeeting : undefined,
+    onScheduleMeeting: scheduleClientMeeting,
     onViewCoaching: (clientName) => {
       state.coachingSelectedClient = clientName;
       navigate("coaching");
@@ -2599,7 +2605,7 @@ function renderSettingsView() {
   document.getElementById("settings-content").innerHTML = `
     <div class="section-heading"><h2>Settings</h2></div>
     <div class="card">
-      <p>Platform preferences and connected services live here. Google Workspace status appears below once the owner is signed in with the live owner account.</p>
+      <p>Platform preferences and connected services live here. Google Workspace is intentionally deferred until after Demo Day; the build uses sample lead-time data for the walkthrough.</p>
     </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Outlet Rates</h2></div>
     <div class="card">
@@ -2618,13 +2624,13 @@ function renderSettingsView() {
     }
     <div class="section-heading" style="margin-top:24px;"><h2>Google Workspace</h2></div>
     <div class="card">
-      <p style="margin:0 0 10px;">Connect Tenyse's Google Workspace account to support Gmail-based pitch-date lookup, client note notifications, and Calendar scheduling.</p>
-      <p class="hint" style="margin:0 0 10px;">If Google Workspace is not connected yet, the portal will show a clear connection status before anyone tries to search Gmail or schedule a meeting.</p>
-      <p id="google-workspace-status" class="hint" style="margin:0 0 10px;">Checking Google Workspace connection...</p>
+      <p style="margin:0 0 10px;">Google Workspace connection is on hold until after Demo Day.</p>
+      <p class="hint" style="margin:0 0 10px;">For the demo, lead time uses sample values and meeting scheduling shows a walkthrough confirmation instead of creating a real Calendar event.</p>
+      <p id="google-workspace-status" class="hint" style="margin:0 0 10px;">Google Workspace deferred; sample data active.</p>
       <ul style="margin:0; padding-left:18px; color:var(--text-secondary); font-size:0.86rem;">
-        <li>Client note notifications: sends Tenyse an email when a client leaves a campaign note.</li>
-        <li>Client meeting scheduling: creates a Google Calendar event and invites the saved client contact.</li>
-        <li>Lead time support: searches Gmail for pitch evidence and fills the placement's Pitch Sent Date when a match is found.</li>
+        <li>Client note notifications: post-demo Gmail connection.</li>
+        <li>Client meeting scheduling: demo confirmation now, real Google Calendar event post-demo.</li>
+        <li>Lead time support: sample values now, Gmail pitch-date lookup post-demo.</li>
       </ul>
     </div>
     ${
@@ -2786,34 +2792,30 @@ function renderCampaignDetailView() {
         alert(err.message);
       }
     },
-    onGenerateActivitySummary: shouldUseOwnerApi()
-      ? ({ campaign: camp, placements: campPlacements, notes }) => {
-          // "Since" the campaign's own start date if known, otherwise a
-          // rolling 7 days — either way, real placements/notes are filtered
-          // by an actual date, never just "everything ever," matching the
-          // prompt's own "near-real-time check-in" framing.
-          const sinceDate = camp.startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-          const newPlacements = campPlacements.filter((p) => p.landedDate && p.landedDate >= sinceDate);
-          return generateAIText("campaign-activity-summary", {
-            client: camp.clientName,
-            campaignName: camp.name,
-            sinceDate,
-            newPlacements,
-            milestonesUpdated: [], // no per-milestone timestamp exists yet to say which changed "since" a date
-            recentNotes: notes,
-          });
-        }
-      : undefined,
-    onGeneratePitchSuggestions: shouldUseOwnerApi()
-      ? ({ campaign: camp, placements: campPlacements, targetOutlet }) =>
-          generateAIText("language-suggestions", {
-            mode: "pitch",
-            client: camp.clientName,
-            targetOutlet,
-            campaignAngle: camp.name,
-            existingCoverage: campPlacements.filter((p) => p.landedDate),
-          })
-      : undefined,
+    onGenerateActivitySummary: ({ campaign: camp, placements: campPlacements, notes }) => {
+      // "Since" the campaign's own start date if known, otherwise a
+      // rolling 7 days — either way, real placements/notes are filtered
+      // by an actual date, never just "everything ever," matching the
+      // prompt's own "near-real-time check-in" framing.
+      const sinceDate = camp.startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const newPlacements = campPlacements.filter((p) => p.landedDate && p.landedDate >= sinceDate);
+      return generateAIText("campaign-activity-summary", {
+        client: camp.clientName,
+        campaignName: camp.name,
+        sinceDate,
+        newPlacements,
+        milestonesUpdated: [], // no per-milestone timestamp exists yet to say which changed "since" a date
+        recentNotes: notes,
+      });
+    },
+    onGeneratePitchSuggestions: ({ campaign: camp, placements: campPlacements, targetOutlet }) =>
+      generateAIText("language-suggestions", {
+        mode: "pitch",
+        client: camp.clientName,
+        targetOutlet,
+        campaignAngle: camp.name,
+        existingCoverage: campPlacements.filter((p) => p.landedDate),
+      }),
   });
 }
 

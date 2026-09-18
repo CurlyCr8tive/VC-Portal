@@ -20,6 +20,9 @@
 import { PLAIN_PROSE_RULES } from "./outputFormat.js";
 
 export function buildExecutiveSummaryPrompt({ client, periodLabel, placements, totalAVE, totalReach, campaignContext, clientIndustry, notableDetails }) {
+  const safePlacements = Array.isArray(placements) ? placements : [];
+  const safeNotableDetails = Array.isArray(notableDetails) ? notableDetails : notableDetails ? [String(notableDetails)] : [];
+
   return `You are drafting a press coverage executive summary for ${client}, covering ${periodLabel}.
 
 Follow this exact structure, matching how Verified Consulting's real reports are written:
@@ -35,10 +38,10 @@ Use this exact terminology, not generic alternatives:
 Real data for this period — use ONLY these numbers, never estimate or invent a figure not listed here:
 - Total Publicity Value: ${totalAVE == null ? "not calculated yet — do not state or estimate a dollar figure" : totalAVE}
 - Total Audience Reach: ${totalReach}
-- Placements (${placements.length} total), with everything known about each:
-${placements.map(p => `  • ${p.publication} — "${p.headline}"${p.publicationDate ? ` (published ${p.publicationDate})` : ""}${p.audienceReach != null ? `, audience reach ${p.audienceReach.toLocaleString()}` : ""}${p.aveValue != null ? `, publicity value $${p.aveValue.toLocaleString()}` : ""}${p.sentiment ? `, coverage tone ${p.sentiment}` : ""}`).join("\n")}
+- Placements (${safePlacements.length} total), with everything known about each:
+${safePlacements.map(p => `  • ${p.publication} — "${p.headline}"${p.publicationDate ? ` (published ${p.publicationDate})` : ""}${p.audienceReach != null ? `, audience reach ${p.audienceReach.toLocaleString()}` : ""}${p.aveValue != null ? `, publicity value $${p.aveValue.toLocaleString()}` : ""}${p.sentiment ? `, coverage tone ${p.sentiment}` : ""}`).join("\n")}
 ${clientIndustry ? `- Client's sector: ${clientIndustry}` : ""}
-${notableDetails && notableDetails.length ? `- Specifics worth naming (real, drawn from the campaign record — use them, don't generalise past them):\n${notableDetails.map(d => `  • ${d}`).join("\n")}` : ""}
+${safeNotableDetails.length ? `- Specifics worth naming (real, drawn from the campaign record — use them, don't generalise past them):\n${safeNotableDetails.map(d => `  • ${d}`).join("\n")}` : ""}
 
 Tone: confident and results-forward, the way a strategist reports to a client who's paying for outcomes — not generic marketing copy.
 

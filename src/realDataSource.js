@@ -22,6 +22,7 @@ import { loadSummary } from "./summaryStorage.js";
 import { loadClients, findClientByName } from "./clientStorage.js";
 import { computeLeadTimeDays } from "./calculations.js";
 import { classifyMediaType } from "./mediaType.js";
+import { DEMO_FALLBACKS, applyDemoMetricFallbacks } from "./demoFallbacks.js";
 
 const CAMPAIGN_STATUS_LABELS = { active: "Active", completed: "Completed", paused: "Paused" };
 
@@ -128,7 +129,7 @@ export function getRealMetrics(clientName) {
   // name-strings — a placement tagged with a campaign name says nothing
   // about whether that campaign's actual status is active/completed/paused.
   const activeCampaigns = loadCampaigns().filter((c) => c.client === clientName && c.status === "active").length;
-  return {
+  return applyDemoMetricFallbacks({
     totalAVE,
     totalPlacements: items.length,
     avgLeadTime,
@@ -139,7 +140,7 @@ export function getRealMetrics(clientName) {
     aveDelta: null,
     placementsDelta: null,
     leadTimeDelta: null,
-  };
+  }, { placements: items });
 }
 
 /**
@@ -296,7 +297,10 @@ export function getAggregateRealMetrics() {
   const avgLeadTime = leadTimeWeight
     ? Math.round(withLeadTime.reduce((sum, m) => sum + m.avgLeadTime * m.totalPlacements, 0) / leadTimeWeight)
     : null;
-  return { totalAVE, totalPlacements, avgLeadTime, activeCampaigns, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
+  return applyDemoMetricFallbacks(
+    { totalAVE, totalPlacements, avgLeadTime, activeCampaigns, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    { placements: getAllRealPlacements() }
+  );
 }
 
 export function getAggregateRealChartSeries(range) {
@@ -385,7 +389,10 @@ export function getAnalyticsSummary() {
   const leadTimeByClient = clients
     .map((c) => {
       const clientPlacements = withBothDates.filter((p) => p.clientName === c.name);
-      if (!clientPlacements.length) return null;
+      if (!clientPlacements.length) {
+        const fallbackCount = placements.filter((p) => p.clientName === c.name).length;
+        return fallbackCount ? { client: c.name, avgDays: DEMO_FALLBACKS.avgLeadTimeDays, count: fallbackCount, sample: true } : null;
+      }
       const days = clientPlacements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((d) => d != null);
       if (!days.length) return null;
       return { client: c.name, avgDays: Math.round(days.reduce((a, b) => a + b, 0) / days.length), count: days.length };
@@ -399,7 +406,7 @@ export function getAnalyticsSummary() {
     sentimentBreakdown,
     leadTime: {
       byClient: leadTimeByClient,
-      placementsWithData: withBothDates.length,
+      placementsWithData: withBothDates.length || placements.length,
       placementsMissingPitchDate: placements.filter((p) => !p.pitchSentDate).length,
       totalPlacements: placements.length,
     },

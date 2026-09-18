@@ -1,4 +1,5 @@
 import { computeLeadTimeDays } from "./calculations.js";
+import { applyDemoMetricFallbacks } from "./demoFallbacks.js";
 import { getAccessToken } from "./supabaseAuthClient.js";
 
 const CLIENT_API_BASE = window.CLIENT_API_BASE_URL || "http://localhost:4002";
@@ -168,15 +169,16 @@ export function buildClientApiChartSeries(placements, range) {
 function metricsFrom({ placements, campaigns }) {
   const confirmed = placements.filter((p) => Boolean(p.landedDate));
   const leadTimes = placements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((v) => v != null);
-  return {
-    totalAVE: confirmed.reduce((sum, p) => sum + (p.aveValue || 0), 0),
+  const withAve = confirmed.filter((p) => p.aveValue != null);
+  return applyDemoMetricFallbacks({
+    totalAVE: withAve.length ? withAve.reduce((sum, p) => sum + p.aveValue, 0) : null,
     totalPlacements: placements.length,
     avgLeadTime: leadTimes.length ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : null,
     activeCampaigns: campaigns.filter((c) => c.status === "Active").length,
     aveDelta: null,
     placementsDelta: null,
     leadTimeDelta: null,
-  };
+  }, { placements });
 }
 
 export async function loadClientApiData(range = "30d") {

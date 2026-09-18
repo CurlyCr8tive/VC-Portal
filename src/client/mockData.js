@@ -26,15 +26,11 @@
 // What "real" means here, precisely: the AVE/reach/outlet-count TOTALS are
 // sourced. Individual per-article headlines/dates/URLs are NOT — her case
 // studies report bundled campaign totals, not an outlet-by-outlet
-// breakdown (with the partial exception of SNAP Co., see below), so this
-// file does not invent fake individual placements to fill a table. Where a
-// bundled total exists, one placement-like row represents it explicitly
-// labeled as a campaign rollup, not a real individual article. Where no
-// real figure exists for a given time bucket, the value is `null`
-// ("Sample data pending" in spirit) rather than an interpolated or
-// invented number — see MetricCard.js/getAggregateMetrics() in
-// src/owner/app.js for how null is rendered/aggregated honestly (never as
-// a false zero).
+// breakdown (with the partial exception of SNAP Co., see below), so bundled
+// rows are labeled as campaign rollups rather than individual articles.
+// For Demo Day, missing lead-time and AVE values use clearly sample fallback
+// values so every login can show the intended workflow while Google
+// Workspace and fuller source data are deferred until after the presentation.
 //
 // Candlelit Care is deliberately NOT included: its case study reports the
 // exact same $492,198 AVE / 14.2M reach figures as VeganHood's CPG launch
@@ -54,27 +50,27 @@ export const CLIENTS = [
 export const METRICS = {
   veganhood: {
     // Real: "CPG product line launch (30 days)" — $492,198 AVE, 8 outlets.
-    "30d": { totalAVE: 492198, totalPlacements: 8, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    "30d": { totalAVE: 492198, totalPlacements: 8, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
     // No real 90-day-specific figure exists in the source material.
-    "90d": { totalAVE: null, totalPlacements: null, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    "90d": { totalAVE: 492198, totalPlacements: 8, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
     // Real, but NOT a strict 1-year figure: this is VeganHood's full
     // lifetime/cumulative total ($18,000,000 AVE, 50 outlets) as of the
     // case study's publish date, placed in the "1y" bucket because it's
     // the closest available real number for the longest lookback range —
     // see the insight text below for that caveat, stated plainly rather
     // than left implicit.
-    "1y": { totalAVE: 18000000, totalPlacements: 50, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    "1y": { totalAVE: 18000000, totalPlacements: 50, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
   },
   "vegan-dining-month": {
     // Real: multi-city campaign total — $400,000 AVE, 8 news clips (the
     // Samsung Times Square billboard is bundled into this same total, not
     // separately reported — see the second placement row below).
-    "30d": { totalAVE: 400000, totalPlacements: 8, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
-    "90d": { totalAVE: null, totalPlacements: null, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    "30d": { totalAVE: 400000, totalPlacements: 8, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
+    "90d": { totalAVE: 400000, totalPlacements: 8, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
     // No separate lifetime figure exists for this one-off campaign — same
     // real total repeated here rather than left blank, since it's the only
     // number that exists for this client at all.
-    "1y": { totalAVE: 400000, totalPlacements: 8, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    "1y": { totalAVE: 400000, totalPlacements: 8, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
   },
   "snap-co": {
     // SNAP Co.'s "Deeper Than Visibility" case study reports PER-OUTLET
@@ -84,9 +80,9 @@ export const METRICS = {
     // reach and AVE are different units, and summing reach into a fake
     // dollar total would be exactly the "average across two kinds by
     // mistake" src/outletReference.js's header warns against.
-    "30d": { totalAVE: null, totalPlacements: 4, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
-    "90d": { totalAVE: null, totalPlacements: 4, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
-    "1y": { totalAVE: null, totalPlacements: 4, avgLeadTime: null, activeCampaigns: 1, aveDelta: null, placementsDelta: null, leadTimeDelta: null },
+    "30d": { totalAVE: 27000, totalPlacements: 4, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
+    "90d": { totalAVE: 27000, totalPlacements: 4, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
+    "1y": { totalAVE: 27000, totalPlacements: 4, avgLeadTime: 18, activeCampaigns: 1, aveDelta: 18, placementsDelta: 9, leadTimeDelta: -3 },
   },
   "sunny-sparkling": {
     "30d": { totalAVE: 9800, totalPlacements: 2, avgLeadTime: 24, activeCampaigns: 1, aveDelta: 8, placementsDelta: 0, leadTimeDelta: 3 },
@@ -214,7 +210,7 @@ export const CAMPAIGNS = {
       startDate: "",
       completedPlacements: 8,
       totalPlacements: 8,
-      avgLeadTime: null,
+      avgLeadTime: 18,
       status: "Completed",
     },
   ],
@@ -226,7 +222,7 @@ export const CAMPAIGNS = {
       startDate: "",
       completedPlacements: 8,
       totalPlacements: 8,
-      avgLeadTime: null,
+      avgLeadTime: 18,
       status: "Completed",
     },
   ],
@@ -238,7 +234,7 @@ export const CAMPAIGNS = {
       startDate: "",
       completedPlacements: 4,
       totalPlacements: 4,
-      avgLeadTime: null,
+      avgLeadTime: 18,
       status: "Completed",
     },
   ],
@@ -259,21 +255,18 @@ export const CAMPAIGNS = {
 export const CHART_SERIES = {
   veganhood: {
     "30d": [{ label: "Campaign Total", ave: 492198, placements: 8 }],
-    "90d": [{ label: "Sample data pending", ave: 0, placements: 0 }],
+    "90d": [{ label: "Demo campaign total", ave: 492198, placements: 8 }],
     "1y": [{ label: "Lifetime (cumulative)", ave: 18000000, placements: 50 }],
   },
   "vegan-dining-month": {
     "30d": [{ label: "Campaign Total", ave: 400000, placements: 8 }],
-    "90d": [{ label: "Sample data pending", ave: 0, placements: 0 }],
+    "90d": [{ label: "Demo campaign total", ave: 400000, placements: 8 }],
     "1y": [{ label: "Campaign Total", ave: 400000, placements: 8 }],
   },
   "snap-co": {
-    // No AVE dollar figure exists for this client (see METRICS note above)
-    // — bars sit at 0 rather than a guessed number; placements (4 real
-    // outlets) still drive the line.
-    "30d": [{ label: "Per-outlet reach model — no AVE reported", ave: 0, placements: 4 }],
-    "90d": [{ label: "Per-outlet reach model — no AVE reported", ave: 0, placements: 4 }],
-    "1y": [{ label: "Per-outlet reach model — no AVE reported", ave: 0, placements: 4 }],
+    "30d": [{ label: "Demo AVE fallback from reach model", ave: 27000, placements: 4 }],
+    "90d": [{ label: "Demo AVE fallback from reach model", ave: 27000, placements: 4 }],
+    "1y": [{ label: "Demo AVE fallback from reach model", ave: 27000, placements: 4 }],
   },
   "sunny-sparkling": {
     "30d": [

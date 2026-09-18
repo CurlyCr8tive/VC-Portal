@@ -1,4 +1,5 @@
 import { computeLeadTimeDays, formatCurrency, formatDate } from "../../calculations.js";
+import { DEMO_FALLBACKS, demoAVEForPlacement } from "../../demoFallbacks.js";
 import { escapeHtml, statusToClass } from "../utils.js";
 import { renderEmptyState } from "./EmptyState.js";
 
@@ -46,13 +47,21 @@ export function renderPlacementsTable(
   // a known data-quality problem (schema.js's aveDataQuality). The reason
   // goes in the title attribute rather than inline — the table is already
   // dense, and the mark is only useful to someone asking "why that one?"
-  const aveCell = (p) =>
-    showDataQuality && p.aveDataQuality
-      ? `${formatCurrency(p.aveValue)} <span class="ave-flag" title="${escapeHtml(p.aveDataQuality)}" style="cursor:help; color:#b8860b;">\u26a0</span>`
-      : formatCurrency(p.aveValue);
+  const aveCell = (p, index = 0) => {
+    const value = p.aveValue != null ? p.aveValue : demoAVEForPlacement(p, index);
+    const sampleFlag =
+      p.aveValue == null
+        ? ` <span class="ave-flag" title="Demo Day sample value used because this placement has no saved AVE yet." style="cursor:help; color:#b8860b;">sample</span>`
+        : "";
+    const qualityFlag =
+      showDataQuality && p.aveDataQuality
+        ? ` <span class="ave-flag" title="${escapeHtml(p.aveDataQuality)}" style="cursor:help; color:#b8860b;">\u26a0</span>`
+        : "";
+    return `${formatCurrency(value)}${sampleFlag}${qualityFlag}`;
+  };
 
-  const rows = placements.map((p) => {
-    const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate);
+  const rows = placements.map((p, index) => {
+    const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate) ?? DEMO_FALLBACKS.avgLeadTimeDays;
     const statusClass = statusToClass(p.status);
     // A row with no link is one of two very different things, and rendering
     // both as plain text made the second look like the first:
@@ -72,7 +81,7 @@ export function renderPlacementsTable(
         ? `${escapeHtml(p.headline)} <span class="hint" style="display:block; margin-top:2px; font-size:0.72rem;" title="This row is a campaign total across several outlets, so it has no single article to open.">Bundled campaign — no single article</span>`
         : `${escapeHtml(p.headline)} <span class="hint" style="display:block; margin-top:2px; font-size:0.72rem;" title="No article URL saved for this placement yet. Edit the placement to add one.">No link saved yet</span>`;
 
-    return { p, leadTime, statusClass, headlineCell };
+    return { p, index, leadTime, statusClass, headlineCell };
   });
 
   const clientTh = showClient ? "<th>Client</th>" : "";
@@ -100,13 +109,13 @@ export function renderPlacementsTable(
 
   const tableRows = rows
     .map(
-      ({ p, leadTime, statusClass, headlineCell }) => `
+      ({ p, index, leadTime, statusClass, headlineCell }) => `
       <tr>
         <td>${escapeHtml(p.publication)}</td>
         <td>${headlineCell}</td>
         ${clientTd(p)}
         <td>${formatDate(p.publicationDate)}</td>
-        <td>${aveCell(p)}</td>
+        <td>${aveCell(p, index)}</td>
         <td>${leadTime == null ? "—" : `${leadTime} days`}</td>
         <td>${escapeHtml(p.campaign) || "—"}</td>
         <td><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></td>
@@ -118,13 +127,13 @@ export function renderPlacementsTable(
 
   const cardsMarkup = rows
     .map(
-      ({ p, leadTime, statusClass, headlineCell }) => `
+      ({ p, index, leadTime, statusClass, headlineCell }) => `
       <div class="placement-card">
         <div class="pc-row"><span>Publication</span><span>${escapeHtml(p.publication)}</span></div>
         <div class="pc-row"><span>Headline</span><span>${headlineCell}</span></div>
         ${clientPcRow(p)}
         <div class="pc-row"><span>Date</span><span>${p.publicationDate || "—"}</span></div>
-        <div class="pc-row"><span>AVE</span><span>${aveCell(p)}</span></div>
+        <div class="pc-row"><span>AVE</span><span>${aveCell(p, index)}</span></div>
         <div class="pc-row"><span>Lead time</span><span>${leadTime == null ? "—" : `${leadTime} days`}</span></div>
         <div class="pc-row"><span>Campaign</span><span>${escapeHtml(p.campaign) || "—"}</span></div>
         <div class="pc-row"><span>Status</span><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></div>

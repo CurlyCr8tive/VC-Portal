@@ -44,11 +44,11 @@ These must be true before invites, Discovery scans, AI helpers, AVE research, Go
 - AI writing helpers: verified through the authenticated owner API — **but via the GPT fallback, not Claude.** `ANTHROPIC_API_KEY` returns `401 API key is invalid` (re-confirmed live Sep 17). All five prompt types return real content, so the feature works; it is simply not running on the intended provider. `generateText()` now returns `fellBackFrom` and the route logs a warning when this happens, so the downgrade is visible instead of silent. Replace the key in **both** `server/owner-api/.env` and `server/client-api/.env` (it is missing entirely from the latter).
 - AVE rate research: verified through the authenticated owner API.
 - Campaign/placement live saves: verified through authenticated create/read/delete API smoke test.
-- Google Workspace: not activated yet because the Google OAuth client ID, client secret, and refresh token are not connected.
+- Google Workspace: intentionally deferred until after Demo Day. The portal uses sample lead-time values and demo-safe meeting confirmations during the presentation.
 - `APP_BASE_URL`: unset in both API `.env` files, so it silently falls back to `localhost:8420`. Client invite emails will point at localhost until this is set to the deployed domain.
 - Live data gap (Sep 17): the `placements` table held 4 rows while the browser held 15 — the case-study coverage lived in localStorage only. `scripts/seed-supabase-from-case-studies.mjs` migrates it, and also seeds `outlet_rates`, which was empty. Requires `db/migrations/2026-09-17-placement-ave-data-quality.sql` to be run first.
 - Supabase project ownership: **confirmed Sep 17, 2026.** Project `bjdzbyfxelshyxoswykk` is in Tenyse's own account, and all three config points (`src/supabaseConfig.js` anon key, both API `.env` service-role keys) already point at it and match. Foundation requirement #1 is satisfied. Earlier notes describing this as a temp/builder-owned project were wrong.
-- Demo vs live divergence: ~15 interactive features are hidden behind `shouldUseOwnerApi()` on the mock login (invite, discovery scan, schedule meeting, rate research, headline suggestions, sentiment analysis, Gmail pitch lookup, coaching saves, campaign/placement saves). Demo mode therefore shows a materially different product than the live one — this has already caused a working feature to be misdiagnosed as broken.
+- Demo vs live divergence: reduced. Discovery scans, AVE rate research, report generation, campaign activity summaries, and pitch/language helpers now use the local-demo owner API path when `ALLOW_LOCAL_DEMO_AUTH=true`. Remaining intentional differences are live-account features that write to or depend on real external accounts: client invites, Google Calendar scheduling, Gmail/Calendar lookup, and Supabase-backed live saves. Keep checking this list during QA so preview mode does not hide a feature that could safely run there.
 
 ## Client Invites
 
@@ -179,7 +179,7 @@ The refresh token must be authorized by Tenyse's Google account with:
 
 ### Demo Day Workaround
 
-Show the fields and status area, but do not claim Gmail/Calendar automation is live until the OAuth credentials are connected.
+For Demo Day, show sample lead-time values and demo-safe scheduling confirmations. Do not claim Gmail/Calendar automation is live until the OAuth credentials are connected after the presentation.
 
 ## Live Saves
 
