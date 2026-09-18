@@ -291,6 +291,13 @@ export function renderPlacementForm(
           <ul style="margin:8px 0 0; padding-left:18px; font-size:0.78rem; color:var(--text-secondary);">
             ${AVE_BENCHMARKS.map((b) => `<li>${escapeHtml(b.type)}: ${escapeHtml(b.range)}</li>`).join("")}
           </ul>
+          <p style="margin:10px 0 0; font-size:0.74rem; color:var(--text-secondary); line-height:1.5;">
+            <strong>There is no industry standard for AVE.</strong> The Barcelona Principles (AMEC, V4.0) state that
+            AVE measures the cost of media space, not the value of coverage, and advise against using it. The two
+            PR platforms that still publish a formula disagree by about 11x on the same outlet, which is why
+            estimates here are shown as a range. Figures are defensible as "the method Muck Rack and Agility PR
+            publish" — not as an industry standard.
+          </p>
         </details>
         ${
           onResearchRate

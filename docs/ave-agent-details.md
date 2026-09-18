@@ -26,6 +26,71 @@ Tenyse specifies otherwise.
 
 ---
 
+## 1b. Is there an industry standard for AVE?
+
+Short answer: **no**, and it is worth knowing exactly how "no" it is before
+telling a client the figure is standard.
+
+### The formal industry position is a rejection
+
+The closest thing to an authoritative standard in communications
+measurement is the **Barcelona Principles**, maintained by **AMEC** (the
+International Association for the Measurement and Evaluation of
+Communication). Now at **V4.0** (2025), they state plainly that AVEs are
+not the value of communication: they measure the cost of media space or
+time, not the value of the coverage, and should not be used. AMEC runs an
+active campaign to "eradicate fully the use of Advertising Value
+Equivalency and all of its derivatives" from PR work.
+
+So the honest framing is: AVE is a widely-used industry *convention* that
+the industry's own measurement body discourages. It is not a standard.
+
+### The traditional convention, for reference
+
+The classic definition is the cost of buying the equivalent ad space,
+multiplied by **3** to credit the third-party endorsement of earned
+coverage. That multiplier has no empirical basis; it is convention.
+
+**This build defaults the multiplier to 1**, which is deliberately more
+conservative than the convention. Raising it is an explicit owner choice
+(see `outletRatesStorage.saveRate`), never something the app does quietly.
+
+### What the platforms that still publish a method actually do
+
+| Platform | Formula |
+|---|---|
+| Muck Rack | SimilarWeb monthly unique visitors × 0.025 × $0.37 |
+| Agility PR | $25 × (average daily visitors ÷ 1,000) |
+
+Both are implemented in `src/aveEstimation.js`. They **disagree by 11.1x on
+every outlet** — Blavity News returns $37,913 by one and $3,416 by the
+other. That gap is not rounding; it is the absence of a standard made
+visible, which is why this build shows a range rather than a single figure.
+
+### What is actually defensible here
+
+1. **Reproduce a named, published method** rather than invent a house
+   formula — "this is Muck Rack's published calculation" answers a client
+   asking where the number came from.
+2. **Show the range.** The spread is the finding.
+3. **Prefer a real price where one exists.** Forbes charges roughly $12,500
+   for a BrandVoice article; that beats any formula for Forbes, and is why
+   `PUBLISHED_RATE_OVERRIDES` exists in the seed script.
+4. **Validate against Tenyse's own reported numbers.** The Muck Rack method
+   reproduces her Vegan Dining Month per-clip figure to within 1%. That is
+   the real justification for using it — not that it is standard, but that
+   it matches the method behind figures she has already shown clients.
+
+### If a client asks whether this is an industry-standard figure
+
+Accurate answer: AVE is a widely-used PR convention that the industry
+measurement body itself discourages, and these figures follow the same
+published method the major PR platforms use. That is defensible.
+
+"It's the industry standard" is not, and should not be said.
+
+---
+
 ## 2. Agent behavior spec
 
 | Aspect | Detail |
@@ -179,6 +244,13 @@ not something to integrate with.
   (`verified: true`) and `docs/agents/ave-calculation-agent.md`. This does
   not supply a per-outlet rate (section 5 below is still empty); it only
   changes which campaign-level totals a future agent may treat as real.
+- **Sept 18, 2026** — Added section 1b on whether an industry standard
+  exists. It does not: the Barcelona Principles (AMEC, V4.0) hold that AVE
+  measures the cost of media space rather than the value of coverage, and
+  AMEC campaigns to eradicate its use. Records the traditional 3x
+  third-party-endorsement multiplier as convention only — this build
+  defaults to 1 — and states what is actually defensible to say to a
+  client. Same caveat surfaced in the placement form's benchmark panel.
 - **Sept 15, 2026** — Section 5 substantially rewritten: per-outlet rates
   are now derivable from published Muck Rack / Agility PR formulas rather
   than blocked on Tenyse. Both are computed and shown as a range. Two open
