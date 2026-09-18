@@ -3,6 +3,7 @@ import {
   getRealClients,
   getClientProfile,
   getAnalyticsSummary,
+  getReportsOverviewSummary,
   getRealMetrics,
   getRealPlacements,
   getRealCampaigns,
@@ -32,7 +33,7 @@ import { renderReportCard } from "../client/components/LatestReportCard.js";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
-import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection } from "./components/AnalyticsCharts.js";
+import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js";
 import { renderClientsList } from "./components/ClientsListCard.js";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js";
 import { renderPlacementForm } from "./components/PlacementForm.js";
@@ -2115,6 +2116,132 @@ function cssId(str) {
   return String(str).replace(/[^a-zA-Z0-9]+/g, "-");
 }
 
+function reportsMetricCard({ label, value, delta, icon, iconBg }) {
+  const deltaHtml =
+    delta == null
+      ? `<p class="metric-delta" style="color:var(--text-secondary);">No prior-period comparison yet</p>`
+      : `<p class="metric-delta ${delta >= 0 ? "positive" : "negative"}">${delta >= 0 ? "\u2191" : "\u2193"} ${Math.abs(delta)}% vs previous period</p>`;
+  return `
+    <div class="card metric-card owner-metric-card">
+      <div class="metric-top">
+        <span class="metric-label">${escapeHtml(label)}</span>
+        <span class="metric-icon" style="background:${iconBg}">${icon}</span>
+      </div>
+      <p class="metric-value">${escapeHtml(value)}</p>
+      ${deltaHtml}
+    </div>
+  `;
+}
+
+/**
+ * The cross-client "Reports & Results" overview: filters, four headline
+ * metrics, a weekly trend chart, a media-type donut, per-client
+ * performance, and recently approved summaries as "reports." Renders
+ * above the existing per-client executive-summary/narrative/Canva-export
+ * cards (renderReportsView below) rather than replacing them — those are
+ * real, working generation tools and stay exactly where they are.
+ *
+ * "vs previous period" deltas are computed for real (see
+ * getReportsOverviewSummary's own comment on the split-sample method) and
+ * show "No prior-period comparison yet" rather than an invented
+ * percentage when there isn't enough data to compare — a trend arrow
+ * with no basis behind it would be indistinguishable from a real one on
+ * screen, unlike a flagged dollar estimate.
+ *
+ * Media type is a name-based classification (mediaType.js), not
+ * confirmed per-placement data — labelled as such in the card heading.
+ */
+function renderReportsOverview(container) {
+  const summary = getReportsOverviewSummary();
+  const { metrics, weeklyTrend, mediaTypeBreakdown, clientPerformance } = summary;
+
+  const approvedSummaries = getRealClients()
+    .map((c) => ({ client: c.name, summary: loadSummary(c.name) }))
+    .filter((r) => r.summary?.approvedAt)
+    .sort((a, b) => (a.summary.approvedAt < b.summary.approvedAt ? 1 : -1));
+
+  container.innerHTML = `
+    <div class="section-heading"><h2>Reports &amp; Results</h2></div>
+    <p class="hint" style="margin:-8px 0 20px;">Cross-client performance from every real placement on file.</p>
+
+    <div class="owner-metrics-grid" style="margin-bottom:24px;">
+      ${reportsMetricCard({ label: "Total Publicity Value (AVE)", value: formatCompactCurrency(metrics.totalAVE), delta: metrics.aveDelta, icon: "$", iconBg: "#fbe2da" })}
+      ${reportsMetricCard({ label: "Total Press Placements", value: String(metrics.totalPlacements), delta: metrics.placementsDelta, icon: "\u25a6", iconBg: "#e1f2f0" })}
+      ${reportsMetricCard({ label: "Active Clients", value: String(metrics.activeClients), delta: null, icon: "\u25ce", iconBg: "#e9ecff" })}
+      ${reportsMetricCard({ label: "Avg. Audience Reach", value: metrics.avgReach ? metrics.avgReach.toLocaleString() : "—", delta: metrics.reachDelta, icon: "\u25c8", iconBg: "#fdf0d8" })}
+    </div>
+
+    <div class="analytics-grid" style="margin-bottom:24px;">
+      <div class="card">
+        <h3 style="margin-top:0;">Placement Trends</h3>
+        <div id="reports-weekly-trend"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Placements by Media Type</h3>
+        <p class="hint" style="margin:0 0 12px;">Classified from outlet name, not confirmed per placement — see Press Placements for the source outlet.</p>
+        <div id="reports-media-type"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <h3 style="margin-top:0;">Client Performance</h3>
+      <div class="table-scroll">
+        <table class="placements-table">
+          <thead><tr><th>Client</th><th>Placements</th><th>AVE</th><th>Est. Reach</th><th>Top Outlets</th><th>Status</th></tr></thead>
+          <tbody>
+            ${clientPerformance
+              .map(
+                (r) => `
+              <tr>
+                <td><strong>${escapeHtml(r.client)}</strong></td>
+                <td class="numeric">${r.totalPlacements}</td>
+                <td class="numeric">${formatCurrency(r.totalAVE)}</td>
+                <td class="numeric">${r.totalReach ? r.totalReach.toLocaleString() : "—"}</td>
+                <td>${r.topOutlets.map((o) => escapeHtml(o)).join(", ") || "—"}</td>
+                <td><span class="status-badge">${escapeHtml(r.status)}</span></td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <h3 style="margin-top:0;">Approved Reports</h3>
+      ${
+        approvedSummaries.length
+          ? `<div class="table-scroll"><table class="placements-table">
+               <thead><tr><th>Client</th><th>Approved</th><th></th></tr></thead>
+               <tbody>${approvedSummaries
+                 .map(
+                   (r) => `<tr><td><strong>${escapeHtml(r.client)}</strong></td><td>${escapeHtml(r.summary.approvedAt.slice(0, 10))}</td><td><button type="button" class="link-btn" data-view-report="${escapeHtml(r.client)}">View</button></td></tr>`
+                 )
+                 .join("")}</tbody>
+             </table></div>`
+          : `<p class="hint" style="margin:0;">No executive summaries approved yet — approve one below to see it listed here.</p>`
+      }
+    </div>
+  `;
+
+  renderWeeklyTrendChart(document.getElementById("reports-weekly-trend"), weeklyTrend);
+  renderDonutChart(document.getElementById("reports-media-type"), {
+    data: mediaTypeBreakdown,
+    centerLabel: "Placements",
+    centerValue: metrics.totalPlacements,
+  });
+  container.querySelectorAll("[data-view-report]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const el = document.getElementById(`report-${slugifyClientId(btn.dataset.viewReport)}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+}
+
+function slugifyClientId(name) {
+  return getRealClients().find((c) => c.name === name)?.id || "";
+}
+
 function renderReportsView() {
   const target = document.getElementById("reports-content");
   if (state.demoState === "loading") return renderLoadingState(target);
@@ -2128,7 +2255,9 @@ function renderReportsView() {
 
   const clients = state.dataSource === "real" ? getRealClients() : CLIENTS;
   target.innerHTML = `
-    <div class="section-heading"><h2>Reports</h2></div>
+    ${state.dataSource === "real" ? `<div id="reports-overview-wrap" style="margin-bottom:32px;"></div>` : ""}
+    <div class="section-heading"><h2>Generate Report Content</h2></div>
+    <p class="hint" style="margin:-8px 0 20px;">Draft, approve, and export the executive summary and full narrative for each client's report.</p>
     <div class="section" id="canva-export-wrap"></div>
     ${clients
       .map(
@@ -2142,6 +2271,8 @@ function renderReportsView() {
       )
       .join("")}
   `;
+  if (state.dataSource === "real") renderReportsOverview(document.getElementById("reports-overview-wrap"));
+
   clients.forEach((c) => {
     const report = state.dataSource === "real" ? getRealReport(c.name) : REPORTS[c.id] || null;
     renderReportCard(document.getElementById(`report-${c.id}`), report);

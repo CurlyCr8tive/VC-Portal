@@ -147,3 +147,152 @@ export function renderLeadTimeSection(container, leadTime) {
 
   container.innerHTML = rows || gapNote ? rows + gapNote : `<div class="state-panel compact"><h3>No lead time data yet</h3><p>Add a pitch date and a landed date to a placement to see turnaround time.</p></div>`;
 }
+
+// ---------------------------------------------------------------------------
+// Donut chart — media type breakdown. Pure SVG (stroke-dasharray ring
+// segments), same "no charting library" rule as PerformanceChart.js, with
+// the same accessible-table fallback pattern.
+// ---------------------------------------------------------------------------
+const DONUT_COLORS = ["#1f2a52", "#8b93b8", "#e2735a", "#3f9e97", "#d8d0c4", "#b8860b"];
+
+export function renderDonutChart(container, { data, centerLabel, centerValue }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) {
+    container.innerHTML = `<div class="state-panel compact"><h3>No data yet</h3></div>`;
+    return;
+  }
+  const R = 60;
+  const CIRC = 2 * Math.PI * R;
+  let offset = 0;
+  const segments = data
+    .filter((d) => d.value > 0)
+    .map((d, i) => {
+      const frac = d.value / total;
+      const dash = frac * CIRC;
+      const seg = `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${DONUT_COLORS[i % DONUT_COLORS.length]}" stroke-width="24" stroke-dasharray="${dash.toFixed(1)} ${(CIRC - dash).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 80 80)"></circle>`;
+      offset += dash;
+      return seg;
+    })
+    .join("");
+
+  const legend = data
+    .filter((d) => d.value > 0)
+    .map(
+      (d, i) =>
+        `<span class="legend-item"><span class="legend-swatch" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]};"></span> ${escapeHtml(d.label)} — ${Math.round((d.value / total) * 100)}%</span>`
+    )
+    .join("");
+
+  const tableRows = data
+    .filter((d) => d.value > 0)
+    .map((d) => `<tr><td>${escapeHtml(d.label)}</td><td>${d.value}</td><td>${Math.round((d.value / total) * 100)}%</td></tr>`)
+    .join("");
+
+  container.innerHTML = `
+    <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <div style="position:relative; width:160px; height:160px; flex-shrink:0;">
+        <svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="${escapeHtml(centerLabel)}: ${escapeHtml(String(centerValue))} total. ${data.map((d) => `${d.label} ${d.value}`).join(", ")}">
+          ${segments}
+        </svg>
+        <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none;">
+          <strong style="font-size:1.3rem; color:var(--color-navy);">${escapeHtml(String(centerValue))}</strong>
+          <span style="font-size:0.7rem; color:var(--text-secondary);">${escapeHtml(centerLabel)}</span>
+        </div>
+      </div>
+      <div class="chart-legend" style="flex-direction:column; gap:8px; align-items:flex-start;">${legend}</div>
+    </div>
+    <button type="button" class="chart-table-toggle" aria-expanded="false">View chart data as a table</button>
+    <table class="chart-data-table" hidden>
+      <thead><tr><th>Type</th><th>Placements</th><th>Share</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `;
+  const toggleBtn = container.querySelector(".chart-table-toggle");
+  const dataTable = container.querySelector(".chart-data-table");
+  toggleBtn.addEventListener("click", () => {
+    const isHidden = dataTable.hasAttribute("hidden");
+    dataTable.toggleAttribute("hidden", !isHidden);
+    toggleBtn.setAttribute("aria-expanded", String(isHidden));
+    toggleBtn.textContent = isHidden ? "Hide chart data table" : "View chart data as a table";
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Weekly placement + reach trend — same bar+line combo as
+// PerformanceChart.js, bucketed by week instead of month, with a second
+// series (audience reach) plotted as the line instead of placement count,
+// matching the "Placement Trends" chart's own two-metric shape.
+// ---------------------------------------------------------------------------
+export function renderWeeklyTrendChart(container, series) {
+  if (!series.length) {
+    container.innerHTML = `<div class="state-panel compact"><h3>No placement data in this range</h3></div>`;
+    return;
+  }
+  const width = 640;
+  const height = 220;
+  const padding = { top: 10, right: 46, bottom: 30, left: 40 };
+  const plotW = width - padding.left - padding.right;
+  const plotH = height - padding.top - padding.bottom;
+  const maxPlacements = Math.max(1, ...series.map((d) => d.placements));
+  const maxReach = Math.max(1, ...series.map((d) => d.reach));
+  const n = series.length;
+  const slot = plotW / n;
+  const barWidth = Math.min(34, slot * 0.5);
+
+  const bars = series
+    .map((d, i) => {
+      const barH = (d.placements / maxPlacements) * plotH;
+      const x = padding.left + i * slot + (slot - barWidth) / 2;
+      const y = padding.top + (plotH - barH);
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" rx="4" fill="#1f2a52"></rect>`;
+    })
+    .join("");
+  const linePoints = series
+    .map((d, i) => {
+      const x = padding.left + i * slot + slot / 2;
+      const y = padding.top + (plotH - (d.reach / maxReach) * plotH);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const dots = series
+    .map((d, i) => {
+      const x = padding.left + i * slot + slot / 2;
+      const y = padding.top + (plotH - (d.reach / maxReach) * plotH);
+      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#3f9e97"></circle>`;
+    })
+    .join("");
+  const xLabels = series
+    .map((d, i) => {
+      const x = padding.left + i * slot + slot / 2;
+      return `<text x="${x.toFixed(1)}" y="${height - 8}" font-size="10" fill="#7a6d64" text-anchor="middle">${escapeHtml(d.label)}</text>`;
+    })
+    .join("");
+  const summary = series.map((d) => `${d.label}: ${d.placements} placements, ${d.reach.toLocaleString()} reach`).join("; ");
+  const tableRows = series.map((d) => `<tr><td>${escapeHtml(d.label)}</td><td>${d.placements}</td><td>${d.reach.toLocaleString()}</td></tr>`).join("");
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly placements and audience reach. ${escapeHtml(summary)}" style="width:100%; height:auto;">
+      ${bars}
+      <polyline points="${linePoints}" fill="none" stroke="#3f9e97" stroke-width="2"></polyline>
+      ${dots}
+      ${xLabels}
+    </svg>
+    <div class="chart-legend">
+      <span class="legend-item"><span class="legend-swatch" style="background:#1f2a52;"></span> Press placements</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#3f9e97; border-radius:50%;"></span> Estimated reach</span>
+    </div>
+    <button type="button" class="chart-table-toggle" aria-expanded="false">View chart data as a table</button>
+    <table class="chart-data-table" hidden>
+      <thead><tr><th>Week</th><th>Placements</th><th>Reach</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `;
+  const toggleBtn = container.querySelector(".chart-table-toggle");
+  const dataTable = container.querySelector(".chart-data-table");
+  toggleBtn.addEventListener("click", () => {
+    const isHidden = dataTable.hasAttribute("hidden");
+    dataTable.toggleAttribute("hidden", !isHidden);
+    toggleBtn.setAttribute("aria-expanded", String(isHidden));
+    toggleBtn.textContent = isHidden ? "Hide chart data table" : "View chart data as a table";
+  });
+}

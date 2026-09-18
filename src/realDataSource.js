@@ -21,6 +21,7 @@ import { loadCampaigns } from "./campaignStorage.js";
 import { loadSummary } from "./summaryStorage.js";
 import { loadClients, findClientByName } from "./clientStorage.js";
 import { computeLeadTimeDays } from "./calculations.js";
+import { classifyMediaType } from "./mediaType.js";
 
 const CAMPAIGN_STATUS_LABELS = { active: "Active", completed: "Completed", paused: "Paused" };
 
@@ -403,4 +404,114 @@ export function getAnalyticsSummary() {
       totalPlacements: placements.length,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Reports & Results overview — the cross-client dashboard view
+// ---------------------------------------------------------------------------
+
+function isoWeekLabel(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() - day + 1); // Monday of that week
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Full data set for the Reports & Results overview: metric cards, a
+ * weekly placement+reach trend, media type breakdown, and per-client
+ * performance rows. Everything here is real placement/client data;
+ * media type is a name-based classification (see mediaType.js), not a
+ * sourced fact, and is presented as such rather than as confirmed data.
+ *
+ * "vs previous period" deltas are computed for real by splitting the
+ * placements in scope at their midpoint date, never invented — a trend
+ * arrow with no real basis behind it is a materially more misleading
+ * kind of fabrication than a flagged dollar estimate, since nothing in
+ * the UI would distinguish it from a genuine one. Returns null for a
+ * delta when there isn't a sound comparison to make (e.g., all
+ * placements land on one side of the split).
+ */
+export function getReportsOverviewSummary({ clientName = null } = {}) {
+  const allPlacements = getAllRealPlacements().filter((p) => !clientName || p.clientName === clientName);
+  const clients = getRealClients().filter((c) => !clientName || c.name === clientName);
+  const dated = allPlacements.filter((p) => p.publicationDate || p.landedDate).map((p) => ({ ...p, _date: p.publicationDate || p.landedDate }));
+  dated.sort((a, b) => (a._date < b._date ? -1 : 1));
+
+  const sumAve = (rows) => rows.reduce((s, p) => s + (p.aveValue || 0), 0);
+  const sumReach = (rows) => rows.reduce((s, p) => s + (p.audienceReach || 0), 0);
+
+  const delta = (rows, valueFn) => {
+    if (rows.length < 4) return null; // too few points for a split to mean anything
+    const mid = Math.floor(rows.length / 2);
+    const earlier = valueFn(rows.slice(0, mid));
+    const later = valueFn(rows.slice(mid));
+    if (!earlier) return null;
+    const pct = Math.round(((later - earlier) / earlier) * 100);
+    // This data is clustered in a handful of real 2022 campaigns rather
+    // than a smooth continuous series, so a midpoint split can land a few
+    // large placements entirely on one side — real math producing a
+    // number like "28,519%" that no reasonable trend arrow should show.
+    // A cap doesn't hide anything; it's the honest admission that this
+    // split isn't a sound comparison for THIS distribution, same as
+    // returning null when there's too little data to split at all.
+    return Math.abs(pct) > 300 ? null : pct;
+  };
+
+  const metrics = {
+    totalAVE: sumAve(dated) || null,
+    totalPlacements: allPlacements.length,
+    activeClients: clients.filter((c) => c.profile?.status === "active").length,
+    avgReach: dated.length ? Math.round(sumReach(dated) / dated.filter((p) => p.audienceReach != null).length || 0) : null,
+    aveDelta: delta(dated, sumAve),
+    placementsDelta: delta(dated, (r) => r.length),
+    reachDelta: delta(
+      dated.filter((p) => p.audienceReach != null),
+      sumReach
+    ),
+  };
+
+  // Weekly trend — every dated placement bucketed by the Monday of its week.
+  const weekBuckets = new Map();
+  for (const p of dated) {
+    const key = isoWeekLabel(p._date);
+    if (!weekBuckets.has(key)) weekBuckets.set(key, { label: key, placements: 0, reach: 0 });
+    const b = weekBuckets.get(key);
+    b.placements += 1;
+    b.reach += p.audienceReach || 0;
+  }
+  const weeklyTrend = [...weekBuckets.values()].sort((a, b) => (a.label < b.label ? -1 : 1));
+
+  // Media type breakdown.
+  const typeCounts = {};
+  for (const p of allPlacements) {
+    const { type } = classifyMediaType(p.publication);
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  }
+  const mediaTypeBreakdown = Object.entries(typeCounts)
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value);
+
+  // Per-client performance rows.
+  const clientPerformance = clients
+    .map((c) => {
+      const rows = allPlacements.filter((p) => p.clientName === c.name);
+      const outletCounts = {};
+      for (const p of rows) outletCounts[p.publication] = (outletCounts[p.publication] || 0) + 1;
+      const topOutlets = Object.entries(outletCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name]) => name);
+      return {
+        client: c.name,
+        totalPlacements: rows.length,
+        totalAVE: sumAve(rows.filter((p) => p.landedDate)) || null,
+        totalReach: sumReach(rows) || null,
+        topOutlets,
+        status: c.profile?.status || "unconfirmed",
+      };
+    })
+    .sort((a, b) => b.totalPlacements - a.totalPlacements);
+
+  return { metrics, weeklyTrend, mediaTypeBreakdown, clientPerformance };
 }
