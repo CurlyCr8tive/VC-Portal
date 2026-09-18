@@ -1830,7 +1830,12 @@ function renderPlacementsView() {
       onSuggestHeadline: suggestHeadline,
       onAnalyzeSentiment: analyzeSentiment,
       onFindPitchDate: findPitchDateInGmail,
-      submitDisabledReason: shouldUseOwnerApi() ? "" : "Sign in with the live owner account to save placements.",
+      // onSubmit above already saves locally when not signed in — this
+      // used to disable the button with "Sign in to Save Placement"
+      // regardless, left over from before that fix. The button now only
+      // needs canSavePlacements (dataSource === "real"), matching what
+      // actually gates the form's existence a few lines up.
+      submitDisabledReason: "",
       knownClients: getRealClients().map((c) => c.name),
       onSubmit: async (rawData) => {
         try {
@@ -2423,9 +2428,13 @@ function renderReportsView() {
       },
     });
   } else {
+    // Correction: this used to read "Sign in with the live owner account"
+    // — wrong diagnosis. The panel was never gated on sign-in; it's gated
+    // on dataSource === "real" (false only in Mock mode), so the message
+    // has to say what actually unblocks it.
     exportWrap.innerHTML = `
       <p style="color:var(--text-secondary); font-size:0.85rem;">
-        Sign in with the live owner account to generate a Canva export from confirmed placement data.
+        Switch the sidebar's data source to "Real" to generate a Canva export from confirmed placement data.
       </p>
     `;
   }
