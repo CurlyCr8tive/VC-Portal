@@ -2329,6 +2329,11 @@ function renderSidebarComponent() {
   renderOwnerSidebar(document.getElementById("owner-sidebar"), {
     ownerName: "Tenyse Williams",
     sessionEmail: session ? session.email : null,
+    // Only a real Supabase sign-in sets session.real (loginApp.js). The
+    // ?demo=owner link loads a mock account carrying the same name and
+    // email, which is why the sidebar could claim to be logged in while
+    // every live feature was gated.
+    isRealSession: Boolean(session?.real),
     currentView: state.view,
     demoState: state.demoState,
     dataSource: state.dataSource,
