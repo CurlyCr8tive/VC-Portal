@@ -212,7 +212,7 @@ function runAveEstimationChecks() {
   for (const entry of OUTLET_TRAFFIC_REFERENCE) {
     assert.ok(AUDIENCE_METRICS.includes(entry.metric), `${entry.outlet}: unknown metric ${entry.metric}`);
     assert.ok(entry.source && entry.source.length > 5, `${entry.outlet}: missing a source`);
-    assert.ok(["owner_source", "third_party", "self_reported"].includes(entry.confidence), `${entry.outlet}: bad confidence`);
+    assert.ok(["owner_source", "third_party", "self_reported", "estimated"].includes(entry.confidence), `${entry.outlet}: bad confidence`);
     assert.ok(Number.isFinite(entry.value) && entry.value > 0, `${entry.outlet}: bad audience value`);
   }
 }

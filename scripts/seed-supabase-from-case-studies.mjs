@@ -98,7 +98,7 @@ try {
   hasDataQualityColumn = false;
   console.warn("WARNING  placements.ave_data_quality is missing — run db/migrations/2026-09-17-placement-ave-data-quality.sql");
   console.warn("         in the Supabase SQL editor. Continuing without it; the duplicate-figure flags will NOT be written.\n");
-  existing = await rest("placements?select=id,client_id,publication,headline,ave_value,audience_reach,notes");
+  existing = await rest("placements?select=id,client_id,publication,headline,ave_value,audience_reach,notes,publication_date");
 }
 
 // Exact string matching is not enough here. Some case-study rows were
@@ -162,18 +162,93 @@ for (const row of REAL_CASE_STUDY_PLACEMENTS) {
   });
 }
 
+// --- campaigns -------------------------------------------------------------
+// The browser and the database had drifted: localStorage held 8 seeded
+// campaigns while Supabase held 3 unrelated ones, so the Campaigns page
+// showed one set and a deployed portal would show another. Matched on
+// (client, name), the same pair a person would use to say "that one already
+// exists".
+const seedCampaignsSrc = seedSrc.slice(seedSrc.indexOf("REAL_CASE_STUDY_CAMPAIGNS"));
+const REAL_CASE_STUDY_CAMPAIGNS = JSON.parse(
+  "[" +
+    seedCampaignsSrc
+      .slice(seedCampaignsSrc.indexOf("["), seedCampaignsSrc.indexOf("];") + 1)
+      .slice(1, -1)
+      .replace(/(\w+):/g, '"$1":')
+      .replace(/,\s*\]/, "]")
+      .trim()
+      .replace(/,$/, "") +
+    "]"
+);
+
+const existingCampaigns = await rest("campaigns?select=id,client_id,name,start_date,duration");
+const campaignsToAdd = [];
+const campaignsToPatch = [];
+for (const row of REAL_CASE_STUDY_CAMPAIGNS) {
+  const clientId = clientByName.get(row.client);
+  if (!clientId) { skipped.push(`campaign "${row.name}" — no client row for ${row.client}`); continue; }
+  const match = existingCampaigns.find((c) => c.client_id === clientId && norm(c.name) === norm(row.name));
+  if (match) {
+    // Backfill only what's blank; never overwrite a value already set.
+    const patch = {};
+    if (!match.start_date && row.startDate) patch.start_date = row.startDate;
+    if (!match.duration && row.duration) patch.duration = row.duration;
+    if (Object.keys(patch).length) campaignsToPatch.push({ id: match.id, name: row.name, patch });
+    continue;
+  }
+  // Earliest REAL publication date among THIS campaign's own placements.
+  // Matched from the seed source rather than from Supabase, because the
+  // placements table stores campaign_id (null on these seeded rows) and not
+  // a campaign name — matching on client alone would hand one campaign's
+  // dates to another, e.g. giving Houston Housing Authority's Social Media
+  // Management the start date of its Media Relations coverage.
+  //
+  // publicationDate only, never landedDate: that is a recording-date
+  // placeholder on several rows and would invent a start date out of the day
+  // the data was typed in.
+  const campaignDates = REAL_CASE_STUDY_PLACEMENTS
+    .filter((p) => p.client === row.client && p.campaign === row.name && p.publicationDate)
+    .map((p) => p.publicationDate)
+    .sort();
+  campaignsToAdd.push({
+    client_id: clientId,
+    name: row.name,
+    start_date: row.startDate || campaignDates[0] || null,
+    duration: row.duration || null,
+    status: ["active", "completed", "paused"].includes(row.status) ? row.status : "completed",
+  });
+}
+
 // --- outlet rates ----------------------------------------------------------
+// Where an outlet's REAL paid-placement price is known, it beats anything
+// derived. The formula returns ~$665,722 for a single Forbes placement
+// while Forbes charges about $12,500 for a BrandVoice article covering the
+// same space — a documented ~53x overshoot, so seeding the derived figure
+// would be seeding a number already known to be wrong.
+const PUBLISHED_RATE_OVERRIDES = {
+  Forbes: { rate: 12500, why: "Forbes BrandVoice sponsored article, widely reported at ~$12,500 — a real paid price, used instead of the derived figure which overshoots it ~53x." },
+};
+
 const existingRates = await rest("outlet_rates?select=outlet_name");
 const haveRate = new Set(existingRates.map((r) => r.outlet_name.toLowerCase()));
 const rateRows = [];
 for (const o of OUTLET_TRAFFIC_REFERENCE) {
-  // Skip figures built on the wrong metric — aveEstimation flags these as
-  // overstating, and a rate table is exactly where an overstated number
-  // would quietly become "the" number.
   const est = estimateAVE(o.value, o.metric);
-  if (!est || est.overstated) continue;
+  if (!est) continue;
   if (haveRate.has(o.outlet.toLowerCase())) continue;
-  rateRows.push({ outlet_name: o.outlet, rate_estimate: Number(est.muckRack.toFixed(2)), multiplier: 1 });
+  // Overstated and estimated figures used to be skipped here, on the
+  // principle that a rate table is exactly where a shaky number quietly
+  // becomes "the" number. They're now included at the owner's explicit
+  // direction, so a dashboard of dashes isn't what Tenyse demos — but the
+  // caveat travels with them: apply-outlet-rates-to-placements.mjs writes an
+  // ave_data_quality flag on every placement that takes one, so they stay
+  // identifiable and a single query finds them all when real figures arrive.
+  const override = PUBLISHED_RATE_OVERRIDES[o.outlet];
+  rateRows.push({
+    outlet_name: o.outlet,
+    rate_estimate: override ? override.rate : Number(est.muckRack.toFixed(2)),
+    multiplier: 1,
+  });
 }
 
 // --- report / write --------------------------------------------------------
@@ -182,6 +257,9 @@ console.log(`\nPlacements: ${existing.length} live, ${toInsert.length} to add, $
 for (const p of toInsert) console.log(`   + ${p.publication.slice(0, 58)}${p.ave_data_quality ? "  [flagged]" : ""}`);
 for (const u of toUpdate) console.log(`   ~ ${u.publication.slice(0, 48)} <- ${Object.keys(u.patch).join(", ")}`);
 for (const s of skipped) console.log(`   ! skipped: ${s}`);
+console.log(`\nCampaigns: ${existingCampaigns.length} live, ${campaignsToAdd.length} to add, ${campaignsToPatch.length} to backfill`);
+for (const c of campaignsToAdd) console.log(`   + ${c.name}${c.start_date ? ` (from ${c.start_date})` : ""}`);
+for (const c of campaignsToPatch) console.log(`   ~ ${c.name} <- ${Object.keys(c.patch).join(", ")}`);
 console.log(`\nOutlet rates: ${existingRates.length} live, ${rateRows.length} to add`);
 for (const r of rateRows) console.log(`   + ${r.outlet_name}: $${r.rate_estimate.toLocaleString()}`);
 
@@ -193,5 +271,9 @@ if (toInsert.length) await rest("placements", { method: "POST", body: toInsert, 
 for (const u of toUpdate) {
   await rest(`placements?id=eq.${u.id}`, { method: "PATCH", body: u.patch, prefer: "return=minimal" });
 }
+if (campaignsToAdd.length) await rest("campaigns", { method: "POST", body: campaignsToAdd, prefer: "return=minimal" });
+for (const c of campaignsToPatch) {
+  await rest(`campaigns?id=eq.${c.id}`, { method: "PATCH", body: c.patch, prefer: "return=minimal" });
+}
 if (rateRows.length) await rest("outlet_rates", { method: "POST", body: rateRows, prefer: "return=minimal" });
-console.log(`\nWrote ${toInsert.length} placements, backfilled ${toUpdate.length}, added ${rateRows.length} outlet rates.`);
+console.log(`\nWrote ${toInsert.length} placements, backfilled ${toUpdate.length}, added ${campaignsToAdd.length} campaigns (backfilled ${campaignsToPatch.length}), added ${rateRows.length} outlet rates.`);

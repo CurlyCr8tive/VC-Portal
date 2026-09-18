@@ -29,6 +29,14 @@
 //   self_reported — the outlet's own media kit. Advertiser-facing, which
 //                   is arguably the right basis for an ad-equivalence
 //                   figure, but it's marketing material.
+//   estimated     — NO sourced figure exists; this is a reasoned placeholder
+//                   so the dashboard shows something rather than a row of
+//                   dashes. Added at the owner's explicit direction. Every
+//                   AVE derived from one of these is written with
+//                   ave_auto_calculated = true AND an ave_data_quality flag
+//                   saying it is an estimate, so it can never be mistaken
+//                   for one of Tenyse's confirmed figures — and so a single
+//                   query finds them all again when real numbers arrive.
 //
 // Nothing here is auto-loaded into outletRatesStorage. These are
 // candidates for a rate, not rates. A figure becomes a rate only when
@@ -108,6 +116,67 @@ export const OUTLET_TRAFFIC_REFERENCE = [
     source: "Semrush, blackenterprise.com",
     sourceDate: "2026-01",
     notes: "Visits, not uniques. Black Enterprise publishes a media kit at bemediakit.com — not yet retrieved.",
+  },
+  // --- Houston Housing Authority's outlets ------------------------------
+  // Added so that client's seven real placements stop showing "—". Only
+  // Bisnow has a sourced figure; the rest are ESTIMATES, at the owner's
+  // direction, and are flagged as such everywhere they surface.
+  {
+    outlet: "Bisnow",
+    value: 163000,
+    metric: "monthly_visits",
+    confidence: "third_party",
+    source: "SimilarWeb, bisnow.com — 490.9K visits over 3 months",
+    sourceDate: "2026-08",
+    notes: "Visits, not uniques, so any estimate from it is marked as overstating.",
+  },
+  {
+    outlet: "Houston Business Journal",
+    value: 145000,
+    metric: "monthly_visits",
+    confidence: "estimated",
+    source: "ESTIMATE — SimilarWeb publishes bizjournals.com network-wide only (8.7M visits/3mo across 40+ city titles). Houston is one of the larger markets; this assumes roughly 5% of network traffic.",
+    sourceDate: "2026-09-18",
+    notes: "Not a sourced figure. The network total cannot be split per city without inventing the split, and this is that invention, stated plainly. Replace as soon as a Houston-specific number exists.",
+  },
+  {
+    outlet: "The Birmingham Times",
+    value: 50000,
+    metric: "monthly_visits",
+    confidence: "estimated",
+    source: "ESTIMATE — no published traffic figure found. Scaled as a long-running Black-owned metro weekly, well below the national digital outlets in this file.",
+    sourceDate: "2026-09-18",
+    notes: "Not a sourced figure.",
+  },
+  {
+    outlet: "Daily Advent Nigeria",
+    value: 40000,
+    metric: "monthly_visits",
+    confidence: "estimated",
+    source: "ESTIMATE — no published traffic figure found.",
+    sourceDate: "2026-09-18",
+    notes:
+      "Not a sourced figure, and worth questioning at all: Daily Advent republishes other outlets' articles. An aggregator pickup is arguably not earned coverage with its own audience, so this value may be conceptually wrong rather than merely imprecise.",
+  },
+  {
+    outlet: "Yahoo Finance",
+    value: 25000,
+    metric: "monthly_visits",
+    confidence: "estimated",
+    source: "ESTIMATE — deliberately NOT derived from Yahoo Finance's own traffic. That site draws hundreds of millions of visits, and the Muck Rack formula over it returns a six-figure value for a single item, the same breakdown documented for Forbes (~53x the outlet's real ad price).",
+    sourceDate: "2026-09-18",
+    notes:
+      "This placement is a syndicated press release, not an editorial feature — Yahoo Finance republished the PRWeb wire. Priced as a wire pickup rather than as earned coverage on a major finance site, because that is what it is. Deliberately conservative; correct it with a real figure rather than trusting this one.",
+  },
+  {
+    outlet: "PRWeb",
+    value: 15000,
+    metric: "monthly_visits",
+    confidence: "estimated",
+    source: "ESTIMATE — PRWeb is a press-release distribution wire, not a publication with its own readership.",
+    sourceDate: "2026-09-18",
+    notes:
+      "Worth questioning whether this should carry an AVE at all. AVE prices what equivalent advertising would have cost; a wire is something the client PAYS to distribute, so valuing it as earned coverage arguably double-counts. Included at the owner's direction with a nominal figure, flagged. Raise with Tenyse before this appears in a client report.",
   },
 ];
 
