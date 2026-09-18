@@ -2740,3 +2740,49 @@ table.placements-table {
     align-items: flex-start;
   }
 }
+
+/* Analytics view — proportional bar breakdowns (AVE by client, status,
+   sentiment, lead time). Same visual language as the SVG performance
+   chart (chart-legend/legend-swatch), simpler markup since these are
+   categorical breakdowns rather than a time series. */
+.analytics-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analytics-bar-row {
+  width: 100%;
+}
+
+.analytics-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.analytics-bar-label strong {
+  color: var(--color-navy);
+}
+
+.analytics-bar-track {
+  width: 100%;
+  height: 14px;
+  background: #f0ece4;
+  border-radius: 7px;
+  overflow: hidden;
+  display: flex;
+}
+
+.analytics-bar-fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}

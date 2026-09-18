@@ -199,15 +199,26 @@ export function getRealCampaigns(clientName) {
 
 function bucketByMonth(items, range) {
   const now = new Date();
-  const monthsBack = range === "30d" ? 1 : range === "90d" ? 3 : 12;
-  const cutoff = new Date(now);
-  cutoff.setMonth(cutoff.getMonth() - monthsBack);
+  // "all" has no cutoff — historical case-study coverage is real,
+  // multi-year-old data (several 2022 placements), which no 30/90/365-day
+  // window could ever include. Without an unbounded option, the chart
+  // read as broken ("No placement value data yet") on a portal that in
+  // fact has $1.48M of real AVE on file — the data existed, the date
+  // filter just excluded all of it.
+  const monthsBack = range === "30d" ? 1 : range === "90d" ? 3 : range === "1y" ? 12 : null;
+  const cutoff = monthsBack == null ? null : new Date(now);
+  if (cutoff) cutoff.setMonth(cutoff.getMonth() - monthsBack);
 
   const buckets = new Map();
   for (const p of items) {
-    if (!p.publicationDate) continue;
-    const d = new Date(p.publicationDate);
-    if (Number.isNaN(d.getTime()) || d < cutoff) continue;
+    // Bundled campaign-total rows (see seedRealCaseStudyData.js) have no
+    // single publicationDate by design — there's no one article to date.
+    // Falling back to landedDate means their AVE still reaches the chart
+    // instead of silently vanishing from every time-bucketed view.
+    const dateStr = p.publicationDate || p.landedDate;
+    if (!dateStr) continue;
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime()) || (cutoff && d < cutoff)) continue;
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     if (!buckets.has(key)) buckets.set(key, { label: key, ave: 0, placements: 0 });
     const bucket = buckets.get(key);
@@ -303,4 +314,93 @@ export function getAggregateRealChartSeries(range) {
 
 export function getAggregateRealInsight() {
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Analytics view — cross-client breakdowns
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the Analytics view charts, computed in one pass over real
+ * data. Every number here traces back to an actual placement or client
+ * record; nothing is invented to make a chart look fuller than the data
+ * actually is. Where a real breakdown would require data that doesn't
+ * exist (a pitch date, a sentiment call nobody's made), this says so
+ * explicitly rather than silently omitting the category or defaulting it
+ * to zero — the same unknown-is-not-zero principle used everywhere else in
+ * this file (see getAggregateRealMetrics's avgLeadTime, or getRealMetrics's
+ * totalAVE).
+ */
+export function getAnalyticsSummary() {
+  const placements = getAllRealPlacements();
+  const clients = getRealClients();
+
+  // --- AVE by client, split into confirmed vs. flagged-as-estimate -------
+  // A stacked total would silently blend a number Tenyse can stand behind
+  // with one that's a derived estimate; keeping them as separate series
+  // lets the chart show both without pretending they're the same kind of
+  // figure. See src/aveDataQuality.js for what a flag means.
+  const aveByClient = clients
+    .map((c) => {
+      const clientPlacements = placements.filter((p) => p.clientName === c.name && p.aveValue != null);
+      const confirmed = clientPlacements.filter((p) => !p.aveDataQuality).reduce((sum, p) => sum + p.aveValue, 0);
+      const flagged = clientPlacements.filter((p) => p.aveDataQuality).reduce((sum, p) => sum + p.aveValue, 0);
+      return { client: c.name, confirmed, flagged, total: confirmed + flagged };
+    })
+    .filter((row) => row.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  // --- Client status breakdown --------------------------------------------
+  const statusCounts = { active: 0, past: 0, unconfirmed: 0 };
+  for (const c of clients) {
+    const status = c.profile?.status;
+    if (status in statusCounts) statusCounts[status] += 1;
+  }
+  const statusBreakdown = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
+
+  // --- Sentiment breakdown -------------------------------------------------
+  // "not set" is its own real category here, not an omission — several
+  // placements are bundled campaign totals with no single tone to assign
+  // (schema.js's own rule: never guess a sentiment with no analysis behind
+  // it), so counting them honestly matters more than a tidier chart.
+  const sentimentCounts = { positive: 0, neutral: 0, negative: 0, "not set": 0 };
+  for (const p of placements) {
+    const key = p.sentiment && p.sentiment in sentimentCounts ? p.sentiment : "not set";
+    sentimentCounts[key] += 1;
+  }
+  const sentimentBreakdown = Object.entries(sentimentCounts)
+    .map(([sentiment, count]) => ({ sentiment, count }))
+    .filter((row) => row.count > 0);
+
+  // --- Lead time -----------------------------------------------------------
+  // Deliberately NOT a single blended average. Most of the seeded case-study
+  // placements have no pitchSentDate — Tenyse's source decks report period
+  // or campaign totals, not per-article pitch dates — so folding them into
+  // one number would either silently drop most of the data or (worse) let
+  // a handful of real turnaround times stand in as if they represented the
+  // whole client roster. Reporting per-client where it EXISTS, and naming
+  // the gap explicitly, is the honest version of this chart.
+  const withBothDates = placements.filter((p) => p.pitchSentDate && p.landedDate);
+  const leadTimeByClient = clients
+    .map((c) => {
+      const clientPlacements = withBothDates.filter((p) => p.clientName === c.name);
+      if (!clientPlacements.length) return null;
+      const days = clientPlacements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((d) => d != null);
+      if (!days.length) return null;
+      return { client: c.name, avgDays: Math.round(days.reduce((a, b) => a + b, 0) / days.length), count: days.length };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.avgDays - b.avgDays);
+
+  return {
+    aveByClient,
+    statusBreakdown,
+    sentimentBreakdown,
+    leadTime: {
+      byClient: leadTimeByClient,
+      placementsWithData: withBothDates.length,
+      placementsMissingPitchDate: placements.filter((p) => !p.pitchSentDate).length,
+      totalPlacements: placements.length,
+    },
+  };
 }

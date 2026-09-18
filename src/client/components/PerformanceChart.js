@@ -5,6 +5,7 @@ const RANGE_LABELS = {
   "30d": "Last 30 Days",
   "90d": "Last 90 Days",
   "1y": "This Year",
+  all: "All Time",
 };
 
 /**

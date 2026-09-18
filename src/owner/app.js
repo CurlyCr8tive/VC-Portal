@@ -2,6 +2,7 @@ import { CLIENTS, METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, AGGREGATE_INSIGH
 import {
   getRealClients,
   getClientProfile,
+  getAnalyticsSummary,
   getRealMetrics,
   getRealPlacements,
   getRealCampaigns,
@@ -31,6 +32,7 @@ import { renderReportCard } from "../client/components/LatestReportCard.js";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
+import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection } from "./components/AnalyticsCharts.js";
 import { renderClientsList } from "./components/ClientsListCard.js";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js";
 import { renderPlacementForm } from "./components/PlacementForm.js";
@@ -51,7 +53,7 @@ import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatt
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260917-demo-qa-1";
 import { seedSamplePlacements } from "./seedSampleData.js";
-import { seedRealCaseStudyData, backfillAveDataQuality } from "./seedRealCaseStudyData.js?v=20260916-ave-quality";
+import { seedRealCaseStudyData, backfillAveDataQuality, inventDemoDayGapsForPreview, applyOutletRatesToPreviewPlacements } from "./seedRealCaseStudyData.js";
 import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260916-polish-2";
 
 // ---------------------------------------------------------------------------
@@ -101,7 +103,12 @@ const state = {
   view: "dashboard",
   demoState: "normal", // normal | loading | empty | error
   dataSource: "real", // real | mock — real reads storage.js placements across all clients
-  chartRange: "30d",
+  // Defaults to "all" rather than "30d" — most real case-study coverage
+  // on file is from 2022, which no rolling 30/90/365-day window could ever
+  // show. A narrower default would mean the Dashboard's headline chart
+  // opens empty on every fresh session despite the portal holding real,
+  // substantial data.
+  chartRange: "all",
   searchTerm: "",
   dashboardMode: "pr", // pr | coaching
   showCoachingOnDashboard: true,
@@ -2171,12 +2178,41 @@ function renderReportsView() {
 }
 
 function renderAnalyticsView() {
-  document.getElementById("analytics-content").innerHTML = `
+  const container = document.getElementById("analytics-content");
+  if (state.dataSource !== "real") {
+    container.innerHTML = `
+      <div class="section-heading"><h2>Analytics</h2></div>
+      <div class="card"><p>Switch the sidebar's data source to "Real" to see cross-client analytics.</p></div>
+    `;
+    return;
+  }
+  const summary = getAnalyticsSummary();
+  container.innerHTML = `
     <div class="section-heading"><h2>Analytics</h2></div>
-    <div class="card">
-      <p>Cross-client analytics and trend comparisons are coming soon. The Performance chart on your Dashboard shows combined value and placement trends for now.</p>
+    <p class="hint" style="margin:-4px 0 20px;">Cross-client breakdowns from every real placement and client record on file. Where a real value is not known, that is shown explicitly rather than guessed — see each card for what that means here.</p>
+    <div class="analytics-grid">
+      <div class="card">
+        <h3 style="margin-top:0;">Publicity Value by Client</h3>
+        <div id="analytics-ave-by-client"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Client Status</h3>
+        <div id="analytics-status"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Coverage Sentiment</h3>
+        <div id="analytics-sentiment"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Average Lead Time</h3>
+        <div id="analytics-lead-time"></div>
+      </div>
     </div>
   `;
+  renderAveByClientChart(document.getElementById("analytics-ave-by-client"), summary.aveByClient);
+  renderStatusBreakdownChart(document.getElementById("analytics-status"), summary.statusBreakdown);
+  renderSentimentChart(document.getElementById("analytics-sentiment"), summary.sentimentBreakdown);
+  renderLeadTimeSection(document.getElementById("analytics-lead-time"), summary.leadTime);
 }
 
 function renderSettingsView() {
@@ -2535,6 +2571,17 @@ if (session) {
   // to resurrect. See backfillAveDataQuality()'s own comment for why it
   // can't live inside the once-only seed.
   if (state.dataSource === "real") backfillAveDataQuality();
+  // Same discovery as inventDemoDayGapsForPreview below: this session's
+  // outlet-rate-derived AVE for SNAP Co. and Houston Housing Authority
+  // reached Supabase only. Mirrors it into the preview's separate store.
+  if (state.dataSource === "real") applyOutletRatesToPreviewPlacements();
+  // Preview-mode ("?demo=owner") counterpart to
+  // scripts/invent-demo-day-gaps.mjs — the local, localStorage-backed data
+  // this preview reads is a separate store from the real Supabase database
+  // that script updated, so fixing one was never going to change the
+  // other. Owner's explicit, twice-stated direction: invent for Demo Day,
+  // revert once real values exist. See that function's own comment.
+  if (state.dataSource === "real") inventDemoDayGapsForPreview();
   // Same reasoning, different data: the seeded executive summaries were
   // written in Markdown, and a browser that already seeded keeps that copy
   // until it's rewritten in place. Runs every load; a summary with no

@@ -60,6 +60,8 @@
 // in notes so nobody mistakes it for a sourced fact.
 
 import { createPlacement } from "../schema.js";
+import { estimateAVE } from "../aveEstimation.js";
+import { findOutletTraffic } from "../outletTrafficReference.js";
 import { toReportProse } from "../reportProse.js";
 import { addPlacement, loadPlacements, deletePlacement, updatePlacement } from "../storage.js";
 import { createCampaign } from "../campaignSchema.js";
@@ -515,6 +517,140 @@ UPCOMING (as of the Jan 2022 snapshot, not confirmed as materialized): interview
  * already carry a flag are left alone, so this never overwrites a
  * resolution.
  */
+/**
+ * FILLS pitch dates and sentiment with INVENTED values, for the LOCAL
+ * PREVIEW ("?demo=owner", localStorage) path only — at the owner's
+ * explicit, twice-stated direction, for Demo Day (Sept 23, 2026), to be
+ * corrected once real values exist. Mirrors what
+ * scripts/invent-demo-day-gaps.mjs does against Supabase for a signed-in
+ * real session — this exists because the preview link and a real session
+ * are two entirely separate data stores (one is localStorage seeded from
+ * the constants above, the other is Supabase read through owner-api), so
+ * fixing one was never going to change what the other shows.
+ *
+ * Same anchor logic as the Supabase script: a real anchor is a
+ * publicationDate; a bundled row with none borrows the earliest real
+ * publicationDate among that client's own placements, or falls back to
+ * HISTORICAL_FALLBACK_DATE if the client has no real date anywhere. Never
+ * anchors to landedDate — RECORDING_DATE there means "the day this was
+ * typed in," not a real publish date, and anchoring to it produced dates
+ * years after the campaign's own documented history.
+ *
+ * Every changed row is tagged in notes with "[INVENTED FOR DEMO — ...]",
+ * identical to the Supabase-side script, so both stores stay auditable
+ * and revertible the same way.
+ */
+// Every client in this seed batch is documented as 2022 case-study
+// material (this file's own header: "real historical case-study data...
+// sourced from Tenyse's own past reporting"). A client with zero real
+// dates anywhere falls back to this rather than to today.
+const HISTORICAL_FALLBACK_DATE = "2022-06-01";
+
+function inventedLeadTimeDays(seedStr) {
+  let hash = 0;
+  for (const ch of String(seedStr)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return 14 + (hash % 8); // 14-21 days, matching Greyz Bistro's own real 17-19 day placements
+}
+
+export function inventDemoDayGapsForPreview() {
+  const all = loadPlacements();
+  const clientRealAnchor = new Map();
+  for (const p of all) {
+    if (!p.publicationDate) continue;
+    const current = clientRealAnchor.get(p.client);
+    if (!current || p.publicationDate < current) clientRealAnchor.set(p.client, p.publicationDate);
+  }
+
+  let updated = 0;
+  for (const existing of all) {
+    const alreadyInvented = /\[INVENTED FOR DEMO/.test(existing.notes || "");
+    const needsPitch = !existing.pitchSentDate;
+    const needsSentiment = !existing.sentiment;
+    if (!needsPitch && !needsSentiment) continue;
+
+    const patch = { ...existing };
+    const tags = [];
+
+    if (needsPitch) {
+      const ownReal = existing.publicationDate || null;
+      const anchor = ownReal || clientRealAnchor.get(existing.client) || HISTORICAL_FALLBACK_DATE;
+      const anchorDate = new Date(anchor);
+      if (!Number.isNaN(anchorDate.getTime())) {
+        const days = inventedLeadTimeDays(existing.id);
+        const pitchDate = new Date(anchorDate);
+        pitchDate.setDate(pitchDate.getDate() - days);
+        patch.pitchSentDate = pitchDate.toISOString().slice(0, 10);
+        tags.push(`pitchSentDate set to ${patch.pitchSentDate} (${days}d before ${ownReal ? "this placement's own" : "this client's earliest known"} real date ${anchor})`);
+
+        // Mirrors the Supabase script's fix: if landedDate isn't backed by
+        // a real publicationDate, it's RECORDING_DATE — "the day this was
+        // typed in," not a real publish date. Pairing a historically-
+        // anchored pitch date against that placeholder produced 1500+ day
+        // "lead times" on screen. Replacing landedDate too, anchored to
+        // the same real date, keeps both ends of the interval consistent.
+        if (!ownReal) {
+          patch.landedDate = anchor;
+          tags.push(`landedDate changed from its RECORDING_DATE placeholder (${existing.landedDate}) to ${anchor}`);
+        }
+      }
+    }
+    if (needsSentiment) {
+      patch.sentiment = "positive";
+      tags.push('sentiment set to "positive" — no per-article analysis behind this, a showcase-deck placement assumed positive');
+    }
+
+    if (tags.length && !alreadyInvented) {
+      const stamp = `[INVENTED FOR DEMO — ${new Date().toISOString().slice(0, 10)}] ${tags.join("; ")}. Replace before this reaches a client.`;
+      patch.notes = existing.notes ? `${existing.notes}\n\n${stamp}` : stamp;
+    }
+    updatePlacement(patch);
+    updated += 1;
+  }
+  return updated;
+}
+
+/**
+ * Local-preview counterpart to scripts/apply-outlet-rates-to-placements.mjs
+ * and scripts/backfill-audience-reach.mjs — same discovery as
+ * inventDemoDayGapsForPreview() above: the browser's localStorage is a
+ * separate store from Supabase, seeded once from the constants at the top
+ * of this file, which were never updated when this session derived AVE
+ * for SNAP Co. and Houston Housing Authority from outlet traffic figures.
+ * That work reached Supabase only — every real-signed-in session sees it,
+ * the preview link never did.
+ *
+ * Mirrors the same derivation client-side using the same modules the
+ * research-rate button already imports (aveEstimation.js,
+ * outletTrafficReference.js), so a placement with no aveValue but a
+ * publication matching a known outlet gets the identical figure Supabase
+ * now holds, flagged the same way.
+ */
+export function applyOutletRatesToPreviewPlacements() {
+  let updated = 0;
+  for (const existing of loadPlacements()) {
+    if (existing.aveValue != null && existing.aveValue !== "") continue;
+    const traffic = findOutletTraffic(existing.publication);
+    if (!traffic) continue;
+    const estimate = estimateAVE(traffic.value, traffic.metric);
+    if (!estimate) continue;
+    const flag =
+      traffic.confidence === "estimated"
+        ? `Estimated figure, not a sourced one. ${traffic.source} Replace once a real number is available.`
+        : estimate.overstated
+          ? `Derived from total visits rather than unique visitors, which the AVE formulas actually call for — so this overstates. Source: ${traffic.source}`
+          : null;
+    updatePlacement({
+      ...existing,
+      aveValue: Number(estimate.muckRack.toFixed(2)),
+      aveAutoCalculated: true,
+      audienceReach: existing.audienceReach ?? traffic.value,
+      aveDataQuality: existing.aveDataQuality || flag,
+    });
+    updated += 1;
+  }
+  return updated;
+}
+
 export function backfillAveDataQuality() {
   let updated = 0;
   for (const existing of loadPlacements()) {

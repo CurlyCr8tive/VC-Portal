@@ -1,0 +1,224 @@
+{
+  "invented_at": "2026-09-18",
+  "reason": "Demo Day (Sept 23, 2026) — owner directive to fill gaps for demo purposes",
+  "changes": [
+    {
+      "id": "b8b5816e-d37f-45a2-b3b9-176e23e9d7fc",
+      "client": "Candlelit Care",
+      "publication": "Essence, 21Ninety, Yahoo News, Parents, SELF Magazine + 1 more (6 total per deck, 1 not individually named)",
+      "patch": {
+        "pitch_sent_date": "2022-05-11",
+        "landed_date": "2022-06-01",
+        "sentiment_tag": "positive",
+        "notes": "Real case-study figure — exact original landing date not specified in source material. Date field is a recording-date placeholder, not a sourced fact. DUPLICATE-FIGURE FLAG: this $492,198/14.2M figure is IDENTICAL to VeganHood's CPG campaign figure above, despite entirely different outlet lists (VeganHood: VegOut/QSR/VegWorld/Patch/PIX11/NBC; Candlelit Care: Essence/21Ninety/Yahoo News/Parents/SELF+1). AVE is a sum of per-outlet ad-rate equivalents — two independently-calculated campaigns landing on the exact same dollar AND reach figure isn't plausible. Confirmed directly from each client's own separate deck slide as of Aug 25 (not just the earlier cross-reference note), plus a leftover \"Candlelit Therapy\" terminology label found under Vegan Dining Month's section of the same overall deck (see that placement's notes) — strong evidence Tenyse's Canva template reuses this exact stat block across clients without updating it. Do not treat either number as confirmed for either client until she confirms from the original Meltwater/Coverage Books export which (if either) is real.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-05-11 (21d before this client's earliest known real date 2022-06-01); landed_date changed from its RECORDING_DATE placeholder (2026-09-17) to 2022-06-01 — pairing an invented pitch date against that placeholder produced a multi-year \"lead time\"; sentiment_tag set to \"positive\" — no per-article sentiment analysis behind this, a showcase-deck placement assumed positive. Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": null,
+        "landed_date": "2026-09-17"
+      }
+    },
+    {
+      "id": "5dbd197c-6b62-4b28-a9d5-aee93b692944",
+      "client": "SNAP Co.",
+      "publication": "Blavity News",
+      "patch": {
+        "pitch_sent_date": "2022-03-16",
+        "notes": "Case-study row used for AI summary and sentiment context.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-03-16 (15d before this placement's own real date 2022-03-31). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-03-31"
+      }
+    },
+    {
+      "id": "67cbde48-a113-466d-90da-796b32b5cdac",
+      "client": "SNAP Co.",
+      "publication": "NewsOne",
+      "patch": {
+        "pitch_sent_date": "2022-03-15",
+        "landed_date": "2022-03-31",
+        "notes": "Real case-study figure — exact original landing date not specified in source material. Date field is a recording-date placeholder, not a sourced fact. Real headline/sentiment confirmed Aug 25. No direct article URL was visible in the source screenshot — only a social share link (twitter.com/newsone/status/1509938918141145096) was shown, not the underlying NewsOne article URL, so articleUrl is left blank rather than substituting the social link. The report's release \"coincided with the 13th annual Trans Day of Visibility\" (March 31) per the deck, but that's the report's release framing, not a stated publish date for this specific NewsOne article — not assumed to be the same date without it being said directly.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-03-15 (16d before this client's earliest known real date 2022-03-31); landed_date changed from its RECORDING_DATE placeholder (2026-09-17) to 2022-03-31 — pairing an invented pitch date against that placeholder produced a multi-year \"lead time\". Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2026-09-17"
+      }
+    },
+    {
+      "id": "a5c2181f-bd1b-4d33-af76-6d4d42f3ebd2",
+      "client": "VegansBaby — Vegan Dining Month",
+      "publication": "8 news outlets across NYC, Las Vegas, Portland, Seattle, Eugene (not individually named in source)",
+      "patch": {
+        "pitch_sent_date": "2022-05-14",
+        "landed_date": "2022-06-01",
+        "sentiment_tag": "positive",
+        "notes": "Real case-study figure — exact original landing date not specified in source material. Date field is a recording-date placeholder, not a sourced fact. Includes a Samsung Times Square billboard placement (same event as VeganHood's Samsung partnership above) bundled into this total. REACH FIGURE CONFLICT, not resolved — flagging rather than picking one: the deck's own \"Executive Summary\" slide (explicitly about all 5 cities) states \"5.63 million individuals,\" used here. A separate slide later in the same deck, labeled \"Overall Coverage Summary of Portland, Seattle & Eugene\" (a 3-city subset), states 18,000,000 reach instead — larger than the 5-city total, which isn't possible if both are real. Stronger evidence that 18M slide is unreliable for this client specifically: its \"Terminology Guide\" box defines \"Clips\" as \"the number of news clips mentioning Candlelit Therapy\" — a different client's name, left in from a reused template. Recommend asking Tenyse directly which (if either) reach figure is real before reporting either to a client.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-05-14 (18d before this client's earliest known real date 2022-06-01); landed_date changed from its RECORDING_DATE placeholder (2026-09-17) to 2022-06-01 — pairing an invented pitch date against that placeholder produced a multi-year \"lead time\"; sentiment_tag set to \"positive\" — no per-article sentiment analysis behind this, a showcase-deck placement assumed positive. Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": null,
+        "landed_date": "2026-09-17"
+      }
+    },
+    {
+      "id": "9f3a1e2d-b436-42fa-a0cd-5ccf827b8240",
+      "client": "Houston Housing Authority",
+      "publication": "The Birmingham Times",
+      "patch": {
+        "pitch_sent_date": "2022-01-12",
+        "notes": "Real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 8:00:41). Covers Northern's prior role at the Housing Authority of the Birmingham District (HABD) before Houston.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-12 (15d before this placement's own real date 2022-01-27). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-01-27"
+      }
+    },
+    {
+      "id": "2daad885-8588-49ad-af8d-1bbd2313fb49",
+      "client": "Houston Housing Authority",
+      "publication": "Houston Business Journal",
+      "patch": {
+        "pitch_sent_date": "2022-01-20",
+        "notes": "By reporter Florian Martin, 8:14pm EST. Real reach/date/sentiment confirmed Aug 25 from the \"Etched\"-branded deck's \"News Coverage Highlights\" slide. No article URL was shown for this specific piece (unlike the OST/South Union placement above) — left blank rather than guessed.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-20 (18d before this placement's own real date 2022-02-07). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-02-07"
+      }
+    },
+    {
+      "id": "e446ec9a-e4f2-4f8e-8691-670c42583b26",
+      "client": "Houston Housing Authority",
+      "publication": "Houston Business Journal",
+      "patch": {
+        "pitch_sent_date": "2022-01-12",
+        "notes": "Real headline/date/URL/sentiment/reach confirmed Aug 25 from a second Canva deck (this one branded \"Etched,\" not Verified Consulting — see REAL_CLIENT_PROFILES' Houston Housing Authority notes for that flag). Reach (17,243) and tone (Neutral) from the deck's own \"News Coverage Highlights\" slide; headline/URL/date confirmed a second time from its Appendix news-clips table.\n\n[2026-09-18] Unreachable article_url removed (Muck Rack tracking redirect — needs a login, not the source). Previous value: https://muckrack.com/link/oAQHSr/local-ministry-opens-affordable-homes-in-ostsouth-union-area\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-12 (19d before this placement's own real date 2022-01-31). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "neutral",
+        "landed_date": "2022-01-31"
+      }
+    },
+    {
+      "id": "ba6ddda8-4391-4bce-bf09-79fa7abc0501",
+      "client": "SNAP Co.",
+      "publication": "LGBTQ Nation",
+      "patch": {
+        "pitch_sent_date": "2022-03-11",
+        "notes": "Real headline/date/URL/sentiment confirmed Aug 25 (byline: Molly Sprayregen, Thursday, March 31, 2022). Reach shown in the deck as \"995,689 K Monthly readers &viewers\" — kept as 995,689 (not ×1,000) since that's already in a plausible range next to Blavity (4.1M) and NewsOne (1.17M), and the same \"K\" suffix appears on 102.7 KIIS FM's figure below where treating it as a real ×1,000 multiplier would be implausible (see that placement's notes) — read as a stray label/column-header artifact carried over from her source export, not a genuine unit, applied consistently across both. Flagging the reasoning rather than asserting it as confirmed — worth a direct check with Tenyse.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-03-11 (20d before this placement's own real date 2022-03-31). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-03-31"
+      }
+    },
+    {
+      "id": "ee6d9508-73a9-412d-a94e-50f7059796c7",
+      "client": "Houston Housing Authority",
+      "publication": "Bisnow",
+      "patch": {
+        "pitch_sent_date": "2022-01-10",
+        "notes": "Real headline/date/URL/sentiment confirmed Aug 25 from the same deck's Appendix news-clips table (timestamp 6:02:22).\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-10 (18d before this placement's own real date 2022-01-28). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-01-28"
+      }
+    },
+    {
+      "id": "87812ee3-81d6-4654-a0d0-f2b91839ac3f",
+      "client": "Houston Housing Authority",
+      "publication": "PRWeb",
+      "patch": {
+        "pitch_sent_date": "2022-01-11",
+        "notes": "Same syndicated press release as the two placements above, on a third wire — real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 7:00:00). Snippet: \"HHA provides affordable homes and services to more than 60,000 low-income Houstonians, including over 17,000 families housed through the Housing Choice Voucher Program... and another 5,700 living in 25 public housing and tax credit developments.\"\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-11 (15d before this placement's own real date 2022-01-26). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-01-26"
+      }
+    },
+    {
+      "id": "c20cbca2-40bc-4444-af9a-545ee36c92bf",
+      "client": "VeganHood",
+      "publication": "8 outlets incl. VegOut, QSR, VegWorld Magazine, Patch, PIX11, NBC",
+      "patch": {
+        "pitch_sent_date": "2022-05-17",
+        "landed_date": "2022-06-01",
+        "notes": "Case-study aggregate row used for demo/reporting context.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-05-17 (15d before this client's earliest known real date 2022-06-01); landed_date changed from its RECORDING_DATE placeholder (2026-09-17) to 2022-06-01 — pairing an invented pitch date against that placeholder produced a multi-year \"lead time\". Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2026-09-17"
+      }
+    },
+    {
+      "id": "574edf57-be23-4837-8386-dfb74b99bc95",
+      "client": "VeganHood",
+      "publication": "Samsung USA (837 NYC brand activation) + Times Square billboard",
+      "patch": {
+        "pitch_sent_date": "2022-05-14",
+        "landed_date": "2022-06-01",
+        "sentiment_tag": "positive",
+        "notes": "Real case-study figure — exact original landing date not specified in source material. Date field is a recording-date placeholder, not a sourced fact. Separate engagement from the CPG product launch above — a Samsung-sponsored brand activation, not press placements. Real numbers from Tenyse's deck: Instagram influencer \"Imma Eat This\" booked, follower count grew 5K to 19.7K (190% increase per the deck). Post-level engagement stats shown: 24k likes, 95k saves, 200k shares, 500K views (deck's own summary figures — a specific example Instagram post screenshotted in the same slide shows different, smaller numbers, so don't conflate the two; treating the summary figures as the campaign-level claim). No dedicated schema field exists for social engagement metrics (see canvaColumnMapping.js's LOW_CONFIDENCE_FIELDS note), so these live here in notes rather than a fabricated structured field.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-05-14 (18d before this client's earliest known real date 2022-06-01); landed_date changed from its RECORDING_DATE placeholder (2026-09-17) to 2022-06-01 — pairing an invented pitch date against that placeholder produced a multi-year \"lead time\"; sentiment_tag set to \"positive\" — no per-article sentiment analysis behind this, a showcase-deck placement assumed positive. Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": null,
+        "landed_date": "2026-09-17"
+      }
+    },
+    {
+      "id": "3a1b6f77-448f-4cfe-a609-29848b2e6dad",
+      "client": "Houston Housing Authority",
+      "publication": "Yahoo Finance",
+      "patch": {
+        "pitch_sent_date": "2022-01-10",
+        "notes": "Real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 11:10:00) — the underlying press release, syndicated; see the Daily Advent Nigeria and PRWeb placements below for the same story on other wires, each counted as its own placement per Tenyse's own reporting deck.\n\n[2026-09-18] Unreachable article_url removed (verified 404). Previous value: https://finance.yahoo.com/news/houston-housing-authority-board-directors-161000092.html\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-10 (16d before this placement's own real date 2022-01-26). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-01-26"
+      }
+    },
+    {
+      "id": "4ec6ec52-983c-4526-a012-7a58ffd843ba",
+      "client": "SNAP Co.",
+      "publication": "102.7 KIIS FM (iHeart)",
+      "patch": {
+        "pitch_sent_date": "2022-03-13",
+        "notes": "Real headline/URL/sentiment confirmed Aug 25 (byline: Cherranda Smith). DATE CONFLICT in her own source, not resolved: the article's byline reads \"Mar 31, 2022,\" but the article URL itself is dated \"2021-03-31\" — used the byline date (2022) since it's the more explicit, human-written date, but this is a real inconsistency in the source material worth asking Tenyse about directly, not something guessed past. REACH FIGURE: deck shows \"108,477 K Monthly readers &Viewers\" — kept as 108,477 (not ×1,000 = 108,477,000), consistent with outletReference.js's existing reasoning that treating \"K\" as a literal ×1,000 multiplier here would put a single-market radio station's reach far above Blavity's national digital reach (4.1M), which isn't plausible. This CORRECTS the previous version of this same placement, which used 108,477,000 — that was the less-consistent reading; flagging so the change is visible rather than silent. Still unverified until Tenyse confirms directly.\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-03-13 (18d before this placement's own real date 2022-03-31). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-03-31"
+      }
+    },
+    {
+      "id": "931578ba-3414-4e44-a6a8-358e614993c9",
+      "client": "Houston Housing Authority",
+      "publication": "Daily Advent Nigeria",
+      "patch": {
+        "pitch_sent_date": "2022-01-06",
+        "notes": "Same syndicated press release as the Yahoo Finance placement above, on a different wire — real headline/date/URL/sentiment confirmed Aug 25 from the Appendix news-clips table (timestamp 11:10:00).\n\n[INVENTED FOR DEMO — 2026-09-18] pitchSentDate set to 2022-01-06 (20d before this placement's own real date 2022-01-26). Replace before this reaches a client."
+      },
+      "previous": {
+        "pitch_sent_date": null,
+        "sentiment_tag": "positive",
+        "landed_date": "2022-01-26"
+      }
+    }
+  ]
+}
