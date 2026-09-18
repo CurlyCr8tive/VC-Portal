@@ -2786,3 +2786,84 @@ table.placements-table {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
 }
+
+/* Campaign status badges — "active"/"paused"/"completed" mirror the three
+   real statuses in db/schema.sql's check constraint; "planning" is a
+   derived label (a campaign with a future start date), not a fourth
+   status this app tracks, so it gets its own visually-distinct color
+   rather than reusing one of the real three. */
+.status-badge.active {
+  background: var(--color-teal-tint);
+  color: #1f6b64;
+  border-color: #bfe4e0;
+}
+.status-badge.planning {
+  background: #efe9f5;
+  color: #5b4a80;
+  border-color: #dccdec;
+}
+.status-badge.paused {
+  background: #fdf0d8;
+  color: #8a5a12;
+  border-color: #f3ddad;
+}
+.status-badge.completed,
+.status-badge.past {
+  background: #eee9e4;
+  color: #6b5f56;
+  border-color: #ddd2c7;
+}
+.status-badge.unconfirmed {
+  background: #fbe2da;
+  color: #a04a30;
+  border-color: #f0c4b4;
+}
+
+/* Filter chips (Campaigns overview's All/Active/Planning/Paused/Completed
+   tabs). A plain toggle-button row, not a full tab widget — matches this
+   codebase's existing preference for simple markup over a component
+   library. */
+.chip-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #e4d9bd;
+  background: var(--text-on-navy);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chip-filter.active {
+  background: var(--color-navy);
+  color: var(--text-on-navy);
+  border-color: var(--color-navy);
+}
+.chip-filter .chip-count {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+}
+.chip-filter.active .chip-count {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Inline progress bar for a table cell (Campaigns overview's Progress
+   column) — same visual language as .analytics-bar-track, smaller. */
+.progress-bar-track {
+  width: 90px;
+  height: 8px;
+  background: #f0ece4;
+  border-radius: 4px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--color-teal);
+}

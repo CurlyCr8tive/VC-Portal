@@ -515,3 +515,39 @@ export function getReportsOverviewSummary({ clientName = null } = {}) {
 
   return { metrics, weeklyTrend, mediaTypeBreakdown, clientPerformance };
 }
+
+// ---------------------------------------------------------------------------
+// Campaigns overview — metric cards + a per-campaign table with AVE and
+// progress, the data campaign records themselves don't carry directly.
+// ---------------------------------------------------------------------------
+
+export function getCampaignsOverviewSummary() {
+  const clients = getRealClients();
+  const allCampaigns = clients.flatMap((c) => getRealCampaigns(c.name).map((camp) => ({ ...camp, clientName: c.name })));
+  const allPlacements = getAllRealPlacements();
+
+  const rows = allCampaigns.map((camp) => {
+    const placements = allPlacements.filter((p) => p.clientName === camp.clientName && p.campaign === camp.name);
+    const ave = placements.filter((p) => p.landedDate).reduce((s, p) => s + (p.aveValue || 0), 0);
+    return {
+      ...camp,
+      ave: ave || null,
+      progressPercent: camp.totalPlacements ? Math.round((camp.completedPlacements / camp.totalPlacements) * 100) : null,
+    };
+  });
+
+  const activeCampaigns = rows.filter((r) => r.status === "Active").length;
+  const totalAVE = rows.reduce((s, r) => s + (r.ave || 0), 0) || null;
+  const clientsWithActive = new Set(rows.filter((r) => r.status === "Active").map((r) => r.clientName)).size;
+
+  return {
+    metrics: {
+      activeCampaigns,
+      totalPlacements: rows.reduce((s, r) => s + r.totalPlacements, 0),
+      totalAVE,
+      clientsWithActive,
+      totalClients: clients.length,
+    },
+    rows: rows.sort((a, b) => (b.startDate || "").localeCompare(a.startDate || "")),
+  };
+}

@@ -4,6 +4,7 @@ import {
   getClientProfile,
   getAnalyticsSummary,
   getReportsOverviewSummary,
+  getCampaignsOverviewSummary,
   getRealMetrics,
   getRealPlacements,
   getRealCampaigns,
@@ -110,6 +111,8 @@ const state = {
   // opens empty on every fresh session despite the portal holding real,
   // substantial data.
   chartRange: "all",
+  campaignsFilter: "all",
+  campaignsSearch: "",
   searchTerm: "",
   dashboardMode: "pr", // pr | coaching
   showCoachingOnDashboard: true,
@@ -1545,6 +1548,112 @@ function renderClientsView() {
   });
 }
 
+/**
+ * Cross-client campaigns overview: four metric cards and a filterable,
+ * searchable table (matching the tabs shown in the target design — All /
+ * Active / Planning / Paused / Completed). Renders above the existing
+ * campaign grid + add/edit form (kept exactly as-is below — real, working
+ * campaign management, not replaced).
+ *
+ * "Planning" isn't one of this schema's three statuses (active/completed/
+ * paused — see db/schema.sql) — mapped from a campaign with a startDate
+ * in the future, rather than adding a status this app doesn't track.
+ */
+function renderCampaignsOverview(container) {
+  const { metrics, rows } = getCampaignsOverviewSummary();
+  const filter = state.campaignsFilter || "all";
+  const search = (state.campaignsSearch || "").toLowerCase();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const rowStatus = (r) => (r.status === "Active" && r.startDate && r.startDate > today ? "Planning" : r.status);
+
+  const filtered = rows.filter((r) => {
+    const st = rowStatus(r);
+    const matchesFilter = filter === "all" || st.toLowerCase() === filter;
+    const matchesSearch = !search || r.name.toLowerCase().includes(search) || r.clientName.toLowerCase().includes(search);
+    return matchesFilter && matchesSearch;
+  });
+
+  const tabCounts = { all: rows.length };
+  for (const r of rows) {
+    const st = rowStatus(r).toLowerCase();
+    tabCounts[st] = (tabCounts[st] || 0) + 1;
+  }
+  const TABS = [
+    ["all", "All Campaigns"],
+    ["active", "Active"],
+    ["planning", "Planning"],
+    ["paused", "Paused"],
+    ["completed", "Completed"],
+  ];
+
+  container.innerHTML = `
+    <div class="section-heading"><h2>Campaigns Overview</h2></div>
+    <p class="hint" style="margin:-8px 0 20px;">Every real campaign across all clients, with publicity value and progress in one place.</p>
+    <div class="owner-metrics-grid" style="margin-bottom:24px;">
+      ${reportsMetricCard({ label: "Active Campaigns", value: String(metrics.activeCampaigns), delta: null, icon: "\u25b6", iconBg: "#fbe2da" })}
+      ${reportsMetricCard({ label: "Total Placements", value: String(metrics.totalPlacements), delta: null, icon: "\u25a6", iconBg: "#e1f2f0" })}
+      ${reportsMetricCard({ label: "Total Publicity Value", value: formatCompactCurrency(metrics.totalAVE), delta: null, icon: "$", iconBg: "#fdf0d8" })}
+      ${reportsMetricCard({ label: "Clients with Active Campaigns", value: `${metrics.clientsWithActive} of ${metrics.totalClients}`, delta: null, icon: "\u25ce", iconBg: "#e9ecff" })}
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${TABS.map(
+            ([key, label]) =>
+              `<button type="button" class="chip-filter ${filter === key ? "active" : ""}" data-campaign-filter="${key}">${escapeHtml(label)} ${tabCounts[key] ? `<span class="chip-count">${tabCounts[key]}</span>` : ""}</button>`
+          ).join("")}
+        </div>
+        <input type="search" id="campaigns-search-input" placeholder="Search campaigns or clients..." value="${escapeHtml(state.campaignsSearch || "")}" style="max-width:220px;" />
+      </div>
+      <div class="table-scroll">
+        <table class="placements-table">
+          <thead><tr><th>Campaign</th><th>Client</th><th>Status</th><th>Placements</th><th>AVE</th><th>Start Date</th><th>Progress</th></tr></thead>
+          <tbody>
+            ${
+              filtered.length
+                ? filtered
+                    .map(
+                      (r) => `
+              <tr>
+                <td><strong>${escapeHtml(r.name)}</strong></td>
+                <td>${escapeHtml(r.clientName)}</td>
+                <td><span class="status-badge ${rowStatus(r).toLowerCase()}">${escapeHtml(rowStatus(r))}</span></td>
+                <td class="numeric">${r.completedPlacements} / ${r.totalPlacements}</td>
+                <td class="numeric">${formatCurrency(r.ave)}</td>
+                <td>${r.startDate ? escapeHtml(r.startDate) : "—"}</td>
+                <td>${
+                  r.progressPercent == null
+                    ? `<span class="hint">Not yet tracked</span>`
+                    : `<div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.progressPercent}%;"></div></div><span class="hint">${r.progressPercent}%</span>`
+                }</td>
+              </tr>`
+                    )
+                    .join("")
+                : `<tr><td colspan="7"><p class="hint" style="margin:12px 0;">No campaigns match this filter.</p></td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll("[data-campaign-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.campaignsFilter = btn.dataset.campaignFilter;
+      renderCampaignsOverview(container);
+    });
+  });
+  const searchInput = container.querySelector("#campaigns-search-input");
+  searchInput.addEventListener("input", (e) => {
+    state.campaignsSearch = e.target.value;
+    renderCampaignsOverview(container);
+  });
+  // Keep focus + caret position across the re-render triggered by typing.
+  if (document.activeElement !== searchInput) searchInput.focus();
+}
+
 function renderCampaignsView() {
   const target = document.getElementById("campaigns-content");
   if (state.demoState === "loading") return renderLoadingState(target);
@@ -1563,7 +1672,8 @@ function renderCampaignsView() {
   const lockClient = !editingCampaign ? state.addCampaignForClient : "";
 
   target.innerHTML = `
-    <div class="section-heading"><h2>Campaigns</h2></div>
+    ${state.dataSource === "real" ? `<div id="campaigns-overview-wrap" style="margin-bottom:32px;"></div>` : ""}
+    <div class="section-heading"><h2>Manage Campaigns</h2></div>
     ${ownerApiAuthHint()}
     ${
       state.dataSource === "real" && state.realRecordsSync === "error"
@@ -1591,6 +1701,8 @@ function renderCampaignsView() {
     </div>
     ${canManageCampaigns ? `<div class="section-heading" style="margin-top:8px;"><h2>Manage Campaigns</h2></div><div id="campaign-manage-list"></div>` : ""}
   `;
+
+  if (state.dataSource === "real") renderCampaignsOverview(document.getElementById("campaigns-overview-wrap"));
 
   renderCampaignsGrid(document.getElementById("campaigns-full-grid"), getAllCampaigns(), {
     onViewCampaign: (id) => showCampaignDetail(id),
