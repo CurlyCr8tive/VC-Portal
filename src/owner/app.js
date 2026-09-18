@@ -2405,18 +2405,18 @@ function renderReportsOverview(container) {
 
     <div class="analytics-grid" style="margin-bottom:24px;">
       <div class="card">
-        <h3 style="margin-top:0;">Placement Trends</h3>
+        <h3 style="margin-top:0;">Placement Trends ${sectionInfoButton({ title: "Placement Trends", body: "Press placements landed and their estimated reach, grouped by week across every visible client. Reach here means audience size at the outlet, not confirmed readers of this specific piece — it's the same sourced-or-flagged figure used everywhere else in this app." })}</h3>
         <div id="reports-weekly-trend"></div>
       </div>
       <div class="card">
-        <h3 style="margin-top:0;">Placements by Media Type</h3>
+        <h3 style="margin-top:0;">Placements by Media Type ${sectionInfoButton({ title: "Placements by Media Type", body: "Every confirmed placement classified as Online, TV, Radio, or Other. Classified automatically from the outlet's name (e.g. Forbes = Online, PIX11 = TV) — this is a lookup, not something Tenyse confirmed per placement, so treat it as a helpful grouping rather than an audited breakdown." })}</h3>
         <p class="hint" style="margin:0 0 12px;">Classified from outlet name, not confirmed per placement — see Press Placements for the source outlet.</p>
         <div id="reports-media-type"></div>
       </div>
     </div>
 
     <div class="card" style="margin-bottom:24px;">
-      <h3 style="margin-top:0;">Client Performance</h3>
+      <h3 style="margin-top:0;">Client Performance ${sectionInfoButton({ title: "Client Performance", body: "One row per client: total confirmed placements, total AVE, estimated combined reach, and the outlets that ran the most coverage. Status (active/past/unconfirmed) mirrors what's set on the Clients page. A client showing 0 placements and — simply has no confirmed placements yet, not a data error." })}</h3>
       <div class="table-scroll">
         <table class="placements-table">
           <thead><tr><th>Client</th><th>Placements</th><th>AVE</th><th>Est. Reach</th><th>Top Outlets</th><th>Status</th></tr></thead>
@@ -2440,7 +2440,7 @@ function renderReportsOverview(container) {
     </div>
 
     <div class="card" style="margin-bottom:24px;">
-      <h3 style="margin-top:0;">Approved Reports</h3>
+      <h3 style="margin-top:0;">Approved Reports ${sectionInfoButton({ title: "Approved Reports", body: "Lists every client whose Executive Summary has been approved below (not just saved as a draft). Approval is what makes a summary eligible for inclusion in a Canva export — a saved-but-unapproved draft is treated as if no summary exists yet. Click View to jump to that client's report section." })}</h3>
       ${
         approvedSummaries.length
           ? `<div class="table-scroll"><table class="placements-table">
@@ -2488,7 +2488,7 @@ function renderReportsView() {
   const clients = state.dataSource === "real" ? getRealClients() : CLIENTS;
   target.innerHTML = `
     ${state.dataSource === "real" ? `<div id="reports-overview-wrap" style="margin-bottom:32px;"></div>` : ""}
-    <div class="section-heading"><h2>Generate Report Content</h2></div>
+    <div class="section-heading"><h2>Generate Report Content ${sectionInfoButton({ title: "Generate Report Content", body: "Two different drafting tools per client: the Executive Summary is short, gets saved and approved, and is what appears on the client's own dashboard and in the Canva CSV export once approved. The Report Narrative is longer and more scene-setting, regenerated fresh every time with nothing saved — it's meant to be copied by hand into the actual report document. The View Report / Download PDF buttons below each client's report card are placeholders: this build has no hosted report page or PDF generator wired up yet, so those two buttons are intentionally disabled (“Not yet available in this demo”) until that's built. Generate CSV above is the real, working export — pick a client and date range and it downloads an actual file for Canva Bulk Create." })}</h2></div>
     <p class="hint" style="margin:-8px 0 20px;">Draft, approve, and export the executive summary and full narrative for each client's report.</p>
     <div class="section" id="canva-export-wrap"></div>
     ${clients
