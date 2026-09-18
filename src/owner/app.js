@@ -46,7 +46,7 @@ import { loadResourcesForClient } from "../coachingResourceStorage.js";
 import { loadOpportunitiesForClient } from "../opportunityStorage.js";
 import { calculateCoachingProgress } from "../coachingProgress.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
-import { loadSummary, saveSummary, approveSummary } from "../summaryStorage.js";
+import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260917-demo-qa-1";
 import { seedSamplePlacements } from "./seedSampleData.js";
@@ -2467,6 +2467,11 @@ if (session) {
   // to resurrect. See backfillAveDataQuality()'s own comment for why it
   // can't live inside the once-only seed.
   if (state.dataSource === "real") backfillAveDataQuality();
+  // Same reasoning, different data: the seeded executive summaries were
+  // written in Markdown, and a browser that already seeded keeps that copy
+  // until it's rewritten in place. Runs every load; a summary with no
+  // Markdown is left alone.
+  normalizeStoredSummaryFormatting();
 
   renderSidebarComponent();
   renderHeaderComponent();

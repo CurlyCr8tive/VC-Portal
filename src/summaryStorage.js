@@ -8,6 +8,7 @@
 // displayed.
 
 import { logError } from "./errorLog.js";
+import { toReportProse, hasMarkdownArtifacts } from "./reportProse.js";
 
 const STORAGE_KEY = "vc_exec_summaries_v1";
 
@@ -27,6 +28,37 @@ function loadAll() {
 
 export function loadSummary(clientName) {
   return loadAll()[clientName] || null;
+}
+
+/**
+ * Rewrites any stored summary still carrying Markdown into plain prose.
+ *
+ * The seeded summaries were hand-written with "# Title" and "**Problem**",
+ * and nothing in this app renders Markdown — the text goes into a plain
+ * textarea, into the client's own dashboard, and into a Canva export, so a
+ * client reads the literal asterisks. Fixing the seed only helps a browser
+ * seeding for the first time; every browser that already ran it, including
+ * ones where Tenyse has APPROVED the text, keeps the old copy until this
+ * runs.
+ *
+ * Safe to call on every load: text with no Markdown is left untouched, and
+ * the conversion changes symbols only, never words (see reportProse.js).
+ * Approval state is preserved — this is a formatting pass, not a new draft,
+ * so it must not quietly un-approve something Tenyse already signed off.
+ */
+export function normalizeStoredSummaryFormatting() {
+  const all = loadAll();
+  let changed = 0;
+  for (const [clientName, entry] of Object.entries(all)) {
+    const text = typeof entry === "string" ? entry : entry?.text;
+    if (!text || !hasMarkdownArtifacts(text)) continue;
+    const cleaned = toReportProse(text);
+    if (cleaned === text) continue;
+    all[clientName] = typeof entry === "string" ? cleaned : { ...entry, text: cleaned };
+    changed += 1;
+  }
+  if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  return changed;
 }
 
 export function saveSummary(clientName, text) {

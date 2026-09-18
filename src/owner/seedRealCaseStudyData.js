@@ -60,6 +60,7 @@
 // in notes so nobody mistakes it for a sourced fact.
 
 import { createPlacement } from "../schema.js";
+import { toReportProse } from "../reportProse.js";
 import { addPlacement, loadPlacements, deletePlacement, updatePlacement } from "../storage.js";
 import { createCampaign } from "../campaignSchema.js";
 import { addCampaign, loadCampaigns } from "../campaignStorage.js";
@@ -584,7 +585,12 @@ export function seedRealCaseStudyData() {
   }
 
   for (const [clientName, text] of Object.entries(REAL_CASE_STUDY_SUMMARIES)) {
-    saveSummary(clientName, text);
+    // Converted on the way in rather than by rewriting the literals above:
+    // those strings stay readable in source with their section structure
+    // intact, and one code path guarantees what actually reaches storage is
+    // plain prose. Nothing downstream renders Markdown — this text lands in
+    // a textarea, on the client's dashboard, and in a Canva export.
+    saveSummary(clientName, toReportProse(text));
     approveSummary(clientName);
   }
 
