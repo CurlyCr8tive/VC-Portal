@@ -19,7 +19,7 @@
 
 import { PLAIN_PROSE_RULES } from "./outputFormat.js";
 
-export function buildExecutiveSummaryPrompt({ client, periodLabel, placements, totalAVE, totalReach, campaignContext }) {
+export function buildExecutiveSummaryPrompt({ client, periodLabel, placements, totalAVE, totalReach, campaignContext, clientIndustry, notableDetails }) {
   return `You are drafting a press coverage executive summary for ${client}, covering ${periodLabel}.
 
 Follow this exact structure, matching how Verified Consulting's real reports are written:
@@ -35,9 +35,14 @@ Use this exact terminology, not generic alternatives:
 Real data for this period — use ONLY these numbers, never estimate or invent a figure not listed here:
 - Total Publicity Value: ${totalAVE == null ? "not calculated yet — do not state or estimate a dollar figure" : totalAVE}
 - Total Audience Reach: ${totalReach}
-- Placements (${placements.length} total): ${placements.map(p => `${p.publication} — ${p.headline}`).join("; ")}
+- Placements (${placements.length} total), with everything known about each:
+${placements.map(p => `  • ${p.publication} — "${p.headline}"${p.publicationDate ? ` (published ${p.publicationDate})` : ""}${p.audienceReach != null ? `, audience reach ${p.audienceReach.toLocaleString()}` : ""}${p.aveValue != null ? `, publicity value $${p.aveValue.toLocaleString()}` : ""}${p.sentiment ? `, coverage tone ${p.sentiment}` : ""}`).join("\n")}
+${clientIndustry ? `- Client's sector: ${clientIndustry}` : ""}
+${notableDetails && notableDetails.length ? `- Specifics worth naming (real, drawn from the campaign record — use them, don't generalise past them):\n${notableDetails.map(d => `  • ${d}`).join("\n")}` : ""}
 
-Tone: confident and results-forward, the way a strategist reports to a client who's paying for outcomes — not generic marketing copy. Keep it to 3-4 short paragraphs.
+Tone: confident and results-forward, the way a strategist reports to a client who's paying for outcomes — not generic marketing copy.
+
+Depth: this is the summary a client reads to understand what they got for their money, so be specific and substantial rather than brief. Name outlets, quote headline framing, and say what each placement did for the client's standing — reach into a particular audience, credibility with a particular readership, timing against a launch. Draw on every field above; a placement's tone, date and reach are all worth using where they say something. Aim for four to six paragraphs. Never pad with adjectives — if there is more real detail, use it; if there genuinely isn't, stop.
 
 If any of the real data above is missing or zero, say so plainly rather than working around it — never smooth over a gap with vague language.
 ${PLAIN_PROSE_RULES}`;

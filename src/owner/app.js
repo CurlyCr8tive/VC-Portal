@@ -1,6 +1,7 @@
 import { CLIENTS, METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, AGGREGATE_INSIGHT, REPORTS } from "../client/mockData.js";
 import {
   getRealClients,
+  getClientProfile,
   getRealMetrics,
   getRealPlacements,
   getRealCampaigns,
@@ -1897,16 +1898,65 @@ async function createPlacementFromReviewQueueItem(id, details = {}) {
  * prompt: an unconfirmed placement or a client with zero real campaigns
  * just means a shorter/emptier input, never a guessed stand-in.
  */
+/**
+ * Everything the AI writing prompts can honestly be told about a client.
+ *
+ * This used to hand over three fields — placements, totalAVE and a campaign
+ * name — and hardcode `totalReach: "not tracked in this build"`, which was
+ * simply untrue: audienceReach is a real schema field, populated on the
+ * seeded placements. `notableDetails` was always an empty array even though
+ * campaign milestones and placement notes were sitting right there. The
+ * drafts read thin because the model was being starved, not because it
+ * couldn't write.
+ *
+ * Everything below is real data already in the system. Nothing is invented
+ * to pad a report — where a figure genuinely isn't known, the prompt is
+ * told that plainly so it says so rather than writing around the gap.
+ */
 function realWritingContextFor(clientName) {
   const placements = getRealPlacements(clientName).filter((p) => Boolean(p.landedDate));
-  const totalAVE = getRealMetrics(clientName).totalAVE;
-  const activeCampaignNames = loadCampaigns()
-    .filter((c) => c.client === clientName && c.status === "active")
-    .map((c) => c.name);
+  const metrics = getRealMetrics(clientName);
+  const campaigns = loadCampaigns().filter((c) => c.client === clientName);
+  const activeCampaignNames = campaigns.filter((c) => c.status === "active").map((c) => c.name);
+  const profile = getClientProfile(clientName) || {};
+
+  // Reach is per-placement; sum what exists rather than claiming it isn't
+  // tracked. Null (not 0) when no placement carries one — same unknown-is-
+  // not-zero rule used for AVE.
+  const withReach = placements.filter((p) => p.audienceReach != null);
+  const totalReach = withReach.length ? withReach.reduce((sum, p) => sum + p.audienceReach, 0) : null;
+
+  // Real specifics worth naming in a narrative, drawn from records that
+  // already exist: campaign milestones the owner actually ticked off, and
+  // the sourced detail captured on each placement.
+  const notableDetails = [
+    ...campaigns.flatMap((c) => (c.milestones || []).filter((m) => m.done).map((m) => `${c.name}: ${m.text}`)),
+    ...placements
+      .filter((p) => p.notes && !/recording-date placeholder/i.test(p.notes))
+      .map((p) => `${p.publication}: ${String(p.notes).split(/\.\s/)[0]}.`),
+  ].slice(0, 8);
+
+  // A real date range beats "the current reporting period".
+  const dates = placements.map((p) => p.publicationDate || p.landedDate).filter(Boolean).sort();
+  const periodLabel = dates.length
+    ? dates[0] === dates[dates.length - 1]
+      ? dates[0]
+      : `${dates[0]} to ${dates[dates.length - 1]}`
+    : "the current reporting period";
+
   return {
     placements,
-    totalAVE,
-    campaignContext: activeCampaignNames.length ? activeCampaignNames.join(", ") : "no active campaign on file for this client",
+    totalAVE: metrics.totalAVE,
+    totalReach,
+    periodLabel,
+    notableDetails,
+    clientIndustry: profile.industry || "",
+    engagementType: profile.engagementType || "",
+    campaignContext: activeCampaignNames.length
+      ? activeCampaignNames.join(", ")
+      : campaigns.length
+        ? `${campaigns.map((c) => c.name).join(", ")} (none currently marked active)`
+        : "no campaign on file for this client",
   };
 }
 
@@ -1956,14 +2006,16 @@ function renderSummaryForm(container, clientName) {
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
     generateStatus.textContent = "Generating…";
-    const { placements, totalAVE, campaignContext } = realWritingContextFor(clientName);
+    const ctx = realWritingContextFor(clientName);
     const result = await generateAIText("executive-summary", {
       client: clientName,
-      periodLabel: "the current reporting period",
-      placements,
-      totalAVE,
-      totalReach: "not tracked in this build",
-      campaignContext,
+      periodLabel: ctx.periodLabel,
+      placements: ctx.placements,
+      totalAVE: ctx.totalAVE,
+      totalReach: ctx.totalReach,
+      campaignContext: ctx.campaignContext,
+      clientIndustry: ctx.clientIndustry,
+      notableDetails: ctx.notableDetails,
     });
     generateBtn.disabled = false;
     if (result.ok) {
@@ -2006,13 +2058,16 @@ function renderReportNarrativeForm(container, clientName) {
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
     statusEl.textContent = "Generating…";
-    const { placements, campaignContext } = realWritingContextFor(clientName);
+    const ctx = realWritingContextFor(clientName);
     const result = await generateAIText("report-narrative", {
       client: clientName,
-      periodLabel: "the current reporting period",
-      placements,
-      campaignContext,
-      notableDetails: [],
+      periodLabel: ctx.periodLabel,
+      placements: ctx.placements,
+      campaignContext: ctx.campaignContext,
+      notableDetails: ctx.notableDetails,
+      totalAVE: ctx.totalAVE,
+      totalReach: ctx.totalReach,
+      clientIndustry: ctx.clientIndustry,
     });
     generateBtn.disabled = false;
     const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
