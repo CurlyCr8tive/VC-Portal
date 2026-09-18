@@ -114,13 +114,30 @@ const VALID_ROLES = new Set(["owner", "pr_client"]);
  * fixes it at the source instead of chasing every downstream symptom.
  */
 export function getSession() {
+  // A real, signed-in session must never be silently downgraded by a
+  // `?demo=` param still sitting in the URL (an old bookmark, a link
+  // clicked from a previous walkthrough, a page left open from before
+  // signing in). Real auth is checked FIRST and wins outright — `?demo=`
+  // only ever applies when there's no real session to protect. Without
+  // this order, logging in for real and then landing on any ?demo= URL
+  // would silently revert to preview mode with no error and no indication
+  // why, which is exactly the bug this fixes.
+  const raw = safeReadSession();
+  if (raw) {
+    try {
+      const session = JSON.parse(raw);
+      if (session?.real && VALID_ROLES.has(session.role)) return session;
+    } catch {
+      // Falls through to demo-params / the general parse-and-validate path below.
+    }
+  }
+
   const demoSession = sessionFromDemoParams();
   if (demoSession) {
     safeWriteSession(demoSession);
     return demoSession;
   }
 
-  const raw = safeReadSession();
   if (!raw) return null;
   let session;
   try {

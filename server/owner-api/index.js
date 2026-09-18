@@ -887,9 +887,13 @@ app.post(
   })
 );
 
+// Demo-capable: read-only, and this is exactly what a demo-mode
+// discovery-scan (also demo-capable) needs somewhere to show its results —
+// gating this stricter than the write that feeds it left scan results with
+// nowhere to appear in preview mode.
 app.get(
   "/api/review-queue",
-  ownerRoute(async (req, res) => {
+  ownerOrLocalDemoAiRoute(async (req, res) => {
     const { data, error } = await supabase.from("review_queue").select("*").eq("status", "pending").order("discovered_at", { ascending: false });
     if (error) throw error;
     res.json(data);
@@ -898,11 +902,19 @@ app.get(
 
 // Closes the loop on discovery-scan's real inserts — confirm/reject a real
 // candidate rather than just being able to see it. `resolved_by` is the
-// owner who acted, read from req.profile (attached by requireOwner), not
-// trusted from the request body.
+// owner who acted, read from req.profile — for a demo-AI request that's the
+// synthetic "local-demo-ai" profile ownerOrLocalDemoAiRoute attaches, never
+// trusted from the request body either way.
+//
+// Demo-capable for "rejected" is safe — it only dismisses a candidate, same
+// class of action as discovery-scan's own writes. The owner UI never sends
+// status:"confirmed" through this route (that goes through
+// create-placement below, which is real-auth only) but this endpoint would
+// technically allow it from a raw request; that's an acceptable gap for a
+// local-only demo flag, not a path the UI exposes.
 app.patch(
   "/api/review-queue/:id",
-  ownerRoute(async (req, res) => {
+  ownerOrLocalDemoAiRoute(async (req, res) => {
     const status = req.body?.status;
     if (!["confirmed", "rejected"].includes(status)) {
       return res.status(400).json({ error: "invalid_body", message: 'status must be "confirmed" or "rejected".' });

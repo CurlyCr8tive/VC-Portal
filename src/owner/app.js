@@ -16,7 +16,7 @@ import {
   getRealReport,
 } from "../realDataSource.js";
 import { computeLeadTimeDays, formatCurrency } from "../calculations.js";
-import { requireSession, logout } from "../auth.js?v=20260916-demo-route-2";
+import { requireSession, logout } from "../auth.js?v=20260918-real-session-priority";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
 import { addPlacement, updatePlacement, deletePlacement, upsertPlacement } from "../storage.js";
@@ -2035,26 +2035,12 @@ function renderReviewQueueView() {
     return;
   }
 
-  if (!shouldUseOwnerApi()) {
-    target.innerHTML = `
-      <div class="section-heading"><h2>Review Queue</h2></div>
-      ${ownerApiAuthHint()}
-      <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
-        The live Review Queue is fed by the Discovery Agent. The preview below shows the confirm/reject
-        workflow without making live changes.
-      </p>
-      <div class="card" id="review-queue-list"></div>
-    `;
-    renderMockReviewQueueSection();
-    return;
-  }
-
   target.innerHTML = `
     <div class="section-heading"><h2>Review Queue ${sectionInfoButton({ title: "Review Queue", body: "Candidate press mentions the Discovery Agent found while scanning for a client, waiting for Tenyse to confirm before they count as a real placement. Nothing here affects AVE totals, reports, or client dashboards until it's approved — this is a human checkpoint between an automated find and a figure a client would see." })}</h2></div>
     <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
-      Real candidate mentions found by the Discovery Agent (Clients → Scan for Mentions), waiting for you
-      to turn into a placement or reject. Creating a placement keeps the article details and marks the
-      queue item confirmed.
+      Real candidate mentions found by the Discovery Agent (Clients → Scan for Mentions) — the outlet,
+      headline, article link, and which client it matched are all shown per row below. Reject a false
+      positive here directly; turning one into a real placement${shouldUseOwnerApi() ? "" : " needs the live owner account signed in"}.
     </p>
     <div class="card" id="review-queue-list"><p class="hint">Loading…</p></div>
   `;
@@ -2085,7 +2071,10 @@ function renderMockReviewQueueSection() {
 async function loadRealReviewQueue() {
   const listEl = document.getElementById("review-queue-list");
   try {
-    const headers = await authedJsonHeaders();
+    // Demo-capable — a real scan (already demo-capable) can run before the
+    // owner ever signs in, and its results need to be visible right here,
+    // not only once real auth is added.
+    const headers = await demoCapableJsonHeaders();
     const [queueRes, clientsRes] = await Promise.all([
       fetch(`${OWNER_API_BASE}/api/review-queue`, { headers }),
       fetch(`${OWNER_API_BASE}/api/clients`, { headers }),
@@ -2124,7 +2113,7 @@ async function resolveRealReviewQueueItem(id, status) {
   try {
     const res = await fetch(`${OWNER_API_BASE}/api/review-queue/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      headers: await authedJsonHeaders(),
+      headers: await demoCapableJsonHeaders(),
       body: JSON.stringify({ status }),
     });
     if (!res.ok) {
@@ -2140,6 +2129,13 @@ async function resolveRealReviewQueueItem(id, status) {
 }
 
 async function createPlacementFromReviewQueueItem(id, details = {}) {
+  // Deliberately real-auth only, unlike the rest of this view — turning a
+  // candidate into a real placement is the one write here a client could
+  // eventually see, so a demo session can review and reject but not finalize.
+  if (!shouldUseOwnerApi()) {
+    alert("Creating a real placement needs the live owner account signed in — you can still review the details and reject false positives here.");
+    return;
+  }
   try {
     const result = await ownerApi(`/api/review-queue/${encodeURIComponent(id)}/create-placement`, {
       method: "POST",

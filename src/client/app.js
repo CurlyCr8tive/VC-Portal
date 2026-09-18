@@ -1,6 +1,6 @@
 import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getClientById } from "./mockData.js";
 import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js";
-import { requireSession, logout, landingPageFor } from "../auth.js?v=20260916-demo-route-2";
+import { requireSession, logout, landingPageFor } from "../auth.js?v=20260918-real-session-priority";
 import { signOutReal } from "../supabaseAuthClient.js";
 import { buildClientApiChartSeries, loadClientApiData, loadClientApiNotes, postClientApiNote, postClientApiOpportunity, updateClientApiHomework } from "../clientApiDataSource.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
