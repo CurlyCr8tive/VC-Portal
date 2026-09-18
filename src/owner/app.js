@@ -84,10 +84,15 @@ function showDevTools() {
 
 function ownerApiAuthHint() {
   if (state.dataSource !== "real" || shouldUseOwnerApi()) return "";
+  // Only name what genuinely still needs a real session. Discovery scans, the
+  // AI writing helpers and AVE rate research all work from the preview login
+  // now (see ALLOW_LOCAL_DEMO_AUTH in owner-api), so listing them here sent
+  // the owner looking for a sign-in that would have changed nothing.
   return `
     <p class="hint" style="margin-bottom:12px;">
-      Sign in with the live owner account to run Discovery scans, invite clients, use AI writing helpers,
-      research AVE rates, and save live changes.
+      Previewing. Changes you make are kept locally and won't reach the live database, and client invites
+      are unavailable — sign in with the live owner account for those. Discovery scans, AI writing and AVE
+      rate research all work here.
     </p>
   `;
 }
@@ -1538,7 +1543,14 @@ function renderCampaignsView() {
   if (state.demoState === "error") return renderErrorState(target, { onRetry: () => setDemoState("normal") });
   syncOwnerRecordsFromSupabase();
 
-  const canManageCampaigns = shouldUseOwnerApi();
+  // Matches canManagePlacements below. This used to require a real signed-in
+  // session, while the message underneath told the owner to switch the data
+  // source to "Real" — which she already had. Following the instruction could
+  // never clear the gate, because the gate was about something else entirely.
+  //
+  // Safe to relax: the submit handler already branches on shouldUseOwnerApi()
+  // and writes locally when there is no session, exactly as placements do.
+  const canManageCampaigns = state.dataSource === "real";
   const editingCampaign = canManageCampaigns && state.editingCampaignId ? loadCampaigns().find((c) => c.id === state.editingCampaignId) : null;
   const lockClient = !editingCampaign ? state.addCampaignForClient : "";
 
@@ -1563,7 +1575,8 @@ function renderCampaignsView() {
               }</h3>
                <div class="card" id="campaign-form-wrap"></div>`
             : `<p style="color:var(--text-secondary); font-size:0.85rem;">
-                 Switch the sidebar's data source to "Real" to create and manage campaigns.
+                 Switch the sidebar's data source to "Real" to create and manage campaigns — adding one while
+                 previewing the mock dataset wouldn't show up in it.
                </p>`
         }
       </section>

@@ -577,6 +577,27 @@ export function seedRealCaseStudyData() {
   const existingCampaigns = loadCampaigns();
   const isDuplicateCampaign = (row) => existingCampaigns.some((c) => c.name === row.name && c.client === row.client);
 
+  // Fill a campaign's start date from the earliest REAL publication date
+  // among its own placements, where it has one. Most seeded campaigns
+  // carry startDate: "" because her case studies report period totals
+  // rather than campaign start dates, which left the UI showing
+  // "Started —" on cards that actually do have dated coverage behind them.
+  //
+  // publicationDate only, never landedDate: landedDate is a recording-date
+  // placeholder on several of these rows (see DATE_DISCLOSURE), so using it
+  // would invent a start date out of the day the data was typed in.
+  // A campaign with no dated placements keeps an empty start date, because
+  // nothing real is known about when it began.
+  const seededPlacements = loadPlacements();
+  for (const row of REAL_CASE_STUDY_CAMPAIGNS) {
+    if (row.startDate) continue;
+    const dates = seededPlacements
+      .filter((p) => p.client === row.client && p.campaign === row.name && p.publicationDate)
+      .map((p) => p.publicationDate)
+      .sort();
+    if (dates.length) row.startDate = dates[0];
+  }
+
   let campaignsAdded = 0;
   for (const row of REAL_CASE_STUDY_CAMPAIGNS) {
     if (isDuplicateCampaign(row)) continue;
