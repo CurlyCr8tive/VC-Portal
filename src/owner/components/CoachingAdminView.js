@@ -11,7 +11,8 @@
 import { escapeHtml } from "../../client/utils.js";
 import { renderPhaseTrackerView } from "./PhaseTrackerView.js?v=20260917-client-name-fix-1";
 import { renderOpportunityEvaluator } from "./OpportunityEvaluator.js?v=20260918-info-popover";
-import { renderCoachingResourceLibrary } from "./CoachingResourceLibrary.js";
+import { renderCoachingResourceLibrary } from "./CoachingResourceLibrary.js?v=20260918-then-fix";
+import { sectionInfoButton } from "./InfoPopover.js";
 
 const TABS = [
   { id: "phases", label: "Phase Tracker" },
@@ -51,7 +52,7 @@ export function renderCoachingAdminView(
   function render() {
     container.innerHTML = `
       <div class="section-heading">
-        <h2>Coaching Program</h2>
+        <h2>Coaching Program ${sectionInfoButton({ title: "Coaching Program", body: "Tenyse's paid coaching track for clients, separate from PR placement work. Each client moves through numbered phases (Research & Discovery, Founder Positioning, etc.) with homework, a call schedule, and an Opportunity Evaluator for scoring incoming brand/media asks against the standing rule: if it doesn't support credibility, audience, partnerships, or revenue, it doesn't get chased." })}</h2>
         <p class="hint" style="margin-top:4px;">Visibility to Revenue — VAAM framework (Visibility, Authority, Alignment, Monetization). Standing rule across every engagement: if it doesn't support credibility, audience, partnerships, or revenue goals, we don't chase it.</p>
       </div>
       ${

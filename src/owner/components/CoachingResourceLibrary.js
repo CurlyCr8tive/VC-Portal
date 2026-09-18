@@ -149,15 +149,14 @@ export function renderCoachingResourceLibrary(container, clientName, { resources
     if (!row) return;
     const checkbox = row.querySelector(`[data-toggle-complete="${CSS.escape(item.id)}"]`);
     if (checkbox) {
-      checkbox.addEventListener("change", () => {
+      checkbox.addEventListener("change", async () => {
         const raw = { ...item, completed: checkbox.checked };
         try {
           if (onSaveResource) {
-            onSaveResource(clientName, raw, item).then((nextData) => {
-              if (nextData) activeResources = nextData.resources;
-              confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";
-              render();
-            }).catch((err) => alert(err.message));
+            const nextData = await onSaveResource(clientName, raw, item);
+            if (nextData) activeResources = nextData.resources;
+            confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";
+            render();
           } else {
             updateResource(toggleResourceComplete(item));
             confirmation = checkbox.checked ? "Checklist item marked complete." : "Checklist item reopened.";

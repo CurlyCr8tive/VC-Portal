@@ -43,7 +43,7 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260917-demo-qa-1";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
-import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-info-popover";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-then-fix";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
@@ -1578,7 +1578,7 @@ function renderClientsView() {
   const editingRecord = isEditing && state.editingClient !== true ? findClientByName(state.editingClient) : null;
 
   target.innerHTML = `
-    <div class="section-heading"><h2>Clients</h2></div>
+    <div class="section-heading"><h2>Clients ${sectionInfoButton({ title: "Clients", body: "Every client on file, real and status-tracked. “Unconfirmed” means Tenyse hasn't verified that client relationship or its figures yet — it is not a data error, and it should stay that way until she confirms it. Click a client to see their profile, campaigns, and placements, or use Scan for Mentions to run the Discovery Agent for them." })}</h2></div>
     ${ownerApiAuthHint()}
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
     ${
@@ -1703,7 +1703,7 @@ function renderCampaignsOverview(container) {
   ];
 
   container.innerHTML = `
-    <div class="section-heading"><h2>Campaigns Overview</h2></div>
+    <div class="section-heading"><h2>Campaigns Overview ${sectionInfoButton({ title: "Campaigns Overview", body: "Every PR campaign across every client, its status (active/planning/paused/completed), and the publicity value (AVE) earned from that campaign's own landed placements — not a client-wide total. Progress is completed placements divided by the campaign's total planned placements. Use the filter chips and search below to narrow this down, and Manage Campaigns further down to add or edit one." })}</h2></div>
     <p class="hint" style="margin:-8px 0 20px;">Every real campaign across all clients, with publicity value and progress in one place.</p>
     <div class="owner-metrics-grid" style="margin-bottom:24px;">
       ${reportsMetricCard({ label: "Active Campaigns", value: String(metrics.activeCampaigns), delta: null, icon: "\u25b6", iconBg: "#fbe2da" })}
@@ -1920,7 +1920,7 @@ function renderPlacementsView() {
     canManagePlacements && state.editingPlacementId ? getAllRealPlacements().find((p) => p.id === state.editingPlacementId) : null;
 
   target.innerHTML = `
-    <div class="section-heading"><h2>Press Placements</h2></div>
+    <div class="section-heading"><h2>Press Placements ${sectionInfoButton({ title: "Press Placements", body: "Every piece of confirmed press coverage Tenyse has landed, across all clients — the source-of-truth records that every AVE total, chart, and report elsewhere in this app is calculated from. AVE (advertising value equivalent) on a placement is either a figure Tenyse entered herself, or one auto-calculated from a saved outlet rate — auto-calculated and estimated figures are always labeled as such, never shown as if confirmed." })}</h2></div>
     ${ownerApiAuthHint()}
     ${
       state.dataSource === "real" && state.realRecordsSync === "error"
@@ -2045,7 +2045,7 @@ function renderReviewQueueView() {
   }
 
   target.innerHTML = `
-    <div class="section-heading"><h2>Review Queue</h2></div>
+    <div class="section-heading"><h2>Review Queue ${sectionInfoButton({ title: "Review Queue", body: "Candidate press mentions the Discovery Agent found while scanning for a client, waiting for Tenyse to confirm before they count as a real placement. Nothing here affects AVE totals, reports, or client dashboards until it's approved — this is a human checkpoint between an automated find and a figure a client would see." })}</h2></div>
     <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
       Real candidate mentions found by the Discovery Agent (Clients → Scan for Mentions), waiting for you
       to turn into a placement or reject. Creating a placement keeps the article details and marks the
@@ -2566,7 +2566,7 @@ function renderAnalyticsView() {
   }
   const summary = getAnalyticsSummary();
   container.innerHTML = `
-    <div class="section-heading"><h2>Analytics</h2></div>
+    <div class="section-heading"><h2>Analytics ${sectionInfoButton({ title: "Analytics", body: "Cross-client breakdowns built from every real placement and client record on file — AVE by client, placement status, sentiment, and lead time. Where a real value isn't known (no sentiment set, no pitch date on record), that shows as its own honest category rather than being folded into an average or guessed at — see each card below for specifics." })}</h2></div>
     <p class="hint" style="margin:-4px 0 20px;">Cross-client breakdowns from every real placement and client record on file. Where a real value is not known, that is shown explicitly rather than guessed — see each card for what that means here.</p>
     <div class="analytics-grid">
       <div class="card">

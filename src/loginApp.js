@@ -62,7 +62,15 @@ form.addEventListener("submit", async (e) => {
   // Real auth is tried first whenever it's configured — a mismatch here
   // (e.g. typing a mock demo email) is expected, not an error, so it just
   // falls through to the mock lookup below rather than surfacing yet.
-  if (isRealAuthConfigured() && !mockAccount) {
+  //
+  // A known real account's email (e.g. Tenyse's) is deliberately ALSO in
+  // MOCK_ACCOUNTS, so the "Open owner demo" walkthrough link keeps working.
+  // That must not shadow her real sign-in: without this check, typing her
+  // real password here would always match the mock account first and land
+  // her back in preview mode no matter what she typed, silently, with no
+  // error — exactly the bug this comment used to hide.
+  const isKnownRealAccount = REAL_ACCOUNTS.some((a) => a.email.toLowerCase() === email.toLowerCase());
+  if (isRealAuthConfigured() && (isKnownRealAccount || !mockAccount)) {
     submitBtn.disabled = true;
     const result = await signInReal(email, password);
     submitBtn.disabled = false;
@@ -76,6 +84,15 @@ form.addEventListener("submit", async (e) => {
       };
       setSession(account);
       window.location.href = landingPageFor(account);
+      return;
+    }
+    // A known real account (Tenyse's) failing real auth must say so — it
+    // must never silently fall through to the mock account below, which
+    // would land her in preview mode with no indication her password was
+    // wrong.
+    if (isKnownRealAccount) {
+      errorEl.textContent = result.message || "That password didn't match. Try again, or reset it in Supabase.";
+      errorEl.classList.add("visible");
       return;
     }
   }
