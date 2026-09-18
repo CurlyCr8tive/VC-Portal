@@ -103,7 +103,20 @@ export function getRealMetrics(clientName) {
   // Press Placements below deliberately does NOT apply this filter — that
   // card counts every placement record regardless of status.
   const confirmed = items.filter((p) => Boolean(p.landedDate));
-  const totalAVE = confirmed.reduce((sum, p) => sum + (p.aveValue || 0), 0);
+  // null (not 0) when NO confirmed placement carries a figure — exactly the
+  // distinction already made for avgLeadTime below and for audienceReach in
+  // schema.js. "$0.00" is a claim: it says this client's coverage was worth
+  // nothing. Houston Housing Authority has seven real placements whose
+  // outlets simply have no audience figure on file yet; reporting that as
+  // zero publicity value is false, and it reads as a broken dashboard
+  // rather than as missing data. formatCurrency() already renders null as
+  // "—", which is the honest thing to show.
+  //
+  // A real 0 is still possible and still shows as $0.00 — that's a client
+  // whose placements are all genuinely valued at zero, which is a
+  // different statement from "not calculated yet".
+  const withAve = confirmed.filter((p) => p.aveValue != null);
+  const totalAVE = withAve.length ? withAve.reduce((sum, p) => sum + p.aveValue, 0) : null;
   const leadTimes = items.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
   // null (not 0) when no placement has both dates yet — 0 would silently
   // claim "same-day turnaround," which isn't what "no data" means. See
@@ -250,7 +263,13 @@ export function getAggregateRealMetrics() {
     return { totalAVE: 0, totalPlacements: 0, avgLeadTime: null, activeCampaigns: 0, aveDelta: null, placementsDelta: null, leadTimeDelta: null };
   }
   const perClient = clients.map((c) => getRealMetrics(c.name));
-  const totalAVE = perClient.reduce((sum, m) => sum + m.totalAVE, 0);
+  // getRealMetrics now returns null for a client with no AVE figures at
+  // all, so this has to skip nulls rather than add them — `sum + null`
+  // coerces to 0 quietly, but a single null would turn the whole aggregate
+  // into NaN if it ever reached arithmetic unguarded. The aggregate stays a
+  // number whenever ANY client has a figure; it's only null when none do.
+  const clientsWithAve = perClient.filter((m) => m.totalAVE != null);
+  const totalAVE = clientsWithAve.length ? clientsWithAve.reduce((sum, m) => sum + m.totalAVE, 0) : null;
   const totalPlacements = perClient.reduce((sum, m) => sum + m.totalPlacements, 0);
   const activeCampaigns = perClient.reduce((sum, m) => sum + m.activeCampaigns, 0);
   // Only clients with an actual computed lead time (getRealMetrics returns

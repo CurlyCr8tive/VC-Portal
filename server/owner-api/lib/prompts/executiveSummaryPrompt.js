@@ -31,7 +31,7 @@ Use this exact terminology, not generic alternatives:
 - "Tone & Sentiment"
 
 Real data for this period — use ONLY these numbers, never estimate or invent a figure not listed here:
-- Total Publicity Value: ${totalAVE}
+- Total Publicity Value: ${totalAVE == null ? "not calculated yet — do not state or estimate a dollar figure" : totalAVE}
 - Total Audience Reach: ${totalReach}
 - Placements (${placements.length} total): ${placements.map(p => `${p.publication} — ${p.headline}`).join("; ")}
 
