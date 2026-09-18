@@ -55,7 +55,7 @@ app.use(express.json());
 // is a browser-enforced restriction, not a server one.
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-VC-Demo-AI");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
@@ -86,6 +86,60 @@ app.get(
 function ownerRoute(handler) {
   return async (req, res) => {
     if (!(await requireOwner(req, res))) return;
+    try {
+      await handler(req, res);
+    } catch (err) {
+      res.status(500).json({ error: "internal_error", message: err.message });
+    }
+  };
+}
+
+// Lets the demo login (?demo=owner, which holds no Supabase JWT) reach
+// owner routes on a local machine, so preview mode isn't a hollow shell.
+//
+// GATED BEHIND AN ENV FLAG, AND THAT IS NOT OPTIONAL. The origin/referer
+// check below is meaningful for a *browser*, which won't let a page forge
+// those headers. It is worth nothing against anything else: curl, Postman,
+// or any script can send `Origin: http://localhost:8420` and
+// `X-VC-Demo-AI: true` and be believed. On a laptop that's fine — the API
+// is only reachable from that laptop. The moment owner-api is deployed
+// (Render, etc.) the same code becomes a complete authentication bypass to
+// Tenyse's production database: no password, no token, two headers.
+//
+// So the flag defaults OFF and must be set explicitly. Set
+// ALLOW_LOCAL_DEMO_AUTH=true in server/owner-api/.env for local work.
+// NEVER set it in the deployed environment's variables.
+const ALLOW_LOCAL_DEMO_AUTH = String(process.env.ALLOW_LOCAL_DEMO_AUTH || "").toLowerCase() === "true";
+
+if (ALLOW_LOCAL_DEMO_AUTH) {
+  console.warn(
+    "[owner-api] ALLOW_LOCAL_DEMO_AUTH is ON — unauthenticated demo requests from a local origin are treated as owner. " +
+      "This must never be set in a deployed environment."
+  );
+}
+
+function isLocalDemoAiRequest(req) {
+  if (!ALLOW_LOCAL_DEMO_AUTH) return false;
+  const origin = String(req.headers.origin || "");
+  const referer = String(req.headers.referer || "");
+  const host = String(req.headers.host || "");
+  const requestedDemoAi = req.headers["x-vc-demo-ai"] === "true";
+  const localPage = /^(http:\/\/(localhost|127\.0\.0\.1):8420|file:)/.test(origin) || /^(http:\/\/(localhost|127\.0\.0\.1):8420|file:)/.test(referer);
+  const localApi = /^(localhost|127\.0\.0\.1):4001$/.test(host);
+  return requestedDemoAi && (localPage || localApi);
+}
+
+function ownerOrLocalDemoAiRoute(handler) {
+  return async (req, res) => {
+    const authHeader = req.headers.authorization || "";
+    if (authHeader.startsWith("Bearer ")) {
+      if (!(await requireOwner(req, res))) return;
+    } else if (isLocalDemoAiRequest(req)) {
+      req.profile = { id: "local-demo-ai", role: "owner", name: "Local Demo AI", email: "demo@verifiedconsulting.local" };
+    } else if (!(await requireOwner(req, res))) {
+      return;
+    }
+
     try {
       await handler(req, res);
     } catch (err) {
@@ -1002,7 +1056,11 @@ app.post(
 // unrelated credential.
 app.post(
   "/api/clients/:clientId/discovery-scan",
-  ownerRoute(async (req, res) => {
+  // Demo-reachable so the Discovery Agent can actually be shown. Note this
+  // one DOES write — candidate mentions land in review_queue — but they
+  // land as 'pending' for human confirm/reject, never straight into
+  // placements, so a demo scan can't put anything in front of a client.
+  ownerOrLocalDemoAiRoute(async (req, res) => {
     if (!isNewsSearchConfigured) {
       return res.status(503).json({
         error: "not_configured",
@@ -1105,7 +1163,10 @@ app.get(
 // whole API has no real per-request auth without Supabase anyway.
 app.post(
   "/api/research-outlet-rate",
-  ownerRoute(async (req, res) => {
+  // Demo-reachable: a read-only rate lookup. Mutates nothing, sends
+  // nothing, and it's the feature that made Calculate look broken in
+  // preview mode.
+  ownerOrLocalDemoAiRoute(async (req, res) => {
     const outletName = String(req.body?.outletName || "").trim();
     if (!outletName) {
       return res.status(400).json({ error: "invalid_body", message: "outletName is required." });
@@ -1143,7 +1204,7 @@ const PROMPT_BUILDERS = {
 
 app.post(
   "/api/generate/:type",
-  ownerRoute(async (req, res) => {
+  ownerOrLocalDemoAiRoute(async (req, res) => {
     const builder = PROMPT_BUILDERS[req.params.type];
     if (!builder) {
       return res.status(404).json({

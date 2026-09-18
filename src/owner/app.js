@@ -1013,6 +1013,21 @@ async function authedJsonHeaders() {
 }
 
 /**
+ * Headers for a route that also accepts the local demo session. Identical
+ * to authedJsonHeaders() when really signed in; adds the demo marker only
+ * when there's no token to send.
+ *
+ * The server ignores that marker unless ALLOW_LOCAL_DEMO_AUTH is on AND
+ * the request looks local, so this is a request to be let in, not a
+ * credential — sending it from a deployed page achieves nothing.
+ */
+async function demoCapableJsonHeaders() {
+  const headers = await authedJsonHeaders();
+  if (!headers.Authorization) headers["X-VC-Demo-AI"] = "true";
+  return headers;
+}
+
+/**
  * Every "real" client the owner UI knows about (getClientsWithMetrics(),
  * getRealClients()) is keyed by a slug generated from placement.client text
  * — localStorage never had a reason to know Supabase's real clients.id
@@ -1302,7 +1317,7 @@ async function discoveryScanClient({ clientName }) {
   try {
     const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(resolved.id)}/discovery-scan`, {
       method: "POST",
-      headers: await authedJsonHeaders(),
+      headers: await demoCapableJsonHeaders(),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -1329,9 +1344,11 @@ async function discoveryScanClient({ clientName }) {
  */
 async function generateAIText(type, data) {
   try {
+    const headers = await authedJsonHeaders();
+    if (!headers.Authorization) headers["X-VC-Demo-AI"] = "true";
     const res = await fetch(`${OWNER_API_BASE}/api/generate/${type}`, {
       method: "POST",
-      headers: await authedJsonHeaders(),
+      headers,
       body: JSON.stringify(data),
     });
     const body = await res.json().catch(() => ({}));
@@ -1356,7 +1373,7 @@ async function researchOutletRate(outletName) {
   try {
     const res = await fetch(`${OWNER_API_BASE}/api/research-outlet-rate`, {
       method: "POST",
-      headers: await authedJsonHeaders(),
+      headers: await demoCapableJsonHeaders(),
       body: JSON.stringify({ outletName }),
     });
     const body = await res.json().catch(() => ({}));
@@ -1913,11 +1930,7 @@ function renderSummaryForm(container, clientName) {
       <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
         <button type="button" class="btn-secondary" id="summary-approve-${cssId(clientName)}" ${!existing ? "disabled" : ""} title="${!existing ? "Save a draft first" : "Approves the saved draft above — not unsaved edits in the box"}">Approve</button>
-        ${
-          shouldUseOwnerApi()
-            ? `<button type="button" class="btn-secondary" id="summary-generate-${cssId(clientName)}">Generate with AI</button>`
-            : `<span class="hint">Sign in with the real owner account to generate with AI.</span>`
-        }
+        <button type="button" class="btn-secondary" id="summary-generate-${cssId(clientName)}">Generate with AI</button>
         <span id="summary-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>
@@ -1981,11 +1994,7 @@ function renderReportNarrativeForm(container, clientName) {
         <textarea id="narrative-text-${cssId(clientName)}" rows="4" placeholder="Click Generate to draft this from ${escapeHtml(clientName)}'s real confirmed placements." readonly></textarea>
       </div>
       <div class="form-actions" style="display:flex; gap:10px; align-items:center;">
-        ${
-          shouldUseOwnerApi()
-            ? `<button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">Generate</button>`
-            : `<span class="hint">Sign in with the real owner account to generate with AI.</span>`
-        }
+        <button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">Generate</button>
         <span id="narrative-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>

@@ -54,9 +54,23 @@ export function renderPlacementsTable(
   const rows = placements.map((p) => {
     const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate);
     const statusClass = statusToClass(p.status);
+    // A row with no link is one of two very different things, and rendering
+    // both as plain text made the second look like the first:
+    //
+    //  - a single article whose URL just wasn't captured — a real gap
+    //  - a BUNDLED campaign row, where Tenyse's case study reports one
+    //    combined figure across six or eight outlets. There is no single
+    //    article to link to, and there never will be. Left bare it reads
+    //    as a broken link rather than as a different kind of record.
+    //
+    // Detected from the publication field, which is how these rows already
+    // describe themselves ("8 outlets incl. …", "… + 1 more").
+    const isBundled = /\b\d+\s+(?:news\s+)?outlets\b|\+\s*\d+\s*more|\bincl\./i.test(p.publication || "");
     const headlineCell = p.articleUrl
       ? `<a href="${escapeHtml(p.articleUrl)}" target="_blank" rel="noopener">${escapeHtml(p.headline)}</a>`
-      : escapeHtml(p.headline);
+      : isBundled
+        ? `${escapeHtml(p.headline)} <span class="hint" style="display:block; margin-top:2px; font-size:0.72rem;" title="This row is a campaign total across several outlets, so it has no single article to open.">Bundled campaign — no single article</span>`
+        : `${escapeHtml(p.headline)} <span class="hint" style="display:block; margin-top:2px; font-size:0.72rem;" title="No article URL saved for this placement yet. Edit the placement to add one.">No link saved yet</span>`;
 
     return { p, leadTime, statusClass, headlineCell };
   });
