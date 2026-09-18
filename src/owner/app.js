@@ -46,9 +46,12 @@ import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=202
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
-import { loadPhasesForClient } from "../coachingPhaseStorage.js";
-import { loadResourcesForClient } from "../coachingResourceStorage.js";
-import { loadOpportunitiesForClient } from "../opportunityStorage.js";
+import { loadPhasesForClient, addPhase as addLocalPhase, updatePhase as updateLocalPhase } from "../coachingPhaseStorage.js";
+import { loadResourcesForClient, addResource as addLocalResource, updateResource as updateLocalResource, deleteResource as deleteLocalResource } from "../coachingResourceStorage.js";
+import { loadOpportunitiesForClient, addOpportunity as addLocalOpportunity, updateOpportunity as updateLocalOpportunity, deleteOpportunity as deleteLocalOpportunity } from "../opportunityStorage.js";
+import { createPhase, applyPhaseEdit, addHomeworkItem, updateHomeworkStatus, respondToReflection, removeHomeworkItem } from "../coachingPhaseSchema.js";
+import { createOpportunity, applyOpportunityEdit } from "../opportunitySchema.js";
+import { createResource, applyResourceEdit } from "../coachingResourceSchema.js";
 import { calculateCoachingProgress } from "../coachingProgress.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
@@ -1156,6 +1159,115 @@ function coachingDataForClient(clientName) {
     opportunities: (data.opportunities || []).filter((opportunity) => opportunity.client === clientName),
     resources: (data.resources || []).filter((resource) => resource.client === clientName),
   };
+}
+
+/**
+ * Preview-mode counterpart to coachingDataForClient() above — reads the
+ * SAME local storage the seed data was already written into
+ * (loadPhasesForClient etc.), rather than state.realCoachingData, which
+ * only ever populates via a real Supabase sync. Discovered mid-session:
+ * seedGreyzBistroCoachingData() already runs and writes real content
+ * into local storage in preview mode, but nothing ever read it back —
+ * coachingDataForClient was passed as null unless signed in, so the
+ * admin view had no function to call at all and showed empty regardless
+ * of what was actually sitting in localStorage.
+ */
+function localCoachingDataForClient(clientName) {
+  return {
+    phases: loadPhasesForClient(clientName).sort((a, b) => a.phaseNumber - b.phaseNumber),
+    opportunities: loadOpportunitiesForClient(clientName),
+    resources: loadResourcesForClient(clientName),
+  };
+}
+
+// --- Local (preview-mode) coaching write handlers -------------------------
+// Mirror the real Supabase-backed ones above field-for-field, writing to
+// local storage instead. Never touches Supabase — a demo/preview session
+// editing coaching content stays entirely on this machine, the same
+// boundary already drawn for placements and campaigns this session.
+
+function saveLocalCoachingPhase(phase) {
+  const existing = loadPhasesForClient(phase.client).find((p) => p.id === phase.id);
+  updateLocalPhase(existing ? applyPhaseEdit(existing, phase) : phase);
+  return localCoachingDataForClient(phase.client);
+}
+
+// loadPhasesForClient() needs a client name; a phase id or homework id
+// alone doesn't carry one, so both lookups below search across every
+// real client's phases rather than requiring the caller to already know
+// which client owns the phase.
+function findLocalPhaseById(phaseId) {
+  for (const c of getRealClients()) {
+    const found = loadPhasesForClient(c.name).find((p) => p.id === phaseId);
+    if (found) return found;
+  }
+  return null;
+}
+
+function createLocalHomework(phaseId, raw) {
+  const phase = findLocalPhaseById(phaseId);
+  if (!phase) throw new Error("Phase not found.");
+  updateLocalPhase(addHomeworkItem(phase, raw));
+  return localCoachingDataForClient(phase.client);
+}
+
+function saveLocalHomework(homeworkId, patch) {
+  const phase = findPhaseOwningHomework(homeworkId);
+  if (!phase) throw new Error("Homework item not found.");
+  const item = (phase.homework || []).find((h) => h.id === homeworkId);
+  const updatedPhase =
+    "status" in patch && item?.type !== "reflection"
+      ? updateHomeworkStatus(phase, homeworkId, patch.status)
+      : "response" in patch
+        ? respondToReflection(phase, homeworkId, patch.response)
+        : { ...phase, homework: (phase.homework || []).map((h) => (h.id === homeworkId ? { ...h, ...patch } : h)) };
+  updateLocalPhase(updatedPhase);
+  return localCoachingDataForClient(phase.client);
+}
+
+function findPhaseOwningHomework(homeworkId) {
+  for (const c of getRealClients()) {
+    const found = loadPhasesForClient(c.name).find((p) => (p.homework || []).some((h) => h.id === homeworkId));
+    if (found) return found;
+  }
+  return null;
+}
+
+function removeLocalHomework(homeworkId) {
+  const phase = findPhaseOwningHomework(homeworkId);
+  if (!phase) throw new Error("Homework item not found.");
+  updateLocalPhase(removeHomeworkItem(phase, homeworkId));
+  return localCoachingDataForClient(phase.client);
+}
+
+function saveLocalOpportunity(clientName, raw, existing = null) {
+  if (existing) {
+    updateLocalOpportunity(applyOpportunityEdit(existing, raw));
+  } else {
+    addLocalOpportunity(createOpportunity({ ...raw, client: clientName }));
+  }
+  return localCoachingDataForClient(clientName);
+}
+
+function removeLocalOpportunity(opportunityId) {
+  const owner = getRealClients().map((c) => c.name).find((name) => loadOpportunitiesForClient(name).some((o) => o.id === opportunityId));
+  deleteLocalOpportunity(opportunityId);
+  return localCoachingDataForClient(owner || "");
+}
+
+function saveLocalResource(clientName, raw, existing = null) {
+  if (existing) {
+    updateLocalResource(applyResourceEdit(existing, raw));
+  } else {
+    addLocalResource(createResource({ ...raw, client: clientName }));
+  }
+  return localCoachingDataForClient(clientName);
+}
+
+function removeLocalResource(resourceId) {
+  const owner = getRealClients().map((c) => c.name).find((name) => loadResourcesForClient(name).some((r) => r.id === resourceId));
+  deleteLocalResource(resourceId);
+  return localCoachingDataForClient(owner || "");
 }
 
 async function syncOwnerCoachingFromSupabase({ force = false } = {}) {
@@ -2604,7 +2716,11 @@ function renderCoachingView() {
   renderCoachingAdminView(document.getElementById("coaching-content"), {
     coachingClients,
     initialClient,
-    coachingDataForClient: shouldUseOwnerApi() ? coachingDataForClient : null,
+    // Preview mode reads/writes local storage (localCoachingDataForClient
+    // + the saveLocal*/removeLocal* handlers below) instead of null — the
+    // seed data was already there, nothing was ever passed a function to
+    // read it back.
+    coachingDataForClient: shouldUseOwnerApi() ? coachingDataForClient : localCoachingDataForClient,
     syncStatus: shouldUseOwnerApi() ? state.realCoachingSync : "local",
     syncMessage: state.realCoachingSyncMessage,
     onLoadTemplate: shouldUseOwnerApi()
@@ -2623,14 +2739,14 @@ function renderCoachingView() {
           return nextData;
         }
       : null,
-    onSavePhase: shouldUseOwnerApi() ? saveRealCoachingPhase : null,
-    onAddHomework: shouldUseOwnerApi() ? createRealHomework : null,
-    onSaveHomework: shouldUseOwnerApi() ? saveRealHomework : null,
-    onRemoveHomework: shouldUseOwnerApi() ? removeRealHomework : null,
-    onSaveOpportunity: shouldUseOwnerApi() ? saveRealOpportunity : null,
-    onRemoveOpportunity: shouldUseOwnerApi() ? removeRealOpportunity : null,
-    onSaveResource: shouldUseOwnerApi() ? saveRealResource : null,
-    onRemoveResource: shouldUseOwnerApi() ? removeRealResource : null,
+    onSavePhase: shouldUseOwnerApi() ? saveRealCoachingPhase : saveLocalCoachingPhase,
+    onAddHomework: shouldUseOwnerApi() ? createRealHomework : createLocalHomework,
+    onSaveHomework: shouldUseOwnerApi() ? saveRealHomework : saveLocalHomework,
+    onRemoveHomework: shouldUseOwnerApi() ? removeRealHomework : removeLocalHomework,
+    onSaveOpportunity: shouldUseOwnerApi() ? saveRealOpportunity : saveLocalOpportunity,
+    onRemoveOpportunity: shouldUseOwnerApi() ? removeRealOpportunity : removeLocalOpportunity,
+    onSaveResource: shouldUseOwnerApi() ? saveRealResource : saveLocalResource,
+    onRemoveResource: shouldUseOwnerApi() ? removeRealResource : removeLocalResource,
   });
 }
 
