@@ -10,7 +10,7 @@
 
 import { escapeHtml } from "../../client/utils.js";
 import { renderPhaseTrackerView } from "./PhaseTrackerView.js?v=20260917-client-name-fix-1";
-import { renderOpportunityEvaluator } from "./OpportunityEvaluator.js";
+import { renderOpportunityEvaluator } from "./OpportunityEvaluator.js?v=20260918-info-popover";
 import { renderCoachingResourceLibrary } from "./CoachingResourceLibrary.js";
 
 const TABS = [

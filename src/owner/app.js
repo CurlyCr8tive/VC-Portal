@@ -34,6 +34,7 @@ import { renderReportCard } from "../client/components/LatestReportCard.js";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
+import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js";
 import { renderClientsList } from "./components/ClientsListCard.js";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js";
@@ -42,7 +43,7 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260917-demo-qa-1";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
-import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260917-client-name-fix-1";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-info-popover";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
@@ -2930,6 +2931,8 @@ function autoSeedRealCaseStudyDataOnce() {
   }
   localStorage.setItem(AUTO_SEED_FLAG_KEY, "1");
 }
+
+installInfoPopoverDelegate();
 
 if (session) {
   const demoParam = new URLSearchParams(location.search).get("demo");

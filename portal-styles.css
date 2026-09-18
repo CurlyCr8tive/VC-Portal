@@ -2867,3 +2867,70 @@ table.placements-table {
   height: 100%;
   background: var(--color-teal);
 }
+
+/* Info popover — "what is this section for" (InfoPopover.js). Distinct
+   from the plain title= hover tooltip already used on metric-card
+   .info-icon: this can hold real paragraph text, works on touch, and
+   stays open until dismissed rather than vanishing when the pointer
+   moves off a single pixel. */
+.info-popover-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--color-navy);
+  color: var(--color-navy);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
+  margin-left: 4px;
+  padding: 0;
+}
+.info-popover-trigger:hover {
+  background: var(--color-navy);
+  color: var(--text-on-navy);
+}
+
+.info-popover {
+  position: absolute;
+  z-index: 1000;
+  background: var(--text-on-navy);
+  border: 1px solid #e4d9bd;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(31, 42, 82, 0.18);
+}
+.info-popover-inner {
+  padding: 14px 16px;
+}
+.info-popover-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.info-popover-head strong {
+  color: var(--color-navy);
+  font-size: 0.9rem;
+}
+.info-popover-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 0 0 8px;
+}
+.info-popover p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

@@ -7,6 +7,7 @@
 // actually gets recorded instead of only living in a call.
 
 import { escapeHtml } from "../../client/utils.js";
+import { sectionInfoButton } from "./InfoPopover.js";
 import {
   EVALUATION_CRITERIA,
   EVALUATION_CRITERIA_HELP,
@@ -30,7 +31,14 @@ export function renderOpportunityEvaluator(container, clientName, { opportunitie
   function render() {
     const opportunities = activeOpportunities || loadOpportunitiesForClient(clientName);
     container.innerHTML = `
-      <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
+        <p class="hint" style="margin:0;">
+          Every incoming brand or partnership opportunity, pressure-tested against the same five criteria before ${escapeHtml(clientName)} responds to anyone.
+          ${sectionInfoButton({
+            title: "Opportunity Evaluator",
+            body: "Reinforces the standing coaching rule: opportunities come to Tenyse first, and this is where that review actually gets recorded instead of only living in a phone call. Log a brand collab, event ask, or influencer request here, score it against Audience Fit, Brand Values, Credibility, Revenue Potential, and Visibility Value, and use the average to decide whether to pursue it, keep pressure-testing it, or decline — before the client says yes on their own.",
+          })}
+        </p>
         <button type="button" class="btn-primary" id="oe-new-btn">${showingForm && !editingId ? "Cancel" : "+ New Opportunity"}</button>
       </div>
       ${showingForm ? formHtml(editingId ? opportunities.find((o) => o.id === editingId) : null) : ""}
