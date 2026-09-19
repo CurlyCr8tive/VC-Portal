@@ -18,6 +18,9 @@ const COACHING_NAV_ITEMS = [
   { id: "files", label: "Files", icon: "▱" },
 ];
 const COACHING_VIEW_IDS = new Set(COACHING_NAV_ITEMS.map((item) => item.id));
+const NAV_PARENT_BY_VIEW = {
+  "campaign-detail": "campaigns",
+};
 
 /**
  * Renders the client-side nav only. No "All Clients", "Team Management",
@@ -59,6 +62,7 @@ export function renderSidebar(container, opts) {
   const isToggleable = showPr && showCoaching;
   const isCoachingView = COACHING_VIEW_IDS.has(currentView) || programView === "coaching";
   const navItems = isToggleable ? (isCoachingView ? COACHING_NAV_ITEMS : PR_NAV_ITEMS) : showCoaching ? COACHING_NAV_ITEMS : PR_NAV_ITEMS;
+  const activeView = NAV_PARENT_BY_VIEW[currentView] || currentView;
 
   container.innerHTML = `
     <button class="sidebar-close" aria-label="Close menu">✕ Close</button>
@@ -76,7 +80,7 @@ export function renderSidebar(container, opts) {
         ${navItems.map(
           (item) => `
           <li>
-            <button data-nav="${item.id}" ${currentView === item.id ? 'aria-current="page"' : ""}>
+            <button data-nav="${item.id}" ${activeView === item.id ? 'aria-current="page"' : ""}>
               <span class="nav-icon" aria-hidden="true">${escapeHtml(item.icon || "•")}</span>
               <span>${escapeHtml(item.label)}</span>
               ${item.caret ? `<span class="nav-badge nav-caret" aria-hidden="true">⌄</span>` : ""}

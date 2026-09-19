@@ -7,7 +7,7 @@ import { escapeHtml } from "../utils.js";
  * needing to know about it.
  */
 export function renderHeader(container, opts) {
-  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource } = opts;
+  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource, contextLabel } = opts;
 
   // Visible regardless of which view is scrolled to, since the header
   // renders on every page — the point is a viewer can never lose track of
@@ -23,6 +23,7 @@ export function renderHeader(container, opts) {
     <div style="display:flex; align-items:center; gap:12px;">
       <button class="hamburger" aria-label="Open menu">☰</button>
       <div>
+        ${contextLabel ? `<div class="page-context">${escapeHtml(contextLabel)}</div>` : ""}
         <h1>${escapeHtml(greeting || `Welcome, ${client.name}!`)}${demoBadge}</h1>
         <p class="header-sub">${escapeHtml(subtitle || "Here's an overview of your campaign progress and results.")}</p>
       </div>

@@ -382,12 +382,15 @@ function groupPlacementsByMonth(placements) {
 
 function dashboardSkeletonHTML() {
   return `
-    <section class="section">
+    <section class="section owner-dashboard-section">
       <div class="owner-dashboard-control-card" id="dashboard-filter-bar"></div>
       <p id="dashboard-filter-summary" class="hint" style="margin:8px 0 0;"></p>
     </section>
-    <section class="section">
+    <section class="section owner-dashboard-section">
       <div class="metrics-grid" id="dashboard-metrics"></div>
+    </section>
+    <section class="section owner-dashboard-section owner-rollup-section">
+      <div id="dashboard-rollup-strip"></div>
     </section>
     <div class="owner-dashboard-split">
       <section class="section" style="margin-bottom:0;">
@@ -402,17 +405,16 @@ function dashboardSkeletonHTML() {
       </section>
       <section class="section" id="dashboard-coaching-overview" style="margin-bottom:0;"></section>
     </div>
-    <section class="section">
-      <div id="dashboard-rollup-strip"></div>
-    </section>
-    <div class="dashboard-split">
+    <div class="dashboard-split owner-analysis-grid">
       <section class="section" style="margin-bottom:0;">
-        <div class="section-heading">
-          <h2>Campaign Progress</h2>
-          ${sectionInfoButton({ title: "Campaign Progress", body: "Every real campaign across all visible clients, most recent first. Status is one of the three this app tracks (active, paused, completed) — see the full Campaigns page for filtering, search, and per-campaign publicity value." })}
-          <button class="link-btn" data-goto="campaigns">View All</button>
+        <div class="owner-analysis-card">
+          <div class="section-heading">
+            <h2>Campaign Progress</h2>
+            ${sectionInfoButton({ title: "Campaign Progress", body: "Every real campaign across all visible clients, most recent first. Status is one of the three this app tracks (active, paused, completed) — see the full Campaigns page for filtering, search, and per-campaign publicity value." })}
+            <button class="link-btn" data-goto="campaigns">View All</button>
+          </div>
+          <div class="campaigns-grid dashboard-campaigns-grid" id="dashboard-campaigns"></div>
         </div>
-        <div class="campaigns-grid" id="dashboard-campaigns"></div>
       </section>
       <section class="section" style="margin-bottom:0;">
         <div class="card chart-card" id="dashboard-chart"></div>
@@ -2420,7 +2422,7 @@ function renderSummaryForm(container, clientName) {
   if (!generateBtn) return;
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
-    generateStatus.textContent = "Generating…";
+    generateStatus.textContent = "Drafting an executive summary...";
     const ctx = realWritingContextFor(clientName);
     const result = await generateAIText("executive-summary", {
       client: clientName,
@@ -2435,9 +2437,9 @@ function renderSummaryForm(container, clientName) {
     generateBtn.disabled = false;
     if (result.ok) {
       container.querySelector(`#summary-text-${cssId(clientName)}`).value = result.text;
-      generateStatus.textContent = `Drafted via ${result.providerUsed} — review, then Save Draft.`;
+      generateStatus.textContent = "Draft ready — review, then Save Draft.";
     } else {
-      generateStatus.textContent = `⚠ ${result.message}`;
+      generateStatus.textContent = result.message;
     }
   });
 }
@@ -2472,7 +2474,7 @@ function renderReportNarrativeForm(container, clientName) {
   if (!generateBtn) return;
   generateBtn.addEventListener("click", async () => {
     generateBtn.disabled = true;
-    statusEl.textContent = "Generating…";
+    statusEl.textContent = "Drafting the report narrative...";
     const ctx = realWritingContextFor(clientName);
     const result = await generateAIText("report-narrative", {
       client: clientName,
@@ -2488,9 +2490,9 @@ function renderReportNarrativeForm(container, clientName) {
     const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
     if (result.ok) {
       textarea.value = result.text;
-      statusEl.textContent = `Drafted via ${result.providerUsed} — copy into the report once reviewed.`;
+      statusEl.textContent = "Draft ready — copy into the report once reviewed.";
     } else {
-      statusEl.textContent = `⚠ ${result.message}`;
+      statusEl.textContent = result.message;
     }
   });
 }
@@ -2992,12 +2994,77 @@ function renderSidebarComponent() {
   });
 }
 
+const OWNER_HEADER_CONTEXT = {
+  dashboard: {
+    contextLabel: "Owner Dashboard",
+    greeting: "Welcome back, Tenyse!",
+    subtitle: "Here's what's happening across all clients.",
+  },
+  clients: {
+    contextLabel: "Owner Dashboard / Clients",
+    greeting: "Clients",
+    subtitle: "Manage client profiles, contacts, campaign status, and portal access.",
+  },
+  campaigns: {
+    contextLabel: "Owner Dashboard / Campaigns (PR)",
+    greeting: "Campaigns (PR)",
+    subtitle: "Track PR campaigns, placements, lead time, and progress across clients.",
+  },
+  coaching: {
+    contextLabel: "Owner Dashboard / Coaching Program",
+    greeting: "Coaching Program",
+    subtitle: "Manage phases, homework, resources, opportunities, and client progress.",
+  },
+  placements: {
+    contextLabel: "Owner Dashboard / Press Placements",
+    greeting: "Press Placements",
+    subtitle: "Review coverage, AVE, lead time, sentiment, and publication details.",
+  },
+  reviewqueue: {
+    contextLabel: "Owner Dashboard / Review Queue",
+    greeting: "Review Queue",
+    subtitle: "Review discovered coverage before adding it to a client record.",
+  },
+  reports: {
+    contextLabel: "Owner Dashboard / Reports",
+    greeting: "Reports",
+    subtitle: "Draft, review, and publish client-facing PR summaries.",
+  },
+  analytics: {
+    contextLabel: "Owner Dashboard / Analytics",
+    greeting: "Analytics",
+    subtitle: "Explore performance trends, media mix, reach, and client outcomes.",
+  },
+  settings: {
+    contextLabel: "Owner Dashboard / Settings",
+    greeting: "Settings",
+    subtitle: "Review portal configuration and demo-day readiness.",
+  },
+};
+
+function getOwnerHeaderContext() {
+  if (state.view === "campaign-detail") {
+    const campaign = getAllCampaigns().find((c) => c.id === state.selectedCampaignId);
+    return {
+      contextLabel: `Owner Dashboard / Campaigns (PR) / ${campaign?.name || "Campaign Detail"}`,
+      greeting: campaign?.name || "Campaign Detail",
+      subtitle: campaign?.clientName
+        ? `${campaign.clientName} campaign workspace: placements, value, lead time, and notes.`
+        : "Campaign workspace: placements, value, lead time, and notes.",
+    };
+  }
+
+  return OWNER_HEADER_CONTEXT[state.view] || OWNER_HEADER_CONTEXT.dashboard;
+}
+
 function renderHeaderComponent() {
+  const headerContext = getOwnerHeaderContext();
   renderHeader(document.getElementById("owner-header"), {
     client: { name: "Tenyse Williams", avatarInitials: "T" },
     dataSource: state.dataSource,
-    greeting: "Welcome back, Tenyse!",
-    subtitle: "Here's what's happening across all clients.",
+    contextLabel: headerContext.contextLabel,
+    greeting: headerContext.greeting,
+    subtitle: headerContext.subtitle,
     searchPlaceholder: "Search clients, campaigns, or programs...",
     extraAction: {
       label: "+ New Client",
@@ -3023,6 +3090,7 @@ function navigate(view) {
   document.querySelectorAll(".client-view").forEach((el) => el.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
   renderSidebarComponent();
+  renderHeaderComponent();
   renderCurrentView();
   closeSidebarMobile();
 }

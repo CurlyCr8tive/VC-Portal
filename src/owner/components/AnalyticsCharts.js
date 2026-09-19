@@ -171,7 +171,19 @@ export function renderDonutChart(container, { data, centerLabel, centerValue }) 
     .map((d, i) => {
       const frac = d.value / total;
       const dash = frac * CIRC;
-      const seg = `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${DONUT_COLORS[i % DONUT_COLORS.length]}" stroke-width="24" stroke-dasharray="${dash.toFixed(1)} ${(CIRC - dash).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 80 80)"></circle>`;
+      const pct = Math.round(frac * 100);
+      const seg = `
+        <g class="interactive-donut-segment" tabindex="0" aria-label="${escapeHtml(d.label)}: ${d.value} placements, ${pct}% of total.">
+          <circle cx="80" cy="80" r="${R}" fill="none" stroke="${DONUT_COLORS[i % DONUT_COLORS.length]}" stroke-width="24" stroke-dasharray="${dash.toFixed(1)} ${(CIRC - dash).toFixed(1)}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 80 80)"></circle>
+          <foreignObject x="10" y="8" width="140" height="58" class="chart-hover-tooltip">
+            <div xmlns="http://www.w3.org/1999/xhtml">
+              <strong>${escapeHtml(d.label)}</strong>
+              <span>${d.value} placement${d.value === 1 ? "" : "s"}</span>
+              <span>${pct}% of media mix</span>
+            </div>
+          </foreignObject>
+        </g>
+      `;
       offset += dash;
       return seg;
     })
@@ -193,7 +205,7 @@ export function renderDonutChart(container, { data, centerLabel, centerValue }) 
   container.innerHTML = `
     <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
       <div style="position:relative; width:160px; height:160px; flex-shrink:0;">
-        <svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="${escapeHtml(centerLabel)}: ${escapeHtml(String(centerValue))} total. ${data.map((d) => `${d.label} ${d.value}`).join(", ")}">
+        <svg class="interactive-report-chart" viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="${escapeHtml(centerLabel)}: ${escapeHtml(String(centerValue))} total. Hover or tab through the donut segments for details. ${data.map((d) => `${d.label} ${d.value}`).join(", ")}">
           ${segments}
         </svg>
         <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none;">
@@ -246,7 +258,26 @@ export function renderWeeklyTrendChart(container, series) {
       const barH = (d.placements / maxPlacements) * plotH;
       const x = padding.left + i * slot + (slot - barWidth) / 2;
       const y = padding.top + (plotH - barH);
-      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" rx="4" fill="#1f2a52"></rect>`;
+      return { d, i, x, y, barH };
+    })
+    .map(({ d, x, y, barH }, i) => {
+      const dotX = padding.left + i * slot + slot / 2;
+      const dotY = padding.top + (plotH - (d.reach / maxReach) * plotH);
+      const tooltipX = Math.max(4, Math.min(width - 190, dotX - 86));
+      const tooltipY = Math.max(4, Math.min(height - 80, Math.min(y, dotY) - 70));
+      return `
+        <g class="interactive-trend-point" tabindex="0" aria-label="${escapeHtml(d.label)}: ${d.placements} placements, estimated reach ${d.reach.toLocaleString()}.">
+          <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${Math.max(2, barH).toFixed(1)}" rx="4" fill="#1f2a52"></rect>
+          <circle cx="${dotX.toFixed(1)}" cy="${dotY.toFixed(1)}" r="5" fill="#3f9e97"></circle>
+          <foreignObject x="${tooltipX.toFixed(1)}" y="${tooltipY.toFixed(1)}" width="178" height="64" class="chart-hover-tooltip">
+            <div xmlns="http://www.w3.org/1999/xhtml">
+              <strong>${escapeHtml(d.label)}</strong>
+              <span>${d.placements} press placement${d.placements === 1 ? "" : "s"}</span>
+              <span>${d.reach.toLocaleString()} estimated reach</span>
+            </div>
+          </foreignObject>
+        </g>
+      `;
     })
     .join("");
   const linePoints = series
@@ -256,13 +287,6 @@ export function renderWeeklyTrendChart(container, series) {
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
-  const dots = series
-    .map((d, i) => {
-      const x = padding.left + i * slot + slot / 2;
-      const y = padding.top + (plotH - (d.reach / maxReach) * plotH);
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#3f9e97"></circle>`;
-    })
-    .join("");
   const xLabels = series
     .map((d, i) => {
       const x = padding.left + i * slot + slot / 2;
@@ -273,10 +297,9 @@ export function renderWeeklyTrendChart(container, series) {
   const tableRows = series.map((d) => `<tr><td>${escapeHtml(d.label)}</td><td>${d.placements}</td><td>${d.reach.toLocaleString()}</td></tr>`).join("");
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly placements and audience reach. ${escapeHtml(summary)}" style="width:100%; height:auto;">
+    <svg class="interactive-report-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Weekly placements and audience reach. Hover or tab through each week for details. ${escapeHtml(summary)}" style="width:100%; height:auto;">
       ${bars}
       <polyline points="${linePoints}" fill="none" stroke="#3f9e97" stroke-width="2"></polyline>
-      ${dots}
       ${xLabels}
     </svg>
     <div class="chart-legend">

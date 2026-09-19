@@ -1206,11 +1206,13 @@ function renderSidebarComponent() {
 
 function renderHeaderComponent() {
   const client = currentClientForChrome();
+  const headerContext = getClientHeaderContext(client);
   renderHeader(document.getElementById("client-header"), {
     client,
     dataSource: state.dataSource,
-    greeting: `Welcome back, ${greetingName(client)}!`,
-    subtitle: "Here's your progress and what's next.",
+    contextLabel: headerContext.contextLabel,
+    greeting: headerContext.greeting,
+    subtitle: headerContext.subtitle,
     searchPlaceholder: "Search resources, placements, or reports...",
     extraAction: supportsCoaching()
       ? {
@@ -1226,6 +1228,75 @@ function renderHeaderComponent() {
   });
 }
 
+function getClientHeaderContext(client) {
+  const name = greetingName(client);
+  const programLabel = activeProgramView() === "coaching" ? "Coaching Program" : "PR Reporting";
+
+  if (state.view === "campaign-detail") {
+    const campaign = getCampaigns(state.clientId).find((c) => c.id === state.selectedCampaignId);
+    return {
+      contextLabel: `${programLabel} / My Campaigns / ${campaign?.name || "Campaign Detail"}`,
+      greeting: campaign?.name || "Campaign Detail",
+      subtitle: "Review the placements, value, lead time, and notes connected to this campaign.",
+    };
+  }
+
+  const byView = {
+    dashboard: {
+      contextLabel: programLabel,
+      greeting: `Welcome back, ${name}!`,
+      subtitle: "Here's your progress and what's next.",
+    },
+    campaigns: {
+      contextLabel: "PR Reporting / My Campaigns",
+      greeting: "My Campaigns",
+      subtitle: "Track campaign progress, placements, value, and follow-up notes.",
+    },
+    placements: {
+      contextLabel: "PR Reporting / Press Placements",
+      greeting: "Press Placements",
+      subtitle: "See the coverage, outlet details, value, lead time, and status for your work.",
+    },
+    reports: {
+      contextLabel: `${programLabel} / Reports & Results`,
+      greeting: "Reports & Results",
+      subtitle: "Review published summaries and performance updates from Verified Consulting.",
+    },
+    analytics: {
+      contextLabel: "PR Reporting / Analytics",
+      greeting: "Analytics",
+      subtitle: "Explore performance trends, audience reach, and the visibility story behind your placements.",
+    },
+    resources: {
+      contextLabel: `${programLabel} / Resources`,
+      greeting: "Resources",
+      subtitle: "Find guides, templates, checklists, and materials connected to your work.",
+    },
+    coaching: {
+      contextLabel: "Coaching Program / My Programs",
+      greeting: "My Programs",
+      subtitle: "See your coaching roadmap, current phase, homework, and next milestone.",
+    },
+    opportunities: {
+      contextLabel: "Coaching Program / Opportunities",
+      greeting: "Opportunities",
+      subtitle: "Evaluate potential partnerships, media moments, and visibility opportunities.",
+    },
+    messages: {
+      contextLabel: "Coaching Program / Messages",
+      greeting: "Messages",
+      subtitle: "Send Tenyse updates, questions, and notes connected to your program.",
+    },
+    files: {
+      contextLabel: "Coaching Program / Files",
+      greeting: "Files",
+      subtitle: "Upload and review documents connected to your coaching work.",
+    },
+  };
+
+  return byView[state.view] || byView.dashboard;
+}
+
 function showActiveViewElement(view) {
   document.querySelectorAll(".client-view").forEach((el) => el.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");
@@ -1235,6 +1306,7 @@ function navigate(view) {
   state.view = view;
   showActiveViewElement(view);
   renderSidebarComponent();
+  renderHeaderComponent();
   renderCurrentView();
   closeSidebarMobile();
 }

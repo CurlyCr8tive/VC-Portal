@@ -391,12 +391,12 @@ export function renderPlacementForm(
         return;
       }
       suggestBtn.disabled = true;
-      suggestionsEl.textContent = "Thinking…";
+      suggestionsEl.textContent = "Drafting suggested report copy...";
       const result = await onSuggestHeadline(headline);
       suggestBtn.disabled = false;
       suggestionsEl.innerHTML = result.ok
-        ? `<strong>Suggested report copy</strong> (via ${escapeHtml(result.providerUsed)}, not the actual published headline):<br>${escapeHtml(result.text).replace(/\n/g, "<br>")}`
-        : `⚠ ${escapeHtml(result.message)}`;
+        ? `<strong>Suggested report copy</strong> (not the actual published headline):<br>${escapeHtml(result.text).replace(/\n/g, "<br>")}`
+        : `${escapeHtml(result.message)}`;
     });
   }
 

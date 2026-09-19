@@ -12,6 +12,10 @@ const NAV_ITEMS = [
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
 
+const NAV_PARENT_BY_VIEW = {
+  "campaign-detail": "campaigns",
+};
+
 /**
  * Owner-side nav. This is the one place in the whole build where "All
  * Clients," full placement editing, and the mentions review queue are
@@ -19,6 +23,7 @@ const NAV_ITEMS = [
  */
 export function renderOwnerSidebar(container, opts) {
   const { ownerName, sessionEmail, isRealSession = false, currentView, demoState, dataSource, showDevControls = false, onNavigate, onDemoStateChange, onDataSourceChange, onLogout, onClose } = opts;
+  const activeView = NAV_PARENT_BY_VIEW[currentView] || currentView;
 
   // The demo link (?demo=owner) loads a mock account carrying Tenyse's real
   // name and email, so the sidebar read "Logged in as
@@ -50,7 +55,7 @@ export function renderOwnerSidebar(container, opts) {
         ${NAV_ITEMS.map(
           (item) => `
           <li>
-            <button data-nav="${item.id}" ${currentView === item.id ? 'aria-current="page"' : ""}>
+            <button data-nav="${item.id}" ${activeView === item.id ? 'aria-current="page"' : ""}>
               <span class="nav-icon" aria-hidden="true">${escapeHtml(item.icon)}</span>
               <span>${escapeHtml(item.label)}</span>
               ${item.badge ? `<span class="nav-badge">${escapeHtml(item.badge)}</span>` : ""}

@@ -1,4 +1,5 @@
 import { escapeHtml } from "../utils.js";
+import { leadTimeDaysForPlacement } from "../../calculations.js";
 import { renderPlacementsTable } from "./PressPlacementTable.js";
 
 /**
@@ -13,6 +14,21 @@ export function renderCampaignDetail(
   { campaign, placements, notes, currentUser, onAddNote, onBack, showClient = false, onGenerateActivitySummary, onGeneratePitchSuggestions }
 ) {
   const milestones = campaign.milestones || [];
+  const totalValue = placements.reduce((sum, placement) => sum + (Number(placement.ave) || 0), 0);
+  const publishedPlacements = placements.filter((placement) => placement.status === "published" || placement.landedDate || placement.url).length;
+  const leadTimes = placements.map(leadTimeDaysForPlacement).filter((days) => Number.isFinite(days) && days > 0);
+  const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((sum, days) => sum + days, 0) / leadTimes.length) : null;
+  const topOutlets = [...new Set(placements.map((placement) => placement.publication).filter(Boolean))].slice(0, 3);
+  const strongestPlacements = [...placements]
+    .sort((a, b) => (Number(b.ave) || 0) - (Number(a.ave) || 0))
+    .slice(0, 3)
+    .filter((placement) => placement.publication || placement.headline);
+  const formatMoney = (value) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: value >= 1000 ? 0 : 2,
+    }).format(value || 0);
   // Owner-only tools: onGenerateActivitySummary/onGeneratePitchSuggestions
   // are only ever passed from the owner dashboard (src/owner/app.js) —
   // client.html's call site doesn't pass them, so a client viewing their
@@ -50,26 +66,73 @@ export function renderCampaignDetail(
 
     ${
       showAiTools
-        ? `<div class="section-heading"><h2>AI Tools</h2></div>
-    <div class="card" style="margin-bottom:24px;">
+        ? `<div class="section-heading"><h2>Campaign Value Workspace</h2></div>
+    <div class="campaign-value-workspace">
+      <div class="campaign-value-story-card">
+        <p class="section-kicker">What Tenyse can show</p>
+        <h3>${escapeHtml(campaign.name)} created ${formatMoney(totalValue)} in estimated publicity value.</h3>
+        <p>
+          This campaign has ${publishedPlacements} visible press ${publishedPlacements === 1 ? "win" : "wins"}
+          ${avgLeadTime ? ` with an average ${avgLeadTime}-day path from pitch to placement.` : "."}
+          ${topOutlets.length ? ` Key outlets include ${escapeHtml(topOutlets.join(", "))}.` : ""}
+        </p>
+        <div class="campaign-value-metrics">
+          <div>
+            <span>Estimated value</span>
+            <strong>${formatMoney(totalValue)}</strong>
+          </div>
+          <div>
+            <span>Press wins</span>
+            <strong>${publishedPlacements}</strong>
+          </div>
+          <div>
+            <span>Avg. lead time</span>
+            <strong>${avgLeadTime ? `${avgLeadTime} days` : "Needs dates"}</strong>
+          </div>
+        </div>
+        ${
+          strongestPlacements.length
+            ? `<div class="campaign-proof-points">
+          <span>Strongest proof points</span>
+          <ul>
+            ${strongestPlacements
+              .map(
+                (placement) => `<li>
+              <strong>${escapeHtml(placement.publication || "Placement")}</strong>
+              ${placement.headline ? ` — ${escapeHtml(placement.headline)}` : ""}
+              ${Number(placement.ave) ? ` (${formatMoney(Number(placement.ave))})` : ""}
+            </li>`
+              )
+              .join("")}
+          </ul>
+        </div>`
+            : ""
+        }
+      </div>
       ${
         onGenerateActivitySummary
-          ? `<p style="margin:0 0 6px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Activity Summary</p>
-      <p class="hint" style="margin:0 0 8px;">A brief, honest check-in drafted from real placements/notes on this campaign — not the period-end executive summary. Nothing here is saved.</p>
-      <button type="button" class="btn-secondary" id="campaign-activity-generate">✨ Generate Activity Summary</button>
-      <div id="campaign-activity-result" style="margin:8px 0 16px; font-size:0.85rem;"></div>`
+          ? `<div class="campaign-work-card">
+        <p class="section-kicker">Client update draft</p>
+        <h3>Turn the work into a client-ready progress update.</h3>
+        <p class="hint">Summarize what happened, why it matters, and what Tenyse is moving next.</p>
+        <button type="button" class="btn-secondary" id="campaign-activity-generate">Draft Client Update</button>
+        <div id="campaign-activity-result" class="campaign-generated-output" aria-live="polite"></div>
+      </div>`
           : ""
       }
       ${
         onGeneratePitchSuggestions
-          ? `<p style="margin:0 0 6px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Pitch Language Suggestions</p>
-      <p class="hint" style="margin:0 0 8px;">Suggested opening lines for outreach on this campaign — grounded in real coverage already secured, never inventing a placement.</p>
-      <div class="field-row" style="margin-bottom:8px;">
-        <label for="campaign-pitch-outlet">Target outlet (optional)</label>
-        <input type="text" id="campaign-pitch-outlet" placeholder="e.g. Eater NY" />
-      </div>
-      <button type="button" class="btn-secondary" id="campaign-pitch-generate">✨ Suggest Pitch Language</button>
-      <div id="campaign-pitch-result" style="margin-top:8px; font-size:0.85rem;"></div>`
+          ? `<div class="campaign-work-card">
+        <p class="section-kicker">Next outreach angle</p>
+        <h3>Use the strongest wins to shape the next media pitch.</h3>
+        <p class="hint">Draft outlet-ready angles grounded in the campaign's existing proof points.</p>
+        <div class="field-row" style="margin-bottom:8px;">
+          <label for="campaign-pitch-outlet">Target outlet</label>
+          <input type="text" id="campaign-pitch-outlet" placeholder="Optional, e.g. Eater NY" />
+        </div>
+        <button type="button" class="btn-secondary" id="campaign-pitch-generate">Draft Outreach Angles</button>
+        <div id="campaign-pitch-result" class="campaign-generated-output" aria-live="polite"></div>
+      </div>`
           : ""
       }
     </div>`
@@ -114,12 +177,12 @@ export function renderCampaignDetail(
     const resultEl = container.querySelector("#campaign-activity-result");
     btn.addEventListener("click", async () => {
       btn.disabled = true;
-      resultEl.textContent = "Generating…";
+      resultEl.textContent = "Drafting a client-ready update...";
       const result = await onGenerateActivitySummary({ campaign, placements, notes });
       btn.disabled = false;
       resultEl.innerHTML = result.ok
-        ? `<em>Via ${escapeHtml(result.providerUsed)}:</em> ${escapeHtml(result.text)}`
-        : `⚠ ${escapeHtml(result.message)}`;
+        ? `<strong>Suggested client update</strong><p>${escapeHtml(result.text)}</p>`
+        : `<p>${escapeHtml(result.message)}</p>`;
     });
   }
 
@@ -129,12 +192,12 @@ export function renderCampaignDetail(
     btn.addEventListener("click", async () => {
       const targetOutlet = container.querySelector("#campaign-pitch-outlet").value.trim();
       btn.disabled = true;
-      resultEl.textContent = "Generating…";
+      resultEl.textContent = "Drafting outreach angles...";
       const result = await onGeneratePitchSuggestions({ campaign, placements, targetOutlet });
       btn.disabled = false;
       resultEl.innerHTML = result.ok
-        ? `<em>Via ${escapeHtml(result.providerUsed)}:</em><br>${escapeHtml(result.text).replace(/\n/g, "<br>")}`
-        : `⚠ ${escapeHtml(result.message)}`;
+        ? `<strong>Suggested outreach angles</strong><p>${escapeHtml(result.text).replace(/\n/g, "<br>")}</p>`
+        : `<p>${escapeHtml(result.message)}</p>`;
     });
   }
 
