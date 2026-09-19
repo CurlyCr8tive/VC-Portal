@@ -42,47 +42,104 @@ export function renderPerformanceChart(container, { series, range, onRangeChange
   }
 
   series = safeSeries;
-  const width = 600;
-  const height = 220;
-  const padding = { top: 10, right: 10, bottom: 30, left: 46 };
-  const plotW = width - padding.left - padding.right;
-  const plotH = height - padding.top - padding.bottom;
+  const totalAve = series.reduce((sum, d) => sum + (Number(d.ave) || 0), 0);
+  const totalPlacements = series.reduce((sum, d) => sum + (Number(d.placements) || 0), 0);
+  const periodsWithCoverage = series.filter((d) => (Number(d.ave) || 0) > 0 || (Number(d.placements) || 0) > 0).length;
+  const strongestByValue = [...series].sort((a, b) => (Number(b.ave) || 0) - (Number(a.ave) || 0))[0];
+  const strongestByPlacements = [...series].sort((a, b) => (Number(b.placements) || 0) - (Number(a.placements) || 0))[0];
+  const latestWithCoverage = [...series].reverse().find((d) => (Number(d.ave) || 0) > 0 || (Number(d.placements) || 0) > 0);
+  const maxAve = Math.max(1, ...series.map((d) => Number(d.ave) || 0));
+  const maxPlacements = Math.max(1, ...series.map((d) => Number(d.placements) || 0));
+  const avgValue = totalPlacements ? totalAve / totalPlacements : 0;
 
-  const maxAve = Math.max(1, ...series.map((d) => d.ave));
-  const maxPlacements = Math.max(1, ...series.map((d) => d.placements));
-  const n = series.length || 1;
-  const slot = plotW / n;
-  const barWidth = Math.min(38, slot * 0.5);
+  const storyParts = [
+    `${formatCurrency(totalAve)} in publicity value`,
+    `${totalPlacements} press placement${totalPlacements === 1 ? "" : "s"}`,
+    `${periodsWithCoverage} active period${periodsWithCoverage === 1 ? "" : "s"}`,
+  ];
+  const storySentence = `${storyParts.join(" across ")}. ${
+    strongestByValue
+      ? `${strongestByValue.label} drove the highest value (${formatCurrency(strongestByValue.ave)}).`
+      : ""
+  }`;
 
-  const bars = series
-    .map((d, i) => {
-      const barH = (d.ave / maxAve) * plotH;
-      const x = padding.left + i * slot + (slot - barWidth) / 2;
-      const y = padding.top + (plotH - barH);
-      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barH.toFixed(1)}" rx="4" fill="#f3ab97"></rect>`;
-    })
-    .join("");
+  const graphWidth = 620;
+  const graphHeight = 180;
+  const graphPadding = { top: 18, right: 18, bottom: 34, left: 18 };
+  const graphW = graphWidth - graphPadding.left - graphPadding.right;
+  const graphH = graphHeight - graphPadding.top - graphPadding.bottom;
+  const slot = graphW / Math.max(1, series.length);
+  const graphBarWidth = Math.min(42, slot * 0.52);
+  const graphPoints = series.map((d, i) => {
+    const ave = Number(d.ave) || 0;
+    const placements = Number(d.placements) || 0;
+    const x = graphPadding.left + i * slot + slot / 2;
+    const barHeight = (ave / maxAve) * graphH;
+    const barX = x - graphBarWidth / 2;
+    const barY = graphPadding.top + graphH - barHeight;
+    const dotY = graphPadding.top + graphH - (placements / maxPlacements) * graphH;
+    const share = totalAve ? Math.round((ave / totalAve) * 100) : 0;
+    return { ...d, ave, placements, x, barX, barY, barHeight, dotY, share };
+  });
+  const placementLine = graphPoints.map((p) => `${p.x.toFixed(1)},${p.dotY.toFixed(1)}`).join(" ");
+  const interactiveGraph = `
+    <div class="value-graph-wrap">
+      <svg class="value-graph" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="Interactive publicity value graph. Hover or tab through each period for details. ${escapeHtml(summary)}">
+        <line x1="${graphPadding.left}" y1="${graphPadding.top + graphH}" x2="${graphWidth - graphPadding.right}" y2="${graphPadding.top + graphH}" stroke="#ead8cf" stroke-width="1"></line>
+        ${graphPoints
+          .map((p) => {
+            const tooltip = `${p.label}: ${formatCurrency(p.ave)} publicity value, ${p.placements} placement${p.placements === 1 ? "" : "s"}, ${p.share}% of total value.`;
+            return `
+              <g class="value-graph-point" tabindex="0" aria-label="${escapeHtml(tooltip)}">
+                <rect x="${p.barX.toFixed(1)}" y="${p.barY.toFixed(1)}" width="${graphBarWidth.toFixed(1)}" height="${Math.max(2, p.barHeight).toFixed(1)}" rx="6"></rect>
+                <circle cx="${p.x.toFixed(1)}" cy="${p.dotY.toFixed(1)}" r="5"></circle>
+                <text x="${p.x.toFixed(1)}" y="${graphHeight - 10}" text-anchor="middle">${escapeHtml(p.label)}</text>
+                <foreignObject x="${Math.max(4, Math.min(graphWidth - 176, p.x - 84)).toFixed(1)}" y="${Math.max(4, p.barY - 82).toFixed(1)}" width="172" height="74" class="value-graph-tooltip">
+                  <div xmlns="http://www.w3.org/1999/xhtml">
+                    <strong>${escapeHtml(p.label)}</strong>
+                    <span>${formatCurrency(p.ave)} publicity value</span>
+                    <span>${p.placements} placement${p.placements === 1 ? "" : "s"} · ${p.share}% of total</span>
+                  </div>
+                </foreignObject>
+              </g>
+            `;
+          })
+          .join("")}
+        <polyline points="${placementLine}" fill="none" stroke="#1f2a52" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      </svg>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-swatch" style="background:var(--color-coral);"></span> Publicity value</span>
+        <span class="legend-item"><span class="legend-swatch" style="background:#1f2a52; border-radius:50%;"></span> Press placements</span>
+      </div>
+    </div>
+  `;
 
-  const linePoints = series
-    .map((d, i) => {
-      const x = padding.left + i * slot + slot / 2;
-      const y = padding.top + (plotH - (d.placements / maxPlacements) * plotH);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  const dots = series
-    .map((d, i) => {
-      const x = padding.left + i * slot + slot / 2;
-      const y = padding.top + (plotH - (d.placements / maxPlacements) * plotH);
-      return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="#1f2a52"></circle>`;
-    })
-    .join("");
-
-  const xLabels = series
-    .map((d, i) => {
-      const x = padding.left + i * slot + slot / 2;
-      return `<text x="${x.toFixed(1)}" y="${height - 8}" font-size="11" fill="#7a6d64" text-anchor="middle">${escapeHtml(d.label)}</text>`;
+  const timelineRows = graphPoints
+    .map((d) => {
+      const barWidth = Math.max(d.ave > 0 ? 8 : 0, Math.round((d.ave / maxAve) * 100));
+      const isValueLeader = strongestByValue && d.label === strongestByValue.label && d.ave > 0;
+      const isPlacementLeader = strongestByPlacements && d.label === strongestByPlacements.label && d.placements > 0;
+      return `
+        <div class="value-timeline-row" tabindex="0">
+          <div class="value-period">
+            <strong>${escapeHtml(d.label)}</strong>
+            ${isValueLeader ? `<span>Highest value</span>` : isPlacementLeader ? `<span>Most placements</span>` : `<span>${d.placements ? "Coverage landed" : "No coverage"}</span>`}
+          </div>
+          <div class="value-bar-track" aria-hidden="true">
+            <div class="value-bar-fill" style="width:${barWidth}%;"></div>
+          </div>
+          <div class="value-row-metrics">
+            <strong>${formatCurrency(d.ave)}</strong>
+            <span>${d.placements} placement${d.placements === 1 ? "" : "s"}</span>
+          </div>
+          <div class="value-row-tooltip" role="tooltip">
+            <strong>${escapeHtml(d.label)}</strong>
+            <span>${formatCurrency(d.ave)} publicity value</span>
+            <span>${d.placements} press placement${d.placements === 1 ? "" : "s"}</span>
+            <span>${d.share}% of total value shown</span>
+          </div>
+        </div>
+      `;
     })
     .join("");
 
@@ -107,19 +164,39 @@ export function renderPerformanceChart(container, { series, range, onRangeChange
       </select>`
       }
     </div>
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Publicity value and placement count over time. ${escapeHtml(summary)}" style="width:100%; height:auto;">
-      ${bars}
-      <polyline points="${linePoints}" fill="none" stroke="#1f2a52" stroke-width="2"></polyline>
-      ${dots}
-      ${xLabels}
-    </svg>
-    <div class="chart-legend">
-      <span class="legend-item"><span class="legend-swatch" style="background:#f3ab97"></span> AVE ($)</span>
-      <span class="legend-item"><span class="legend-swatch" style="background:#1f2a52; border-radius:50%;"></span> Placements</span>
+    <div class="value-story" role="img" aria-label="Publicity value story. ${escapeHtml(summary)}">
+      <div class="value-story-summary">
+        <p class="eyebrow">What this shows</p>
+        <h3>${escapeHtml(storySentence)}</h3>
+        <p>This connects Tenyse's press wins to visible business value: when coverage landed, how much publicity value it created, and how many placements supported that momentum.</p>
+      </div>
+      <div class="value-story-metrics">
+        <div>
+          <span>Total value</span>
+          <strong>${formatCurrency(totalAve)}</strong>
+        </div>
+        <div>
+          <span>Press wins</span>
+          <strong>${totalPlacements}</strong>
+        </div>
+        <div>
+          <span>Avg. value / win</span>
+          <strong>${formatCurrency(avgValue)}</strong>
+        </div>
+      </div>
+      ${interactiveGraph}
+      <div class="value-timeline" aria-hidden="true">
+        ${timelineRows}
+      </div>
+      ${
+        latestWithCoverage
+          ? `<p class="value-story-note">Most recent visible activity: <strong>${escapeHtml(latestWithCoverage.label)}</strong> with ${latestWithCoverage.placements} placement${latestWithCoverage.placements === 1 ? "" : "s"} and ${formatCurrency(latestWithCoverage.ave)} in value.</p>`
+          : ""
+      }
     </div>
     <button type="button" class="chart-table-toggle" aria-expanded="false">View chart data as a table</button>
     <table class="chart-data-table" hidden>
-      <thead><tr><th>Period</th><th>AVE ($)</th><th>Placements</th></tr></thead>
+      <thead><tr><th>Period</th><th>Publicity value</th><th>Press placements</th></tr></thead>
       <tbody>${tableRows}</tbody>
     </table>
   `;

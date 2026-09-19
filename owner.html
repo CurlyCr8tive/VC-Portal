@@ -76,6 +76,7 @@
       const sidebar = document.getElementById("owner-sidebar");
       const header = document.getElementById("owner-header");
       if (!sidebar || !header || sidebar.querySelector("[data-nav]")) return;
+      const detail = event.error?.stack || event.message || "No browser error details were provided.";
       sidebar.innerHTML = `
         <div class="sidebar-brand">
           <span class="logo-mark" aria-hidden="true">V</span>
@@ -90,6 +91,7 @@
         <div>
           <h1>Owner portal needs a refresh</h1>
           <p class="header-sub">The dashboard script did not load cleanly. Refresh this page, then sign in again if prompted.</p>
+          <pre style="white-space:pre-wrap; max-width:900px; margin-top:16px; padding:14px; border:1px solid #ead8cf; border-radius:8px; background:#fff7f2; color:#7a3e2d; font-size:0.85rem; line-height:1.4;">${String(detail).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]))}</pre>
         </div>
       `;
     }, true);

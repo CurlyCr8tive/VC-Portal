@@ -17,6 +17,7 @@
     "data:fix-placement-links": "node scripts/fix-placement-links.mjs",
     "data:apply-outlet-rates": "node scripts/apply-outlet-rates-to-placements.mjs",
     "data:backfill-audience-reach": "node scripts/backfill-audience-reach.mjs",
-    "auth:provision-test-accounts": "node scripts/provision-test-accounts.mjs"
+    "auth:provision-test-accounts": "node scripts/provision-test-accounts.mjs",
+    "auth:set-owner-password": "node scripts/set-owner-password.mjs"
   }
 }
