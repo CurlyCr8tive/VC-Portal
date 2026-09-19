@@ -16,17 +16,17 @@ import {
 } from "../clientApiDataSource.js?v=20260919-report-builder";
 import { renderSidebar } from "./components/ClientSidebar.js";
 import { renderHeader } from "./components/DashboardHeader.js";
-import { renderMetricsGrid } from "./components/MetricCard.js?v=20260919-report-builder";
-import { renderPlacementsTable } from "./components/PressPlacementTable.js?v=20260919-report-builder";
-import { renderCampaignsGrid } from "./components/CampaignProgressCard.js";
+import { renderMetricsGrid } from "./components/MetricCard.js?v=20260919-live-ui";
+import { renderPlacementsTable } from "./components/PressPlacementTable.js?v=20260919-live-ui";
+import { renderCampaignsGrid } from "./components/CampaignProgressCard.js?v=20260919-live-ui";
 import { renderPerformanceChart } from "./components/PerformanceChart.js?v=20260919-report-builder-2";
 import { renderInsightCard } from "./components/CampaignInsightCard.js";
-import { renderReportCard } from "./components/LatestReportCard.js?v=20260919-report-builder";
+import { renderReportCard } from "./components/LatestReportCard.js?v=20260919-live-ui";
 import { renderLoadingState } from "./components/LoadingState.js";
 import { renderErrorState } from "./components/ErrorState.js";
-import { renderCampaignDetail } from "./components/CampaignDetailView.js?v=20260919-report-builder";
+import { renderCampaignDetail } from "./components/CampaignDetailView.js?v=20260919-live-ui";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
-import { renderCoachingProgramView } from "./components/CoachingProgramView.js?v=20260917-coaching-polish-1";
+import { renderCoachingProgramView } from "./components/CoachingProgramView.js?v=20260919-live-ui";
 import { loadPhasesForClient } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient } from "../coachingResourceStorage.js";
 import { loadOpportunitiesForClient } from "../opportunityStorage.js";
@@ -932,11 +932,12 @@ function renderClientMessageList(messages) {
       ${messages
         .map(
           (message) => `
-        <article class="review-queue-item">
+        <article class="review-queue-item live-card" tabindex="0" data-live-tip="${escapeHtml(`Message to Tenyse sent ${formatReadableDate(message.createdAt?.slice(0, 10) || "")}.`) }">
           <div class="rq-info">
             <p class="rq-headline">${escapeHtml(message.subject)}</p>
             <p class="rq-meta">${escapeHtml(message.body)} · ${escapeHtml(formatReadableDate(message.createdAt?.slice(0, 10) || ""))}</p>
           </div>
+          <div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(message.subject)}</strong><p>${escapeHtml(message.body)}</p><span>Saved as a client note/message for Tenyse.</span></div>
         </article>`
         )
         .join("")}

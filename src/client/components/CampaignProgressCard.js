@@ -26,6 +26,9 @@ export function renderCampaignsGrid(container, campaigns, { onViewCampaign } = {
   container.innerHTML = campaigns
     .map((c) => {
       const hasProgress = c.progressPercent != null;
+      const tip = hasProgress
+        ? `${c.name} is ${c.progressPercent}% tracked, with ${c.completedPlacements} of ${c.totalPlacements} placements completed.`
+        : `${c.name} has placements tracked, but campaign progress has not been manually set yet.`;
       const progressMarkup = hasProgress
         ? `
         <div class="progress-track" role="progressbar" aria-valuenow="${c.progressPercent}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(c.name)} progress estimate">
@@ -41,7 +44,7 @@ export function renderCampaignsGrid(container, campaigns, { onViewCampaign } = {
         </div>`;
 
       return `
-    <div class="card campaign-card">
+    <div class="card campaign-card live-card" tabindex="0" data-live-tip="${escapeHtml(tip)}">
       ${c.clientName ? `<span class="campaign-client-tag">${escapeHtml(c.clientName)}</span>` : ""}
       <h3>${escapeHtml(c.name)}</h3>
       ${progressMarkup}
@@ -53,6 +56,7 @@ export function renderCampaignsGrid(container, campaigns, { onViewCampaign } = {
         ${c.milestones && c.milestones.length ? `<span>${c.milestones.filter((m) => m.done).length} of ${c.milestones.length} milestones done</span>` : ""}
       </div>
       <button class="view-btn" data-campaign="${escapeHtml(c.id)}">View campaign details</button>
+      <div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(c.name)}</strong><p>${escapeHtml(tip)}</p><span>Open details for value, lead time, proof points, and AI drafts.</span></div>
     </div>`;
     })
     .join("");

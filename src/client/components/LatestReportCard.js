@@ -16,7 +16,7 @@ export function renderReportCard(container, report, options = {}) {
   const canDownload = Boolean(report.pdfUrl || report.executiveSummary);
 
   container.innerHTML = `
-    <div class="card report-card" style="${report.executiveSummary ? "flex-direction:column; align-items:stretch;" : ""}">
+    <div class="card report-card live-card" tabindex="0" data-live-tip="${escapeHtml(`Published report for ${report.period}. Use View Report for the client-ready summary or Download PDF for a shareable file.`)}" style="${report.executiveSummary ? "flex-direction:column; align-items:stretch;" : ""}">
       <div class="report-info">
         <h3>${escapeHtml(report.title)}</h3>
         <p>${escapeHtml(report.period)} · Published ${escapeHtml(report.datePublished)}</p>
@@ -40,6 +40,11 @@ export function renderReportCard(container, report, options = {}) {
             </div>`
           : ""
       }
+      <div class="live-tip-panel" role="tooltip">
+        <strong>${escapeHtml(report.title)}</strong>
+        <p>${escapeHtml(`Published ${report.datePublished}. This is the client-facing output generated from tracked placements and approved summary copy.`)}</p>
+        <span>Preview or download the report.</span>
+      </div>
     </div>
   `;
 

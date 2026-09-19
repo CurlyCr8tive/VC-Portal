@@ -1,5 +1,5 @@
 import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
-import { nextId } from "../utils.js";
+import { escapeHtml, nextId } from "../utils.js";
 
 function deltaLabel(delta, { lowerIsBetter = false } = {}) {
   if (delta == null) return "";
@@ -18,16 +18,22 @@ function tooltipMarkup(id, text) {
   `;
 }
 
-function card({ label, value, icon, iconBg, delta, deltaOpts, tooltipText }) {
+function card({ label, value, icon, iconBg, delta, deltaOpts, tooltipText, actionText }) {
   const tipId = nextId("tip");
+  const tip = tooltipText || `${label} reflects the current reporting data for this account.`;
   return `
-    <div class="card metric-card">
+    <div class="card metric-card live-card" tabindex="0" data-live-tip="${escapeHtml(tip)}">
       <div class="metric-top">
         <span class="metric-label">${label} ${tooltipText ? tooltipMarkup(tipId, tooltipText) : ""}</span>
         <span class="metric-icon" style="background:${iconBg}">${icon}</span>
       </div>
       <p class="metric-value">${value}</p>
       ${delta != null ? deltaLabel(delta, deltaOpts) : ""}
+      <div class="live-tip-panel" role="tooltip">
+        <strong>${escapeHtml(label)}</strong>
+        <p>${escapeHtml(tip)}</p>
+        ${actionText ? `<span>${escapeHtml(actionText)}</span>` : ""}
+      </div>
     </div>
   `;
 }
@@ -41,6 +47,7 @@ export function renderMetricsGrid(container, metrics) {
       iconBg: "#fbe2da",
       delta: metrics.aveDelta,
       tooltipText: "An estimate of what similar exposure may have cost as paid advertising.",
+      actionText: "Shows the value story behind press wins.",
     })}
     ${card({
       label: "Total Press Placements",
@@ -48,6 +55,8 @@ export function renderMetricsGrid(container, metrics) {
       icon: "📰",
       iconBg: "#e1f2f0",
       delta: metrics.placementsDelta,
+      tooltipText: "Confirmed press wins visible to this client.",
+      actionText: "Feeds campaign progress and reports.",
     })}
     ${card({
       label: "Avg. Lead Time",
@@ -57,6 +66,7 @@ export function renderMetricsGrid(container, metrics) {
       delta: metrics.leadTimeDelta,
       deltaOpts: { lowerIsBetter: true },
       tooltipText: "The time between the beginning of outreach and the publication of a press placement.",
+      actionText: "Shows how quickly PR activity becomes visible.",
     })}
     ${card({
       label: "Active Campaigns",
@@ -64,6 +74,8 @@ export function renderMetricsGrid(container, metrics) {
       icon: "📁",
       iconBg: "#efe9f5",
       delta: null,
+      tooltipText: "Campaigns currently tracked for this client.",
+      actionText: "Open campaigns to see status and next steps.",
     })}
   `;
 

@@ -82,16 +82,16 @@ export function renderClientsList(
       const profile = c.profile || { status: "unconfirmed", engagementType: "pr" };
       const termCount = discoveryTermsCount(profile.keywordConfig);
       return `
-    <div class="card client-list-card">
+    <div class="card client-list-card live-card" tabindex="0" data-live-tip="${escapeHtml(`${c.name}: ${formatCurrency(c.metrics.totalAVE)} AVE, ${c.metrics.totalPlacements} placements, ${c.metrics.activeCampaigns} active campaigns. Use the actions to open their dashboard, scan for mentions, or manage relationship details.`)}">
       <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:8px;">
         <h3 style="margin:0;">${escapeHtml(c.name)}</h3>
         <span class="status-badge ${STATUS_BADGE_CLASS[profile.status] || "in-progress"}" title="${escapeHtml(STATUS_TOOLTIP[profile.status] || STATUS_TOOLTIP.unconfirmed)}">${escapeHtml(STATUS_LABEL[profile.status] || "Status Unconfirmed")}</span>
       </div>
       <p style="font-size:0.78rem; color:var(--text-secondary); margin:2px 0 10px;">${escapeHtml(ENGAGEMENT_LABEL[profile.engagementType] || "PR")}${profile.industry ? ` · ${escapeHtml(profile.industry)}` : ""}</p>
       <div class="client-mini-metrics">
-        <div><strong>${formatCurrency(c.metrics.totalAVE)}</strong>AVE</div>
-        <div><strong>${c.metrics.totalPlacements}</strong>Placements</div>
-        <div><strong>${c.metrics.activeCampaigns}</strong>Campaigns</div>
+        <div class="mini-live-stat" data-live-tip="${escapeHtml(`${c.name}'s estimated publicity value from tracked placements.`)}"><strong>${formatCurrency(c.metrics.totalAVE)}</strong>AVE</div>
+        <div class="mini-live-stat" data-live-tip="${escapeHtml(`${c.metrics.totalPlacements} press placements currently tracked for ${c.name}.`)}"><strong>${c.metrics.totalPlacements}</strong>Placements</div>
+        <div class="mini-live-stat" data-live-tip="${escapeHtml(`${c.metrics.activeCampaigns} active PR campaigns currently tied to ${c.name}.`)}"><strong>${c.metrics.activeCampaigns}</strong>Campaigns</div>
       </div>
       <p style="font-size:0.82rem; color:var(--text-secondary); margin:0;">
         ${c.campaignNames.length ? escapeHtml(c.campaignNames.join(", ")) : "No active campaigns"}
@@ -129,6 +129,11 @@ export function renderClientsList(
       </div>`
           : ""
       }
+      <div class="live-tip-panel" role="tooltip">
+        <strong>${escapeHtml(c.name)}</strong>
+        <p>${escapeHtml(`${formatCurrency(c.metrics.totalAVE)} AVE across ${c.metrics.totalPlacements} placements. ${termCount ? `${termCount} discovery terms are ready for mention scanning.` : "Discovery terms can be added for stronger scans."}`)}</p>
+        <span>Open dashboard, scan mentions, or manage this client.</span>
+      </div>
     </div>`;
     })
     .join("");

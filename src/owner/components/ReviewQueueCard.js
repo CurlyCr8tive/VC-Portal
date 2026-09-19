@@ -17,7 +17,7 @@ export function renderReviewQueue(container, items, { onConfirm, onReject, confi
       ${items
         .map(
           (item) => `
-        <div class="review-queue-item">
+        <div class="review-queue-item live-card" tabindex="0" data-live-tip="${escapeHtml(`Discovery matched “${item.matchedOn || "keyword"}” for ${item.client}. Tenyse reviews the source before this becomes a confirmed placement.`)}">
           <div class="rq-info">
             <p class="rq-headline">
               ${
@@ -88,6 +88,11 @@ export function renderReviewQueue(container, items, { onConfirm, onReject, confi
           </form>`
               : ""
           }
+          <div class="live-tip-panel" role="tooltip">
+            <strong>Discovery match</strong>
+            <p>${escapeHtml(`Matched on “${item.matchedOn || "keyword match"}” for ${item.client}. Confirming creates a placement; rejecting keeps it out of client-facing totals.`)}</p>
+            <span>${item.articleUrl ? "Open the source, then confirm or reject." : "Review the match before taking action."}</span>
+          </div>
         </div>`
         )
         .join("")}

@@ -19,6 +19,18 @@
 // is called exactly once, at app startup.
 
 let popoverEl = null;
+let closeTimer = null;
+
+function cancelPopoverClose() {
+  if (!closeTimer) return;
+  window.clearTimeout(closeTimer);
+  closeTimer = null;
+}
+
+function schedulePopoverClose() {
+  cancelPopoverClose();
+  closeTimer = window.setTimeout(closePopover, 140);
+}
 
 function ensurePopoverEl() {
   if (popoverEl) return popoverEl;
@@ -26,15 +38,19 @@ function ensurePopoverEl() {
   popoverEl.className = "info-popover";
   popoverEl.hidden = true;
   popoverEl.setAttribute("role", "dialog");
+  popoverEl.addEventListener("pointerenter", cancelPopoverClose);
+  popoverEl.addEventListener("pointerleave", schedulePopoverClose);
   document.body.appendChild(popoverEl);
   return popoverEl;
 }
 
 function closePopover() {
+  cancelPopoverClose();
   if (popoverEl) popoverEl.hidden = true;
 }
 
 function openPopoverFor(button) {
+  cancelPopoverClose();
   const el = ensurePopoverEl();
   const title = button.dataset.infoTitle || "";
   const body = button.dataset.infoBody || "";
@@ -60,6 +76,7 @@ function openPopoverFor(button) {
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
   el.style.width = `${width}px`;
+  el.dataset.openFor = button.dataset.infoTitle;
 
   el.querySelector(".info-popover-close").addEventListener("click", closePopover);
 }
@@ -69,6 +86,31 @@ function openPopoverFor(button) {
  * working through every future innerHTML re-render — no per-page wiring.
  */
 export function installInfoPopoverDelegate() {
+  document.addEventListener("pointerover", (e) => {
+    const trigger = e.target.closest(".info-popover-trigger");
+    if (!trigger) return;
+    openPopoverFor(trigger);
+  });
+
+  document.addEventListener("pointerout", (e) => {
+    const trigger = e.target.closest(".info-popover-trigger");
+    if (!trigger) return;
+    if (trigger.contains(e.relatedTarget)) return;
+    schedulePopoverClose();
+  });
+
+  document.addEventListener("focusin", (e) => {
+    const trigger = e.target.closest(".info-popover-trigger");
+    if (!trigger) return;
+    openPopoverFor(trigger);
+  });
+
+  document.addEventListener("focusout", (e) => {
+    const trigger = e.target.closest(".info-popover-trigger");
+    if (!trigger) return;
+    schedulePopoverClose();
+  });
+
   document.addEventListener("click", (e) => {
     const trigger = e.target.closest(".info-popover-trigger");
     if (trigger) {
@@ -79,7 +121,6 @@ export function installInfoPopoverDelegate() {
         closePopover();
       } else {
         openPopoverFor(trigger);
-        ensurePopoverEl().dataset.openFor = trigger.dataset.infoTitle;
       }
       return;
     }

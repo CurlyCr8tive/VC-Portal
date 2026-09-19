@@ -124,7 +124,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
   function progressCardHtml({ phases, progressPercent }) {
     const reached = phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length;
     return `
-      <article class="cp-card cp-progress-card" id="cp-overview">
+      <article class="cp-card cp-progress-card live-card" id="cp-overview" tabindex="0" data-live-tip="${escapeHtml(`Overall roadmap progress is ${progressPercent}%, with ${reached} of ${phases.length} phases reached.`)}">
         <div class="cp-card-head">
           <div>
             <h3>Overall Progress</h3>
@@ -147,6 +147,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
             })
             .join("")}
         </div>
+        <div class="live-tip-panel" role="tooltip"><strong>Overall Progress</strong><p>${escapeHtml(`This shows where the client is in the coaching roadmap: ${reached} of ${phases.length} phases reached.`)}</p><span>Use the roadmap to understand what is next.</span></div>
       </article>
     `;
   }
@@ -156,7 +157,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
       ? phase.deliverables
       : ["One sheet (PDF)", "Media pitch (customized)", "Partnership email template", "Influencer vetting criteria"];
     return `
-      <article class="cp-card cp-phase-card" id="cp-phases">
+      <article class="cp-card cp-phase-card live-card" id="cp-phases" tabindex="0" data-live-tip="${escapeHtml(`Current focus: Phase ${phase.phaseNumber}, ${phase.name}.`) }">
         <div class="cp-phase-header">
           <div>
             <span class="cp-phase-pill">Phase ${escapeHtml(String(phase.phaseNumber))}</span>
@@ -193,13 +194,14 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
             <p>${escapeHtml(resource?.content || "A step-by-step walkthrough on what to include, how to position your value, and common mistakes to avoid.")}</p>
           </div>
         </div>
+        <div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(phase.name)}</strong><p>${escapeHtml(phase.goal || "This phase focuses the client's next steps in the coaching program.")}</p><span>Review goals, deliverables, and featured resources.</span></div>
       </article>
     `;
   }
 
   function coachCardHtml() {
     return `
-      <article class="cp-card cp-coach-card">
+      <article class="cp-card cp-coach-card live-card" tabindex="0" data-live-tip="Message Tenyse from inside the coaching program context.">
         <h3>Your Coach</h3>
         <div class="cp-coach-row">
           <div class="cp-coach-avatar">TW</div>
@@ -209,6 +211,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
             <button type="button" class="btn-secondary" data-cp-anchor="notes">Message Tenyse</button>
           </div>
         </div>
+        <div class="live-tip-panel" role="tooltip"><strong>Your Coach</strong><p>Reach Tenyse from the same place where homework, resources, and opportunities live.</p><span>Message Tenyse</span></div>
       </article>
     `;
   }
@@ -221,7 +224,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
           { id: "fallback-2", text: "Compile 10 potential influencer partners", dueDate: "", status: "not_started", type: "action" },
         ];
     return `
-      <article class="cp-card cp-homework-card" id="cp-homework">
+      <article class="cp-card cp-homework-card live-card" id="cp-homework" tabindex="0" data-live-tip="${escapeHtml(`${visible.length} homework items are visible for this phase.`)}">
         <h3>This Phase's Homework</h3>
         <div class="cp-homework-list">
           ${visible
@@ -239,13 +242,14 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
             .join("")}
         </div>
         <button type="button" class="new-client-btn" data-cp-anchor="homework">View All Homework</button>
+        <div class="live-tip-panel" role="tooltip"><strong>This Phase's Homework</strong><p>${escapeHtml(`${visible.length} action items keep the client moving between coaching calls.`)}</p><span>Check items off as progress happens.</span></div>
       </article>
     `;
   }
 
   function reflectionCardHtml(reflection) {
     return `
-      <article class="cp-card cp-reflection-card" id="cp-notes">
+      <article class="cp-card cp-reflection-card live-card" id="cp-notes" tabindex="0" data-live-tip="Reflection responses help Tenyse understand what the client is thinking between sessions.">
         <h3>Reflection Prompt</h3>
         <p><span aria-hidden="true">“</span>${escapeHtml(reflection?.text || "What's one partnership opportunity that excites you right now, and what would make it a good fit for your brand?")}</p>
         <textarea id="cp-reflection-response" rows="4" placeholder="Write your response here...">${escapeHtml(reflection?.response || "")}</textarea>
@@ -253,6 +257,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
           <button type="button" class="new-client-btn" id="cp-save-reflection" ${reflection ? "" : "disabled"}>Save Response</button>
           <small>${reflection?.status === "complete" ? "Saved" : "Last saved: Sep 10, 2026"}</small>
         </div>
+        <div class="live-tip-panel" role="tooltip"><strong>Reflection Prompt</strong><p>This captures client context and gives Tenyse better coaching notes before the next call.</p><span>Save a response for Tenyse to review.</span></div>
       </article>
     `;
   }
@@ -278,11 +283,12 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
 
   function actionCard(icon, title, body, label, action) {
     return `
-      <article class="cp-card cp-action-card">
+      <article class="cp-card cp-action-card live-card" tabindex="0" data-live-tip="${escapeHtml(body)}">
         <span aria-hidden="true">${icon}</span>
         <h3>${escapeHtml(title)}</h3>
         <p>${escapeHtml(body)}</p>
         <button type="button" class="btn-secondary" data-cp-action="${escapeHtml(action)}">${escapeHtml(label)}</button>
+        <div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(body)}</p><span>${escapeHtml(label)}</span></div>
       </article>
     `;
   }

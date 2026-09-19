@@ -110,7 +110,7 @@ export function renderPlacementsTable(
   const tableRows = rows
     .map(
       ({ p, index, leadTime, statusClass, headlineCell }) => `
-      <tr>
+      <tr class="live-row" tabindex="0" data-live-tip="${escapeHtml(`${p.publication || "Placement"}: ${formatCurrency(demoAVEForPlacement(p, index))} estimated publicity value, ${leadTime == null ? "lead time not available" : `${leadTime} day lead time`}, status ${p.status || "not set"}.`)}">
         <td>${escapeHtml(p.publication)}</td>
         <td>${headlineCell}</td>
         ${clientTd(p)}
@@ -128,7 +128,7 @@ export function renderPlacementsTable(
   const cardsMarkup = rows
     .map(
       ({ p, index, leadTime, statusClass, headlineCell }) => `
-      <div class="placement-card">
+      <div class="placement-card live-card" tabindex="0" data-live-tip="${escapeHtml(`${p.publication || "Placement"}: ${formatCurrency(demoAVEForPlacement(p, index))} estimated publicity value, ${leadTime == null ? "lead time not available" : `${leadTime} day lead time`}.`)}">
         <div class="pc-row"><span>Publication</span><span>${escapeHtml(p.publication)}</span></div>
         <div class="pc-row"><span>Headline</span><span>${headlineCell}</span></div>
         ${clientPcRow(p)}
@@ -139,6 +139,7 @@ export function renderPlacementsTable(
         <div class="pc-row"><span>Status</span><span class="status-badge ${statusClass}">${escapeHtml(p.status)}</span></div>
         <div class="pc-row"><span>Sentiment</span><span>${sentimentBadge(p)}</span></div>
         ${actionsPcRow(p)}
+        <div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(p.publication || "Placement")}</strong><p>${escapeHtml(`${formatCurrency(demoAVEForPlacement(p, index))} estimated publicity value with ${leadTime == null ? "lead time not available" : `${leadTime} day lead time`}.`)}</p><span>This row feeds reports, analytics, and campaign value.</span></div>
       </div>`
     )
     .join("");

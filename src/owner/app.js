@@ -25,19 +25,19 @@ import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, del
 import { createClient, applyClientEdit } from "../clientSchema.js";
 import { addClient, updateClient, upsertClientByName, findClientByName } from "../clientStorage.js";
 import { renderHeader } from "../client/components/DashboardHeader.js";
-import { renderMetricsGrid } from "../client/components/MetricCard.js?v=20260919-report-builder";
-import { renderPlacementsTable } from "../client/components/PressPlacementTable.js?v=20260919-report-builder";
-import { renderCampaignsGrid } from "../client/components/CampaignProgressCard.js";
+import { renderMetricsGrid } from "../client/components/MetricCard.js?v=20260919-live-ui";
+import { renderPlacementsTable } from "../client/components/PressPlacementTable.js?v=20260919-live-ui";
+import { renderCampaignsGrid } from "../client/components/CampaignProgressCard.js?v=20260919-live-ui";
 import { renderPerformanceChart } from "../client/components/PerformanceChart.js?v=20260919-report-builder-2";
 import { renderInsightCard } from "../client/components/CampaignInsightCard.js";
-import { renderReportCard } from "../client/components/LatestReportCard.js?v=20260919-report-builder";
+import { renderReportCard } from "../client/components/LatestReportCard.js?v=20260919-live-ui";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
-import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js";
+import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260919-dashboard-alive";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-report-builder";
-import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-report-builder-2";
-import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-source-links";
+import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-live-ui";
+import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-live-ui";
 import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js?v=20260919-report-builder";
@@ -46,7 +46,7 @@ import { renderClientDetailForm } from "./components/ClientDetailForm.js";
 import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-then-fix";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js?v=20260919-report-builder";
-import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-report-builder";
+import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-live-ui";
 import { loadPhasesForClient, addPhase as addLocalPhase, updatePhase as updateLocalPhase } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient, addResource as addLocalResource, updateResource as updateLocalResource, deleteResource as deleteLocalResource } from "../coachingResourceStorage.js";
 import { loadOpportunitiesForClient, addOpportunity as addLocalOpportunity, updateOpportunity as updateLocalOpportunity, deleteOpportunity as deleteLocalOpportunity } from "../opportunityStorage.js";
@@ -431,15 +431,26 @@ function dashboardSkeletonHTML() {
   `;
 }
 
-function ownerMetricCard({ label, value, note, icon, iconBg, tooltip }) {
+function ownerMetricCard({ label, value, note, icon, iconBg, tooltip, target, actionLabel }) {
+  const interactiveClass = target ? " is-interactive" : "";
+  const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}"` : "";
   return `
-    <div class="card metric-card owner-metric-card">
+    <div class="card metric-card owner-metric-card${interactiveClass}"${interactionAttrs}>
       <div class="metric-top">
-        <span class="metric-label">${escapeHtml(label)}${tooltip ? ` <span class="info-icon" title="${escapeHtml(tooltip)}">i</span>` : ""}</span>
+        <span class="metric-label">${escapeHtml(label)}${tooltip ? ` <span class="info-icon metric-info-icon" aria-hidden="true">i</span>` : ""}</span>
         <span class="metric-icon" style="background:${iconBg}">${icon}</span>
       </div>
       <p class="metric-value">${escapeHtml(String(value))}</p>
       ${note ? `<p class="metric-delta positive">${escapeHtml(note)}</p>` : ""}
+      ${
+        tooltip
+          ? `<div class="metric-hover-panel" role="tooltip">
+        <strong>${escapeHtml(label)}</strong>
+        <p>${escapeHtml(tooltip)}</p>
+        ${actionLabel ? `<span>${escapeHtml(actionLabel)}</span>` : ""}
+      </div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -654,7 +665,9 @@ function renderOwnerMetrics(container, metrics) {
       note: aveNote,
       icon: "$",
       iconBg: "#fbe2da",
-      tooltip: "Estimated equivalent paid-media value for confirmed coverage.",
+      tooltip: "Estimated equivalent paid-media value from confirmed and demo-ready placements. This is the headline value story Tenyse can turn into a client report.",
+      target: "reports",
+      actionLabel: "Open report builder",
     })}
     ${ownerMetricCard({
       label: "Total Press Placements",
@@ -662,6 +675,9 @@ function renderOwnerMetrics(container, metrics) {
       note: metrics.placementsDelta != null ? `${metrics.placementsDelta > 0 ? "+" : ""}${metrics.placementsDelta} vs prior period` : "Across visible clients",
       icon: "▦",
       iconBg: "#e1f2f0",
+      tooltip: "Confirmed coverage wins across the visible clients. These placements feed campaign value, client reports, and the review workflow.",
+      target: "placements",
+      actionLabel: "Review placements",
     })}
     ${ownerMetricCard({
       label: "Avg. Lead Time",
@@ -669,7 +685,9 @@ function renderOwnerMetrics(container, metrics) {
       note: metrics.leadTimeDelta != null ? `${metrics.leadTimeDelta < 0 ? "" : "+"}${metrics.leadTimeDelta} days vs prior period` : "Demo lead-time model",
       icon: "◷",
       iconBg: "#fdf0d8",
-      tooltip: "Days between pitch sent date and landed date.",
+      tooltip: "Average days from pitch activity to landed coverage. For demo day this uses the seeded lead-time model while Google Workspace is on hold.",
+      target: "analytics",
+      actionLabel: "Explore analytics",
     })}
     ${ownerMetricCard({
       label: "Active Campaigns (PR)",
@@ -677,6 +695,9 @@ function renderOwnerMetrics(container, metrics) {
       note: "Active",
       icon: "□",
       iconBg: "#efe9f5",
+      tooltip: "PR campaigns currently in motion. Campaign detail pages show proof points, value, client update drafts, and outreach angles.",
+      target: "campaigns",
+      actionLabel: "Open campaigns",
     })}
     ${ownerMetricCard({
       label: "Active Coaching Programs",
@@ -684,8 +705,24 @@ function renderOwnerMetrics(container, metrics) {
       note: coachingCount === 1 ? "Client enrolled" : "Clients enrolled",
       icon: "◎",
       iconBg: "#e9ecff",
+      tooltip: "Coaching programs tied to clients after visibility lands. This keeps roadmap phases, homework, resources, and opportunities in one place.",
+      target: "coaching",
+      actionLabel: "Open coaching hub",
     })}
   `;
+  wireMetricCardNavigation(container);
+}
+
+function wireMetricCardNavigation(container) {
+  container.querySelectorAll("[data-metric-goto]").forEach((card) => {
+    const openTarget = () => navigate(card.dataset.metricGoto);
+    card.addEventListener("click", openTarget);
+    card.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      openTarget();
+    });
+  });
 }
 
 function renderCompactPlacementsTable(container, placements) {
@@ -1861,10 +1898,46 @@ function renderCampaignsOverview(container) {
     <div class="section-heading"><h2>Campaigns Overview ${sectionInfoButton({ title: "Campaigns Overview", body: "Every PR campaign across every client, its status (active/planning/paused/completed), and the publicity value (AVE) earned from that campaign's own landed placements — not a client-wide total. Progress is completed placements divided by the campaign's total planned placements. Use the filter chips and search below to narrow this down, and Manage Campaigns further down to add or edit one." })}</h2></div>
     <p class="hint" style="margin:-8px 0 20px;">Every real campaign across all clients, with publicity value and progress in one place.</p>
     <div class="owner-metrics-grid" style="margin-bottom:24px;">
-      ${reportsMetricCard({ label: "Active Campaigns", value: String(metrics.activeCampaigns), delta: null, icon: "\u25b6", iconBg: "#fbe2da" })}
-      ${reportsMetricCard({ label: "Total Placements", value: String(metrics.totalPlacements), delta: null, icon: "\u25a6", iconBg: "#e1f2f0" })}
-      ${reportsMetricCard({ label: "Total Publicity Value", value: formatCompactCurrency(metrics.totalAVE), delta: null, icon: "$", iconBg: "#fdf0d8" })}
-      ${reportsMetricCard({ label: "Clients with Active Campaigns", value: `${metrics.clientsWithActive} of ${metrics.totalClients}`, delta: null, icon: "\u25ce", iconBg: "#e9ecff" })}
+      ${reportsMetricCard({
+        label: "Active Campaigns",
+        value: String(metrics.activeCampaigns),
+        delta: null,
+        icon: "\u25b6",
+        iconBg: "#fbe2da",
+        tooltip: "Campaigns currently in motion, separated from completed or paused work so Tenyse can see where follow-up still matters.",
+        target: "campaigns",
+        actionLabel: "Filter campaign work",
+      })}
+      ${reportsMetricCard({
+        label: "Total Placements",
+        value: String(metrics.totalPlacements),
+        delta: null,
+        icon: "\u25a6",
+        iconBg: "#e1f2f0",
+        tooltip: "All placements connected to campaign records. These feed campaign progress, reports, and client-facing proof.",
+        target: "placements",
+        actionLabel: "Open placements",
+      })}
+      ${reportsMetricCard({
+        label: "Total Publicity Value",
+        value: formatCompactCurrency(metrics.totalAVE),
+        delta: null,
+        icon: "$",
+        iconBg: "#fdf0d8",
+        tooltip: "Estimated publicity value earned by campaign placements. This gives Tenyse a quick value story before opening a campaign detail.",
+        target: "reports",
+        actionLabel: "Open value reports",
+      })}
+      ${reportsMetricCard({
+        label: "Clients with Active Campaigns",
+        value: `${metrics.clientsWithActive} of ${metrics.totalClients}`,
+        delta: null,
+        icon: "\u25ce",
+        iconBg: "#e9ecff",
+        tooltip: "How many clients currently have PR campaigns in motion, useful for prioritizing client follow-up.",
+        target: "clients",
+        actionLabel: "Open clients",
+      })}
     </div>
 
     <div class="card" style="margin-bottom:24px;">
@@ -1920,6 +1993,7 @@ function renderCampaignsOverview(container) {
     state.campaignsSearch = e.target.value;
     renderCampaignsOverview(container);
   });
+  wireMetricCardNavigation(container);
   // Keep focus + caret position across the re-render triggered by typing.
   if (document.activeElement !== searchInput) searchInput.focus();
 }
@@ -2517,19 +2591,30 @@ function cssId(str) {
   return String(str).replace(/[^a-zA-Z0-9]+/g, "-");
 }
 
-function reportsMetricCard({ label, value, delta, icon, iconBg }) {
+function reportsMetricCard({ label, value, delta, icon, iconBg, tooltip, target, actionLabel }) {
   const deltaHtml =
     delta == null
       ? `<p class="metric-delta" style="color:var(--text-secondary);">No prior-period comparison yet</p>`
       : `<p class="metric-delta ${delta >= 0 ? "positive" : "negative"}">${delta >= 0 ? "\u2191" : "\u2193"} ${Math.abs(delta)}% vs previous period</p>`;
+  const interactiveClass = target ? " is-interactive" : "";
+  const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}"` : "";
   return `
-    <div class="card metric-card owner-metric-card">
+    <div class="card metric-card owner-metric-card${interactiveClass}"${interactionAttrs}>
       <div class="metric-top">
-        <span class="metric-label">${escapeHtml(label)}</span>
+        <span class="metric-label">${escapeHtml(label)}${tooltip ? ` <span class="info-icon metric-info-icon" aria-hidden="true">i</span>` : ""}</span>
         <span class="metric-icon" style="background:${iconBg}">${icon}</span>
       </div>
       <p class="metric-value">${escapeHtml(value)}</p>
       ${deltaHtml}
+      ${
+        tooltip
+          ? `<div class="metric-hover-panel" role="tooltip">
+        <strong>${escapeHtml(label)}</strong>
+        <p>${escapeHtml(tooltip)}</p>
+        ${actionLabel ? `<span>${escapeHtml(actionLabel)}</span>` : ""}
+      </div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -2566,10 +2651,46 @@ function renderReportsOverview(container) {
     <p class="hint" style="margin:-8px 0 20px;">Cross-client performance from every real placement on file.</p>
 
     <div class="owner-metrics-grid" style="margin-bottom:24px;">
-      ${reportsMetricCard({ label: "Total Publicity Value (AVE)", value: formatCompactCurrency(metrics.totalAVE), delta: metrics.aveDelta, icon: "$", iconBg: "#fbe2da" })}
-      ${reportsMetricCard({ label: "Total Press Placements", value: String(metrics.totalPlacements), delta: metrics.placementsDelta, icon: "\u25a6", iconBg: "#e1f2f0" })}
-      ${reportsMetricCard({ label: "Active Clients", value: String(metrics.activeClients), delta: null, icon: "\u25ce", iconBg: "#e9ecff" })}
-      ${reportsMetricCard({ label: "Avg. Audience Reach", value: metrics.avgReach ? metrics.avgReach.toLocaleString() : "—", delta: metrics.reachDelta, icon: "\u25c8", iconBg: "#fdf0d8" })}
+      ${reportsMetricCard({
+        label: "Total Publicity Value (AVE)",
+        value: formatCompactCurrency(metrics.totalAVE),
+        delta: metrics.aveDelta,
+        icon: "$",
+        iconBg: "#fbe2da",
+        tooltip: "The estimated paid-media equivalent of visible press coverage. Hovering here gives context; opening it takes you to the report builder where this becomes client-ready copy.",
+        target: "reports",
+        actionLabel: "Build a client report",
+      })}
+      ${reportsMetricCard({
+        label: "Total Press Placements",
+        value: String(metrics.totalPlacements),
+        delta: metrics.placementsDelta,
+        icon: "\u25a6",
+        iconBg: "#e1f2f0",
+        tooltip: "The confirmed press wins currently feeding reports, analytics, and campaign value. Click through to inspect the source placements.",
+        target: "placements",
+        actionLabel: "Inspect placement sources",
+      })}
+      ${reportsMetricCard({
+        label: "Active Clients",
+        value: String(metrics.activeClients),
+        delta: null,
+        icon: "\u25ce",
+        iconBg: "#e9ecff",
+        tooltip: "Clients currently represented in the reporting set. This helps Tenyse see who has enough tracked activity for a meaningful client update.",
+        target: "clients",
+        actionLabel: "Open client list",
+      })}
+      ${reportsMetricCard({
+        label: "Avg. Audience Reach",
+        value: metrics.avgReach ? metrics.avgReach.toLocaleString() : "—",
+        delta: metrics.reachDelta,
+        icon: "\u25c8",
+        iconBg: "#fdf0d8",
+        tooltip: "Average outlet audience size across placements with reach data. It is a visibility signal, not a guarantee of individual article readers.",
+        target: "analytics",
+        actionLabel: "Explore analytics",
+      })}
     </div>
 
     <div class="analytics-grid" style="margin-bottom:24px;">
@@ -2624,6 +2745,7 @@ function renderReportsOverview(container) {
       }
     </div>
   `;
+  wireMetricCardNavigation(container);
 
   renderWeeklyTrendChart(document.getElementById("reports-weekly-trend"), weeklyTrend);
   renderDonutChart(document.getElementById("reports-media-type"), {
