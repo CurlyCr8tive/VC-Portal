@@ -79,10 +79,10 @@ create or replace view placements_for_client as
 select
   id, client_id, campaign_id, publication, headline, article_url, publication_date,
   ave_value, ave_auto_calculated, pitch_sent_date, landed_date,
-  lead_time_override_days, lead_time_source, lead_time_notes,
   sentiment_tag, sentiment_confirmed_by_owner, audience_reach,
   case when notes_shareable then notes else null end as notes,
-  notes_shareable, source, created_at, created_by
+  notes_shareable, source, created_at, created_by,
+  lead_time_override_days, lead_time_source, lead_time_notes
 from placements;
 
 alter table client_messages enable row level security;
