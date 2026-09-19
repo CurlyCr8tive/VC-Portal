@@ -7,7 +7,7 @@ import { escapeHtml } from "../../client/utils.js";
  * and is orchestrated by owner/app.js — this component doesn't know or care
  * how "generate" works, only how to ask for it and show the outcome.
  */
-export function renderCanvaExportPanel(container, { clients, onGenerate, getSummaryStatus }) {
+export function renderCanvaExportPanel(container, { clients, onGenerate, getSummaryStatus, getDateRangeForClient }) {
   container.innerHTML = `
     <div class="card report-export-card">
       <p class="eyebrow">Final Export</p>
@@ -53,6 +53,8 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
   const resultEl = container.querySelector("#canva-export-result");
   const clientSelect = container.querySelector("#canva-export-client");
   const summaryStatusEl = container.querySelector("#canva-summary-status");
+  const startInput = container.querySelector("#canva-export-start");
+  const endInput = container.querySelector("#canva-export-end");
 
   // Shown before generating, not after — silently exporting without an
   // approved summary should read as a visible choice, not a surprise
@@ -63,8 +65,20 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     renderSummaryStatus(summaryStatusEl, approvedSummary);
   }
 
+  function updateDateRange() {
+    const clientName = clientSelect.value;
+    const range = clientName && getDateRangeForClient ? getDateRangeForClient(clientName) : null;
+    startInput.value = range?.startDate || "";
+    endInput.value = range?.endDate || "";
+  }
+
   if (clients.length > 0) {
-    clientSelect.addEventListener("change", updateSummaryStatus);
+    clientSelect.addEventListener("change", () => {
+      updateDateRange();
+      updateSummaryStatus();
+      resultEl.innerHTML = "";
+    });
+    updateDateRange();
     updateSummaryStatus();
   }
 
@@ -103,8 +117,12 @@ function renderResult(resultEl, result) {
     resultEl.innerHTML = `
       <div class="review-queue-item" style="border-color:var(--color-teal);">
         <div class="rq-info">
-          <p class="rq-headline">CSV downloaded — ${result.count} placement${result.count === 1 ? "" : "s"} included.</p>
-          <p class="rq-meta">Next: upload it into Canva Bulk Create and review the generated report pages before sending.</p>
+          <p class="rq-headline">CSV downloaded — ${result.summaryOnly ? "approved summary included" : `${result.count} placement${result.count === 1 ? "" : "s"} included`}.</p>
+          <p class="rq-meta">${
+            result.summaryOnly
+              ? "No landed placements matched this range, so this file gives Canva the approved report summary only."
+              : "Next: upload it into Canva Bulk Create and review the generated report pages before sending."
+          }</p>
         </div>
       </div>
     `;

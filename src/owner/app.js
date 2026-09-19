@@ -41,7 +41,7 @@ import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-li
 import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js?v=20260919-report-builder";
-import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260919-report-builder";
+import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260919-live-ui";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
 import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-then-fix";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
@@ -58,7 +58,7 @@ import { applyDemoMetricFallbacks } from "../demoFallbacks.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
-import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260919-report-builder";
+import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260919-live-ui";
 import { seedSamplePlacements } from "./seedSampleData.js";
 import { seedRealCaseStudyData, backfillAveDataQuality, inventDemoDayGapsForPreview, applyOutletRatesToPreviewPlacements } from "./seedRealCaseStudyData.js";
 import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260916-polish-2";
@@ -2777,6 +2777,29 @@ function renderReportsView() {
   }
 
   const clients = state.dataSource === "real" ? getRealClients() : CLIENTS;
+  const getApprovedSummary = (clientName) => {
+    const summary = loadSummary(clientName);
+    return summary?.approvedAt ? summary : null;
+  };
+  const getExportDateRangeForClient = (clientName) => {
+    const dates = getAllRealPlacements()
+      .filter((p) => (p.client || p.clientName) === clientName && p.landedDate)
+      .map((p) => p.publicationDate || p.landedDate)
+      .filter(Boolean)
+      .sort();
+    if (!dates.length) return null;
+    return { startDate: dates[0], endDate: dates[dates.length - 1] };
+  };
+  const downloadCanvaCsvForClient = (clientName, { startDate = "", endDate = "" } = {}) => {
+    const result = generateCanvaExport(getAllRealPlacements(), {
+      clientName,
+      startDate,
+      endDate,
+      approvedSummary: getApprovedSummary(clientName),
+    });
+    if (result.ok) downloadCsv(result.csv, result.filename);
+    return result;
+  };
   target.innerHTML = `
     ${state.dataSource === "real" ? `<div id="reports-overview-wrap" style="margin-bottom:32px;"></div>` : ""}
     <div class="section-heading"><h2>Report Builder ${sectionInfoButton({ title: "Report Builder", body: "A guided path from tracked placements to client-ready report assets: generate an executive summary, save and approve it, draft the longer narrative, download a PDF preview, and export the CSV for Canva Bulk Create. The AI drafts from placement data already in the system; Tenyse still reviews and approves what goes to the client." })}</h2></div>
@@ -2797,7 +2820,7 @@ function renderReportsView() {
             <p class="eyebrow">Client Report</p>
             <h3>${c.name}</h3>
           </div>
-          <button type="button" class="link-btn" data-scroll-export>Export CSV</button>
+          <button type="button" class="link-btn" data-export-client="${escapeHtml(c.name)}">Export CSV</button>
         </div>
         <div class="report-builder-grid">
           <div>
@@ -2822,8 +2845,14 @@ function renderReportsView() {
     }
   });
 
-  target.querySelectorAll("[data-scroll-export]").forEach((btn) => {
+  target.querySelectorAll("[data-export-client]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      const clientName = btn.dataset.exportClient;
+      const range = getExportDateRangeForClient(clientName) || {};
+      const result = downloadCanvaCsvForClient(clientName, range);
+      if (!result.ok) {
+        alert(result.message || "This client does not have export-ready report data yet.");
+      }
       document.getElementById("canva-export-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
@@ -2835,24 +2864,13 @@ function renderReportsView() {
     // same way generateCanvaExport treats it. Keeps the "never leak a
     // draft into a client-facing export" rule enforced at every layer that
     // touches this data, not just the one closest to the CSV itself.
-    const getApprovedSummary = (clientName) => {
-      const summary = loadSummary(clientName);
-      return summary?.approvedAt ? summary : null;
-    };
-
     renderCanvaExportPanel(exportWrap, {
       clients: getRealClients(),
       getSummaryStatus: getApprovedSummary,
+      getDateRangeForClient: getExportDateRangeForClient,
       onGenerate: ({ clientName, startDate, endDate }) => {
         if (!clientName) return { ok: false, reason: "no_placements", message: "Choose a client first." };
-        const result = generateCanvaExport(getAllRealPlacements(), {
-          clientName,
-          startDate,
-          endDate,
-          approvedSummary: getApprovedSummary(clientName),
-        });
-        if (result.ok) downloadCsv(result.csv, result.filename);
-        return result;
+        return downloadCanvaCsvForClient(clientName, { startDate, endDate });
       },
     });
   } else {

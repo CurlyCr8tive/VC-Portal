@@ -149,6 +149,17 @@ function withinRange(dateStr, startDate, endDate) {
   return true;
 }
 
+function buildSummaryOnlyCsv({ clientName, startDate, endDate, approvedSummary }) {
+  const period = `${startDate || "All"} to ${endDate || "All"}`;
+  const columnLabels = ["Client", "Report Period", SUMMARY_COLUMN_LABEL];
+  const row = {
+    Client: clientName,
+    "Report Period": period,
+    [SUMMARY_COLUMN_LABEL]: approvedSummary.text,
+  };
+  return serializeRowsToCsv([row], columnLabels);
+}
+
 /**
  * Builds the export. Never returns a partial/incomplete CSV — if any
  * eligible placement is missing a required (high-confidence) field, the
@@ -162,10 +173,26 @@ function withinRange(dateStr, startDate, endDate) {
  */
 export function generateCanvaExport(allPlacements, { clientName, startDate, endDate, approvedSummary = null }) {
   const eligible = allPlacements.filter(
-    (p) => (p.client || p.clientName) === clientName && p.landedDate && withinRange(p.publicationDate, startDate, endDate)
+    (p) => (p.client || p.clientName) === clientName && p.landedDate && withinRange(p.publicationDate || p.landedDate, startDate, endDate)
   );
 
   if (eligible.length === 0) {
+    if (approvedSummary?.approvedAt) {
+      const csv = buildSummaryOnlyCsv({ clientName, startDate, endDate, approvedSummary });
+      const safeClientName = clientName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+      const filename = `${safeClientName}-canva-summary-${startDate || "all"}-to-${endDate || "all"}.csv`;
+      return {
+        ok: true,
+        csv,
+        filename,
+        count: 0,
+        summaryOnly: true,
+        warnings: ["No landed placements matched this date range, so the export includes the approved executive summary only."],
+      };
+    }
     return { ok: false, reason: "no_placements", message: "No confirmed (landed) placements for this client in that date range." };
   }
 
