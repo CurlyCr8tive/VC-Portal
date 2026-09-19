@@ -1,5 +1,5 @@
 import { escapeHtml } from "../../client/utils.js";
-import { formatCurrency } from "../../calculations.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { renderEmptyState } from "../../client/components/EmptyState.js";
 
 const STATUS_LABELS = { active: "Active", paused: "Paused", completed: "Completed" };

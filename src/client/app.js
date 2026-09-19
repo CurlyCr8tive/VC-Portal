@@ -1,5 +1,5 @@
 import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getClientById } from "./mockData.js";
-import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js";
+import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js?v=20260919-report-builder";
 import { requireSession, logout, landingPageFor } from "../auth.js?v=20260918-real-session-priority";
 import { signOutReal } from "../supabaseAuthClient.js";
 import {
@@ -13,18 +13,18 @@ import {
   postClientApiNote,
   postClientApiOpportunity,
   updateClientApiHomework,
-} from "../clientApiDataSource.js";
+} from "../clientApiDataSource.js?v=20260919-report-builder";
 import { renderSidebar } from "./components/ClientSidebar.js";
 import { renderHeader } from "./components/DashboardHeader.js";
-import { renderMetricsGrid } from "./components/MetricCard.js";
-import { renderPlacementsTable } from "./components/PressPlacementTable.js";
+import { renderMetricsGrid } from "./components/MetricCard.js?v=20260919-report-builder";
+import { renderPlacementsTable } from "./components/PressPlacementTable.js?v=20260919-report-builder";
 import { renderCampaignsGrid } from "./components/CampaignProgressCard.js";
-import { renderPerformanceChart } from "./components/PerformanceChart.js";
+import { renderPerformanceChart } from "./components/PerformanceChart.js?v=20260919-report-builder-2";
 import { renderInsightCard } from "./components/CampaignInsightCard.js";
-import { renderReportCard } from "./components/LatestReportCard.js";
+import { renderReportCard } from "./components/LatestReportCard.js?v=20260919-report-builder";
 import { renderLoadingState } from "./components/LoadingState.js";
 import { renderErrorState } from "./components/ErrorState.js";
-import { renderCampaignDetail } from "./components/CampaignDetailView.js";
+import { renderCampaignDetail } from "./components/CampaignDetailView.js?v=20260919-report-builder";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { renderCoachingProgramView } from "./components/CoachingProgramView.js?v=20260917-coaching-polish-1";
 import { loadPhasesForClient } from "../coachingPhaseStorage.js";

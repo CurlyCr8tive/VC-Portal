@@ -1,12 +1,5 @@
 import { escapeHtml } from "../../client/utils.js";
 
-/**
- * Preview of the mentions-discovery review queue described in the PRD. The
- * discovery agent itself doesn't exist yet — these are hand-authored
- * candidate rows so the confirm/reject *workflow* can be seen and tried,
- * not a working scanner. Confirm/Reject only update in-memory state for
- * this session; nothing here is persisted or wired to real placements.
- */
 export function renderReviewQueue(container, items, { onConfirm, onReject, confirmLabel = "Confirm", showPlacementDetails = false } = {}) {
   if (!items || items.length === 0) {
     container.innerHTML = `
@@ -26,8 +19,22 @@ export function renderReviewQueue(container, items, { onConfirm, onReject, confi
           (item) => `
         <div class="review-queue-item">
           <div class="rq-info">
-            <p class="rq-headline">${escapeHtml(item.headline)}</p>
+            <p class="rq-headline">
+              ${
+                item.articleUrl
+                  ? `<a href="${escapeHtml(item.articleUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.headline)}</a>`
+                  : escapeHtml(item.headline)
+              }
+            </p>
             <p class="rq-meta">${escapeHtml(item.publication)} · for ${escapeHtml(item.client)} · matched on "${escapeHtml(item.matchedOn)}" · found ${escapeHtml(item.discoveredDate)}</p>
+            <div class="rq-source-row">
+              ${
+                item.articleUrl
+                  ? `<a class="source-link" href="${escapeHtml(item.articleUrl)}" target="_blank" rel="noopener noreferrer">View source</a>`
+                  : `<span class="hint">No source link saved</span>`
+              }
+              <span>Match: ${escapeHtml(item.matchedOn || "keyword match")}</span>
+            </div>
           </div>
           <div class="review-queue-actions">
             <button class="btn-confirm" data-confirm="${escapeHtml(item.id)}">${escapeHtml(confirmLabel)}</button>

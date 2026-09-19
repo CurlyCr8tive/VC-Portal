@@ -1,4 +1,4 @@
-import { formatCurrency } from "../../calculations.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { escapeHtml } from "../utils.js";
 
 const RANGE_LABELS = {
@@ -82,6 +82,9 @@ export function renderPerformanceChart(container, { series, range, onRangeChange
     return { ...d, ave, placements, x, barX, barY, barHeight, dotY, share };
   });
   const placementLine = graphPoints.map((p) => `${p.x.toFixed(1)},${p.dotY.toFixed(1)}`).join(" ");
+  const summary = series
+    .map((d) => `${d.label}: ${formatCurrency(d.ave)} AVE across ${d.placements} placement${d.placements === 1 ? "" : "s"}`)
+    .join("; ");
   const interactiveGraph = `
     <div class="value-graph-wrap">
       <svg class="value-graph" viewBox="0 0 ${graphWidth} ${graphHeight}" role="img" aria-label="Interactive publicity value graph. Hover or tab through each period for details. ${escapeHtml(summary)}">
@@ -142,10 +145,6 @@ export function renderPerformanceChart(container, { series, range, onRangeChange
       `;
     })
     .join("");
-
-  const summary = series
-    .map((d) => `${d.label}: ${formatCurrency(d.ave)} AVE across ${d.placements} placement${d.placements === 1 ? "" : "s"}`)
-    .join("; ");
 
   const tableRows = series
     .map((d) => `<tr><td>${escapeHtml(d.label)}</td><td>${formatCurrency(d.ave)}</td><td>${d.placements}</td></tr>`)

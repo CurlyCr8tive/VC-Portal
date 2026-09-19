@@ -1,4 +1,4 @@
-import { formatCurrency } from "../../calculations.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { escapeHtml } from "../../client/utils.js";
 import { renderEmptyState } from "../../client/components/EmptyState.js";
 
@@ -248,9 +248,9 @@ export function renderClientsList(
           const result = await onDiscoveryScan({ clientId, clientName: client?.name });
           statusEl.textContent = result.ok
             ? `Scanned ${result.scanned ?? 0}, matched ${result.matched ?? 0}, added ${result.inserted ?? 0} to Review Queue.`
-            : `Scan preview ready. ${result.message || "Live scan connection is planned for handoff."}`;
+            : result.message || "Scan could not complete. Check search setup and try again.";
         } catch (err) {
-          statusEl.textContent = "Scan preview ready. Live scan connection is planned for handoff.";
+          statusEl.textContent = "Scan could not complete. Check search setup and try again.";
         } finally {
           btn.disabled = false;
         }

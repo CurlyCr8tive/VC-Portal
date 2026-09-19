@@ -9,15 +9,16 @@ import { escapeHtml } from "../../client/utils.js";
  */
 export function renderCanvaExportPanel(container, { clients, onGenerate, getSummaryStatus }) {
   container.innerHTML = `
-    <div class="card">
-      <h3 style="color:var(--color-navy); font-size:1.05rem; margin:0 0 4px;">Canva Report Export</h3>
+    <div class="card report-export-card">
+      <p class="eyebrow">Final Export</p>
+      <h3 style="color:var(--color-navy); font-size:1.15rem; margin:0 0 4px;">Canva Bulk Create CSV</h3>
       <p style="color:var(--text-secondary); font-size:0.85rem; margin:0 0 14px;">
-        Generates a CSV of a client's confirmed placements for Canva Bulk Create.
-        Upload it into Canva, then do one final visual review before sending the report to a client.
+        Package a client's confirmed placements and approved executive summary into a Canva-ready file.
+        This is the bridge from tracked work to Tenyse's branded report template.
       </p>
 
-      <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px; font-size:0.82rem;">
-        <strong>Template check recommended.</strong> Make sure the column names match the Canva template before running Bulk Create.
+      <div class="report-export-note">
+        <strong>Demo path:</strong> generate the CSV here, upload it to Canva Bulk Create, then do the final visual review inside Tenyse's template.
       </div>
 
       <div id="canva-summary-status" style="margin-bottom:14px;"></div>
@@ -41,7 +42,7 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
           </div>
         </div>
         <div class="form-actions">
-          <button type="button" class="btn-primary" id="canva-export-generate" ${clients.length === 0 ? "disabled" : ""}>Generate CSV</button>
+          <button type="button" class="btn-primary" id="canva-export-generate" ${clients.length === 0 ? "disabled" : ""}>Download Canva CSV</button>
         </div>
       </div>
 
@@ -80,7 +81,7 @@ function renderSummaryStatus(el, approvedSummary) {
   if (!approvedSummary) {
     el.innerHTML = `
       <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; font-size:0.82rem;">
-        ⚠ No approved executive summary for this period. Export will proceed without one — generate and approve a summary first if the report should include it.
+        No approved executive summary yet. The placement rows can still export, but approve the summary below first if this report should include the narrative headline.
       </div>
     `;
     return;
@@ -103,7 +104,7 @@ function renderResult(resultEl, result) {
       <div class="review-queue-item" style="border-color:var(--color-teal);">
         <div class="rq-info">
           <p class="rq-headline">CSV downloaded — ${result.count} placement${result.count === 1 ? "" : "s"} included.</p>
-          <p class="rq-meta">Upload it into Canva's Bulk Create, then do a final visual check before sending it to the client.</p>
+          <p class="rq-meta">Next: upload it into Canva Bulk Create and review the generated report pages before sending.</p>
         </div>
       </div>
     `;
@@ -122,8 +123,8 @@ function renderResult(resultEl, result) {
   if (result.reason === "missing_fields") {
     resultEl.innerHTML = `
       <div class="warn" style="background:#fdeceb; border:1px solid #f3cfc9; color:#8a3b2c; border-radius:var(--radius-md); padding:14px 16px;">
-        <p style="margin:0 0 8px; font-weight:600;">Export stopped — some confirmed placements are missing required fields.</p>
-        <p style="margin:0 0 8px; font-size:0.85rem;">Nothing was generated. Fix these first, then try again — a partial file would break Bulk Create silently.</p>
+        <p style="margin:0 0 8px; font-weight:600;">A few placement details are needed before export.</p>
+        <p style="margin:0 0 8px; font-size:0.85rem;">Complete these fields, then download the Canva CSV again.</p>
         <ul style="margin:0; padding-left:18px; font-size:0.85rem;">
           ${result.issues
             .map((issue) => `<li><strong>${escapeHtml(issue.placement)}</strong>: missing ${issue.missingColumns.map(escapeHtml).join(", ")}</li>`)

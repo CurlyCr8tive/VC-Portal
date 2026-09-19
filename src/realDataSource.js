@@ -20,7 +20,7 @@ import { loadPlacements } from "./storage.js";
 import { loadCampaigns } from "./campaignStorage.js";
 import { loadSummary } from "./summaryStorage.js";
 import { loadClients, findClientByName } from "./clientStorage.js";
-import { leadTimeDaysForPlacement } from "./calculations.js";
+import { leadTimeDaysForPlacement } from "./calculations.js?v=20260919-report-builder";
 import { classifyMediaType } from "./mediaType.js";
 import { DEMO_FALLBACKS, applyDemoMetricFallbacks } from "./demoFallbacks.js";
 

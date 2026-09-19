@@ -8,7 +8,7 @@
 // as PerformanceChart: no charting library, and every chart has a plain
 // data-table fallback for anyone who can't read it visually.
 
-import { formatCurrency } from "../../calculations.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { escapeHtml } from "../../client/utils.js";
 
 function barRow({ label, value, max, formatValue, color, sublabel }) {

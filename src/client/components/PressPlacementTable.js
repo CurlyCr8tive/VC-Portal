@@ -1,4 +1,4 @@
-import { leadTimeDaysForPlacement, formatCurrency, formatDate } from "../../calculations.js";
+import { leadTimeDaysForPlacement, formatCurrency, formatDate } from "../../calculations.js?v=20260919-report-builder";
 import { DEMO_FALLBACKS, demoAVEForPlacement } from "../../demoFallbacks.js";
 import { escapeHtml, statusToClass } from "../utils.js";
 import { renderEmptyState } from "./EmptyState.js";

@@ -1,4 +1,4 @@
-import { leadTimeDaysForPlacement } from "./calculations.js";
+import { leadTimeDaysForPlacement } from "./calculations.js?v=20260919-report-builder";
 import { applyDemoMetricFallbacks } from "./demoFallbacks.js";
 import { getAccessToken } from "./supabaseAuthClient.js";
 

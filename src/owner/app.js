@@ -14,8 +14,8 @@ import {
   getAggregateRealChartSeries,
   getAggregateRealInsight,
   getRealReport,
-} from "../realDataSource.js";
-import { formatCurrency, leadTimeDaysForPlacement } from "../calculations.js";
+} from "../realDataSource.js?v=20260919-report-builder";
+import { formatCurrency, leadTimeDaysForPlacement } from "../calculations.js?v=20260919-report-builder";
 import { requireSession, logout } from "../auth.js?v=20260918-real-session-priority";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
@@ -25,28 +25,28 @@ import { loadCampaigns, addCampaign, updateCampaign as updateCampaignRecord, del
 import { createClient, applyClientEdit } from "../clientSchema.js";
 import { addClient, updateClient, upsertClientByName, findClientByName } from "../clientStorage.js";
 import { renderHeader } from "../client/components/DashboardHeader.js";
-import { renderMetricsGrid } from "../client/components/MetricCard.js";
-import { renderPlacementsTable } from "../client/components/PressPlacementTable.js";
+import { renderMetricsGrid } from "../client/components/MetricCard.js?v=20260919-report-builder";
+import { renderPlacementsTable } from "../client/components/PressPlacementTable.js?v=20260919-report-builder";
 import { renderCampaignsGrid } from "../client/components/CampaignProgressCard.js";
-import { renderPerformanceChart } from "../client/components/PerformanceChart.js";
+import { renderPerformanceChart } from "../client/components/PerformanceChart.js?v=20260919-report-builder-2";
 import { renderInsightCard } from "../client/components/CampaignInsightCard.js";
-import { renderReportCard } from "../client/components/LatestReportCard.js";
+import { renderReportCard } from "../client/components/LatestReportCard.js?v=20260919-report-builder";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
 import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js";
-import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js";
-import { renderClientsList } from "./components/ClientsListCard.js?v=20260918-demo-scan-fix";
-import { renderReviewQueue } from "./components/ReviewQueueCard.js";
+import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-report-builder";
+import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-report-builder-2";
+import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-source-links";
 import { renderPlacementForm } from "./components/PlacementForm.js";
 import { renderCampaignForm } from "./components/CampaignForm.js";
-import { renderCampaignManageList } from "./components/CampaignManageList.js";
-import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260917-demo-qa-1";
+import { renderCampaignManageList } from "./components/CampaignManageList.js?v=20260919-report-builder";
+import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260919-report-builder";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
 import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-then-fix";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
-import { renderOutletRatesView } from "./components/OutletRatesView.js";
-import { renderCampaignDetail } from "../client/components/CampaignDetailView.js";
+import { renderOutletRatesView } from "./components/OutletRatesView.js?v=20260919-report-builder";
+import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-report-builder";
 import { loadPhasesForClient, addPhase as addLocalPhase, updatePhase as updateLocalPhase } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient, addResource as addLocalResource, updateResource as updateLocalResource, deleteResource as deleteLocalResource } from "../coachingResourceStorage.js";
 import { loadOpportunitiesForClient, addOpportunity as addLocalOpportunity, updateOpportunity as updateLocalOpportunity, deleteOpportunity as deleteLocalOpportunity } from "../opportunityStorage.js";
@@ -58,7 +58,7 @@ import { applyDemoMetricFallbacks } from "../demoFallbacks.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
-import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260917-demo-qa-1";
+import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260919-report-builder";
 import { seedSamplePlacements } from "./seedSampleData.js";
 import { seedRealCaseStudyData, backfillAveDataQuality, inventDemoDayGapsForPreview, applyOutletRatesToPreviewPlacements } from "./seedRealCaseStudyData.js";
 import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260916-polish-2";
@@ -1470,11 +1470,11 @@ async function discoveryScanClient({ clientName }) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: "Live scan connection is planned for handoff." };
+      return { ok: false, message: body.message || "Scan could not complete. Check search setup and try again." };
     }
     return { ok: true, ...body };
   } catch (err) {
-    return { ok: false, message: "Live scan connection is planned for handoff." };
+    return { ok: false, message: "Scan could not complete. Check search setup and try again." };
   }
 }
 
@@ -2457,19 +2457,21 @@ function renderSummaryForm(container, clientName) {
 function renderReportNarrativeForm(container, clientName) {
   container.innerHTML = `
     <p style="margin:0 0 8px; font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary);">Report Narrative</p>
-    <p class="hint" style="margin:0 0 10px;">The fuller campaign story for the actual report document — longer and more scene-setting than the Executive Summary card above. Generated fresh each time, nothing here is saved; copy it into the report by hand once it reads right.</p>
+    <p class="hint" style="margin:0 0 10px;">The fuller campaign story for the report document — longer and more scene-setting than the Executive Summary card above. Generate it from the same placement data, review it, then copy it into Tenyse's final client-facing report.</p>
     <div class="entry-form">
       <div class="field-row" style="margin-bottom:10px;">
         <textarea id="narrative-text-${cssId(clientName)}" rows="4" placeholder="Click Generate to draft this from ${escapeHtml(clientName)}'s real confirmed placements." readonly></textarea>
       </div>
-      <div class="form-actions" style="display:flex; gap:10px; align-items:center;">
+      <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">Generate</button>
+        <button type="button" class="btn-secondary" id="narrative-copy-${cssId(clientName)}" disabled>Copy Narrative</button>
         <span id="narrative-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>
   `;
 
   const generateBtn = container.querySelector(`#narrative-generate-${cssId(clientName)}`);
+  const copyBtn = container.querySelector(`#narrative-copy-${cssId(clientName)}`);
   const statusEl = container.querySelector(`#narrative-generate-status-${cssId(clientName)}`);
   if (!generateBtn) return;
   generateBtn.addEventListener("click", async () => {
@@ -2490,9 +2492,23 @@ function renderReportNarrativeForm(container, clientName) {
     const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
     if (result.ok) {
       textarea.value = result.text;
-      statusEl.textContent = "Draft ready — copy into the report once reviewed.";
+      copyBtn.disabled = false;
+      statusEl.textContent = "Draft ready — review, then copy into the final report.";
     } else {
       statusEl.textContent = result.message;
+    }
+  });
+
+  copyBtn?.addEventListener("click", async () => {
+    const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
+    if (!textarea.value.trim()) return;
+    try {
+      await navigator.clipboard.writeText(textarea.value);
+      statusEl.textContent = "Narrative copied.";
+    } catch {
+      textarea.select();
+      document.execCommand("copy");
+      statusEl.textContent = "Narrative copied.";
     }
   });
 }
@@ -2641,17 +2657,33 @@ function renderReportsView() {
   const clients = state.dataSource === "real" ? getRealClients() : CLIENTS;
   target.innerHTML = `
     ${state.dataSource === "real" ? `<div id="reports-overview-wrap" style="margin-bottom:32px;"></div>` : ""}
-    <div class="section-heading"><h2>Generate Report Content ${sectionInfoButton({ title: "Generate Report Content", body: "Two different drafting tools per client: the Executive Summary is short, gets saved and approved, and is what appears on the client's own dashboard and in the Canva CSV export once approved. The Report Narrative is longer and more scene-setting, regenerated fresh every time with nothing saved — it's meant to be copied by hand into the actual report document. The View Report / Download PDF buttons below each client's report card are placeholders: this build has no hosted report page or PDF generator wired up yet, so those two buttons are intentionally disabled (“Not yet available in this demo”) until that's built. Generate CSV above is the real, working export — pick a client and date range and it downloads an actual file for Canva Bulk Create." })}</h2></div>
-    <p class="hint" style="margin:-8px 0 20px;">Draft, approve, and export the executive summary and full narrative for each client's report.</p>
+    <div class="section-heading"><h2>Report Builder ${sectionInfoButton({ title: "Report Builder", body: "A guided path from tracked placements to client-ready report assets: generate an executive summary, save and approve it, draft the longer narrative, download a PDF preview, and export the CSV for Canva Bulk Create. The AI drafts from placement data already in the system; Tenyse still reviews and approves what goes to the client." })}</h2></div>
+    <p class="hint" style="margin:-8px 0 20px;">Turn confirmed placements into a reviewed client report package: summary, narrative, PDF preview, and Canva CSV export.</p>
+    <div class="report-builder-steps" aria-label="Report builder workflow">
+      <div><span>1</span><strong>Choose client</strong><small>Select the client and reporting window.</small></div>
+      <div><span>2</span><strong>Draft with AI</strong><small>Generate summary and full narrative from placements.</small></div>
+      <div><span>3</span><strong>Review + approve</strong><small>Tenyse edits before anything becomes client-facing.</small></div>
+      <div><span>4</span><strong>Export</strong><small>Download PDF preview and Canva-ready CSV.</small></div>
+    </div>
     <div class="section" id="canva-export-wrap"></div>
     ${clients
       .map(
         (c) => `
-      <div class="section">
-        <h3 style="color:var(--color-navy); font-size:0.95rem; margin-bottom:8px;">${c.name}</h3>
-        ${state.dataSource === "real" ? `<div class="card" id="summary-form-${c.id}" style="margin-bottom:14px;"></div>` : ""}
-        ${state.dataSource === "real" ? `<div class="card" id="report-narrative-${c.id}" style="margin-bottom:14px;"></div>` : ""}
-        <div id="report-${c.id}"></div>
+      <div class="section report-builder-client-section">
+        <div class="report-builder-client-heading">
+          <div>
+            <p class="eyebrow">Client Report</p>
+            <h3>${c.name}</h3>
+          </div>
+          <button type="button" class="link-btn" data-scroll-export>Export CSV</button>
+        </div>
+        <div class="report-builder-grid">
+          <div>
+            ${state.dataSource === "real" ? `<div class="card report-work-card" id="summary-form-${c.id}"></div>` : ""}
+            ${state.dataSource === "real" ? `<div class="card report-work-card" id="report-narrative-${c.id}"></div>` : ""}
+          </div>
+          <div id="report-${c.id}"></div>
+        </div>
       </div>`
       )
       .join("")}
@@ -2666,6 +2698,12 @@ function renderReportsView() {
       renderSummaryForm(document.getElementById(`summary-form-${c.id}`), c.name);
       renderReportNarrativeForm(document.getElementById(`report-narrative-${c.id}`), c.name);
     }
+  });
+
+  target.querySelectorAll("[data-scroll-export]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.getElementById("canva-export-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 
   const exportWrap = document.getElementById("canva-export-wrap");

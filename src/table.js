@@ -1,4 +1,4 @@
-import { leadTimeDaysForPlacement, formatCurrency, formatDate } from "./calculations.js";
+import { leadTimeDaysForPlacement, formatCurrency, formatDate } from "./calculations.js?v=20260919-report-builder";
 
 function escapeHtml(str) {
   const div = document.createElement("div");

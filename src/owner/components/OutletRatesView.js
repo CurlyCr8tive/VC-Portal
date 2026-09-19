@@ -12,7 +12,7 @@
 // accurate, not a placeholder waiting to be filled with fake data.
 
 import { escapeHtml } from "../../client/utils.js";
-import { formatCurrency } from "../../calculations.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { listAllRates, saveRate, daysSinceUpdated } from "../../outletRatesStorage.js";
 import { logError } from "../../errorLog.js";
 

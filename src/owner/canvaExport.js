@@ -13,7 +13,7 @@
 // export — a report of coverage shouldn't include stories that haven't
 // actually run yet.
 
-import { formatCurrency } from "../calculations.js";
+import { formatCurrency } from "../calculations.js?v=20260919-report-builder";
 import { HIGH_CONFIDENCE_FIELDS, MEDIUM_CONFIDENCE_FIELDS, LOW_CONFIDENCE_FIELDS } from "./canvaColumnMapping.js?v=20260917-demo-qa-1";
 
 const HIGH_CONFIDENCE_COLUMNS = Object.values(HIGH_CONFIDENCE_FIELDS);

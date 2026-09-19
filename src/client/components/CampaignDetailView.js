@@ -1,5 +1,5 @@
 import { escapeHtml } from "../utils.js";
-import { leadTimeDaysForPlacement } from "../../calculations.js";
+import { leadTimeDaysForPlacement } from "../../calculations.js?v=20260919-report-builder";
 import { renderPlacementsTable } from "./PressPlacementTable.js";
 
 /**

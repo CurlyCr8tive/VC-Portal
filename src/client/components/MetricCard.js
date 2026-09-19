@@ -1,4 +1,4 @@
-import { formatCurrency } from "../../calculations.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { nextId } from "../utils.js";
 
 function deltaLabel(delta, { lowerIsBetter = false } = {}) {
