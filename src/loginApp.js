@@ -91,7 +91,7 @@ form.addEventListener("submit", async (e) => {
     // would land her in preview mode with no indication her password was
     // wrong.
     if (isKnownRealAccount) {
-      errorEl.textContent = result.message || "That password didn't match. Try again, or reset it in Supabase.";
+      errorEl.textContent = result.message || "That password didn't match. Try again, or use the account reset link.";
       errorEl.classList.add("visible");
       return;
     }
@@ -99,7 +99,7 @@ form.addEventListener("submit", async (e) => {
 
   const account = mockAccount || login(email);
   if (!account) {
-    errorEl.textContent = "No matching account for that email/password. Try one of the accounts listed below.";
+    errorEl.textContent = "We couldn't find that account. Check the email, or use one of the demo preview links below.";
     errorEl.classList.add("visible");
     return;
   }

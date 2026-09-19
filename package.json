@@ -9,6 +9,14 @@
     "start:owner-api": "npm --prefix server/owner-api start",
     "start:client-api": "npm --prefix server/client-api start",
     "serve:static": "python3 -m http.server 8420",
-    "install:apis": "npm --prefix server/owner-api ci && npm --prefix server/client-api ci"
+    "install:apis": "npm --prefix server/owner-api ci && npm --prefix server/client-api ci",
+    "demo:deck": "node scripts/build-demo-day-deck.js",
+    "demo:gaps": "node scripts/invent-demo-day-gaps.mjs",
+    "demo:gaps:revert": "node scripts/revert-demo-day-gaps.mjs",
+    "data:seed": "node scripts/seed-supabase-from-case-studies.mjs",
+    "data:fix-placement-links": "node scripts/fix-placement-links.mjs",
+    "data:apply-outlet-rates": "node scripts/apply-outlet-rates-to-placements.mjs",
+    "data:backfill-audience-reach": "node scripts/backfill-audience-reach.mjs",
+    "auth:provision-test-accounts": "node scripts/provision-test-accounts.mjs"
   }
 }

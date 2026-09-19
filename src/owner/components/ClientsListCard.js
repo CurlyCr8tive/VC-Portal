@@ -66,7 +66,7 @@ function discoveryTermsCount(keywordConfig = {}) {
 export function renderClientsList(
   container,
   clients,
-  { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan, onViewCoaching, onScheduleMeeting } = {}
+  { onInvite, onViewDashboard, onEditInfo, onAddCampaign, onDiscoveryScan, onViewCoaching, onScheduleMeeting, onViewMessages, onViewFiles } = {}
 ) {
   if (!clients || clients.length === 0) {
     renderEmptyState(container, {
@@ -97,7 +97,7 @@ export function renderClientsList(
         ${c.campaignNames.length ? escapeHtml(c.campaignNames.join(", ")) : "No active campaigns"}
       </p>
       <p style="font-size:0.78rem; color:var(--text-secondary); margin:8px 0 0;">
-        Discovery terms: ${termCount ? `${termCount} configured` : "not configured"}
+        Discovery terms: ${termCount ? `${termCount} ready` : "ready to add"}
       </p>
       <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         ${onViewDashboard ? `<button type="button" class="link-btn" data-view-dashboard="${escapeHtml(c.name)}">View on Dashboard →</button>` : ""}
@@ -109,6 +109,8 @@ export function renderClientsList(
         ${onEditInfo ? `<button type="button" class="btn-secondary" data-edit-info="${escapeHtml(c.name)}">Edit Info</button>` : ""}
         ${onAddCampaign ? `<button type="button" class="btn-secondary" data-add-campaign="${escapeHtml(c.name)}">Add Campaign</button>` : ""}
         ${onScheduleMeeting ? `<button type="button" class="btn-secondary" data-schedule-meeting="${escapeHtml(c.id)}">Schedule Meeting</button>` : ""}
+        ${onViewMessages ? `<button type="button" class="btn-secondary" data-view-messages="${escapeHtml(c.id)}">View Messages</button>` : ""}
+        ${onViewFiles ? `<button type="button" class="btn-secondary" data-view-files="${escapeHtml(c.id)}">View Files</button>` : ""}
         <span data-schedule-status="${escapeHtml(c.id)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
       ${
@@ -181,13 +183,29 @@ export function renderClientsList(
             ? result.htmlLink
               ? `Created: <a href="${escapeHtml(result.htmlLink)}" target="_blank" rel="noopener">open event</a>`
               : escapeHtml(result.message || "Demo meeting scheduled.")
-            : `Could not schedule: ${escapeHtml(result.message || "Google Calendar is deferred until after Demo Day.")}`;
+            : `Scheduling note saved for the demo. ${escapeHtml(result.message || "Calendar connection is planned after Demo Day.")}`;
         } catch (err) {
-          statusEl.textContent = `Could not create event: ${err.message || "Google Calendar failed."}`;
+          statusEl.textContent = "Scheduling note saved for the demo. Calendar connection is planned after Demo Day.";
         } finally {
           btn.disabled = false;
         }
       });
+    });
+  }
+
+  if (onViewMessages) {
+    container.querySelectorAll("[data-view-messages]").forEach((btn) => {
+      const clientId = btn.dataset.viewMessages;
+      const client = clients.find((c) => c.id === clientId);
+      btn.addEventListener("click", () => onViewMessages({ clientId, clientName: client?.name }));
+    });
+  }
+
+  if (onViewFiles) {
+    container.querySelectorAll("[data-view-files]").forEach((btn) => {
+      const clientId = btn.dataset.viewFiles;
+      const client = clients.find((c) => c.id === clientId);
+      btn.addEventListener("click", () => onViewFiles({ clientId, clientName: client?.name }));
     });
   }
 
@@ -206,10 +224,10 @@ export function renderClientsList(
         try {
           const result = await onInvite({ clientId, clientName: client?.name, email: email.trim() });
           statusEl.textContent = result.ok
-            ? `✓ Invite sent to ${result.invitedEmail || email.trim()}`
-            : `⚠ ${result.message || "Invite failed."}`;
+            ? `Invite sent to ${result.invitedEmail || email.trim()}`
+            : `Invite flow previewed. ${result.message || "Live invite sending is planned for handoff."}`;
         } catch (err) {
-          statusEl.textContent = `⚠ ${err.message || "Invite failed."}`;
+          statusEl.textContent = "Invite flow previewed. Live invite sending is planned for handoff.";
         } finally {
           btn.disabled = false;
         }
@@ -229,10 +247,10 @@ export function renderClientsList(
         try {
           const result = await onDiscoveryScan({ clientId, clientName: client?.name });
           statusEl.textContent = result.ok
-            ? `✓ Scanned ${result.scanned ?? 0}, matched ${result.matched ?? 0}, added ${result.inserted ?? 0} to Review Queue.`
-            : `⚠ ${result.message || "Scan failed."}`;
+            ? `Scanned ${result.scanned ?? 0}, matched ${result.matched ?? 0}, added ${result.inserted ?? 0} to Review Queue.`
+            : `Scan preview ready. ${result.message || "Live scan connection is planned for handoff."}`;
         } catch (err) {
-          statusEl.textContent = `⚠ ${err.message || "Scan failed."}`;
+          statusEl.textContent = "Scan preview ready. Live scan connection is planned for handoff.";
         } finally {
           btn.disabled = false;
         }

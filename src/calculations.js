@@ -14,6 +14,13 @@ export function computeLeadTimeDays(pitchSentDate, landedDate) {
   return Math.round((landed - pitch) / msPerDay);
 }
 
+export function leadTimeDaysForPlacement(placement = {}) {
+  if (placement.leadTimeOverrideDays != null && Number.isFinite(Number(placement.leadTimeOverrideDays))) {
+    return Number(placement.leadTimeOverrideDays);
+  }
+  return computeLeadTimeDays(placement.pitchSentDate, placement.landedDate);
+}
+
 export function formatCurrency(value) {
   if (value == null || Number.isNaN(value)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);

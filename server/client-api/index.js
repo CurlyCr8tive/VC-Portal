@@ -23,8 +23,11 @@ import { sendNoteNotification } from "./lib/gmailNotify.js";
 // local-dev fallback only.
 const PORT = process.env.PORT || process.env.CLIENT_API_PORT || 4002;
 
+const FILE_BUCKET = process.env.CLIENT_FILE_BUCKET || "client-files";
+const MAX_UPLOAD_BYTES = Number(process.env.CLIENT_FILE_MAX_BYTES || 8 * 1024 * 1024);
+
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "12mb" }));
 
 // Dev-only convenience, not a production CORS policy. See owner-api/index.js's
 // matching comment — Allow-Headers/Methods and the OPTIONS short-circuit are
@@ -107,6 +110,76 @@ function resourceRowToApi(row) {
     completed: row.completed,
     createdAt: row.created_at,
   };
+}
+
+function reportRowToApi(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    title: row.title,
+    periodLabel: row.period_label || "",
+    executiveSummary: row.executive_summary,
+    narrative: row.narrative || "",
+    status: row.status,
+    approvedAt: row.approved_at || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function messageRowToApi(row) {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    authorId: row.author_id,
+    authorRole: row.author_role,
+    subject: row.subject,
+    body: row.body,
+    createdAt: row.created_at,
+  };
+}
+
+async function fileRowToApi(row) {
+  let downloadUrl = "";
+  if (row.storage_bucket && row.storage_path) {
+    const { data } = await supabase.storage.from(row.storage_bucket).createSignedUrl(row.storage_path, 60 * 15);
+    downloadUrl = data?.signedUrl || "";
+  }
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    uploadedBy: row.uploaded_by,
+    uploadedByRole: row.uploaded_by_role,
+    fileName: row.file_name,
+    mimeType: row.mime_type || "application/octet-stream",
+    sizeBytes: row.size_bytes == null ? null : Number(row.size_bytes),
+    storageBucket: row.storage_bucket,
+    storagePath: row.storage_path,
+    notes: row.notes || "",
+    createdAt: row.created_at,
+    downloadUrl,
+  };
+}
+
+async function ensureClientFilesBucket() {
+  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+  if (listError) throw listError;
+  if ((buckets || []).some((bucket) => bucket.name === FILE_BUCKET)) return;
+  const { error } = await supabase.storage.createBucket(FILE_BUCKET, {
+    public: false,
+    fileSizeLimit: MAX_UPLOAD_BYTES,
+  });
+  if (error && !/already exists/i.test(error.message || "")) throw error;
+}
+
+function safeStorageName(name) {
+  const cleaned = String(name || "upload")
+    .trim()
+    .replace(/[/\\]/g, "-")
+    .replace(/[^\w.\- ]+/g, "")
+    .replace(/\s+/g, "-");
+  return cleaned || "upload";
 }
 
 app.get(
@@ -247,6 +320,22 @@ app.get(
 );
 
 app.get(
+  "/api/reports/latest",
+  clientRoute(async (req, res) => {
+    const { data, error } = await supabase
+      .from("client_reports")
+      .select("*")
+      .eq("client_id", req.profile.client_id)
+      .in("status", ["approved", "published"])
+      .order("approved_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    res.json(reportRowToApi(data));
+  })
+);
+
+app.get(
   "/api/campaigns/:campaignId/notes",
   clientRoute(async (req, res) => {
     // Confirm the campaign actually belongs to this client before returning
@@ -304,6 +393,108 @@ app.post(
     });
 
     res.status(201).json(note);
+  })
+);
+
+app.get(
+  "/api/messages",
+  clientRoute(async (req, res) => {
+    const { data, error } = await supabase
+      .from("client_messages")
+      .select("*")
+      .eq("client_id", req.profile.client_id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json((data || []).map(messageRowToApi));
+  })
+);
+
+app.post(
+  "/api/messages",
+  clientRoute(async (req, res) => {
+    const subject = String(req.body?.subject || "").trim();
+    const body = String(req.body?.body || "").trim();
+    if (!subject || !body) {
+      return res.status(400).json({ error: "invalid_body", message: "Subject and message are required." });
+    }
+
+    const { data, error } = await supabase
+      .from("client_messages")
+      .insert({
+        client_id: req.profile.client_id,
+        author_id: req.profile.id,
+        author_role: "pr_client",
+        subject,
+        body,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    const { data: client } = await supabase.from("clients").select("name").eq("id", req.profile.client_id).single();
+    sendNoteNotification({
+      clientName: client?.name || "Unknown client",
+      campaignName: "General message",
+      authorName: req.profile.name,
+      body: `${subject}\n\n${body}`,
+    });
+
+    res.status(201).json(messageRowToApi(data));
+  })
+);
+
+app.get(
+  "/api/files",
+  clientRoute(async (req, res) => {
+    const { data, error } = await supabase
+      .from("client_files")
+      .select("*")
+      .eq("client_id", req.profile.client_id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(await Promise.all((data || []).map(fileRowToApi)));
+  })
+);
+
+app.post(
+  "/api/files",
+  clientRoute(async (req, res) => {
+    const fileName = safeStorageName(req.body?.fileName);
+    const mimeType = String(req.body?.mimeType || "application/octet-stream").trim();
+    const rawBase64 = String(req.body?.dataBase64 || "").replace(/^data:[^;]+;base64,/, "");
+    if (!rawBase64) return res.status(400).json({ error: "invalid_body", message: "Choose a file before uploading." });
+
+    const buffer = Buffer.from(rawBase64, "base64");
+    if (!buffer.length) return res.status(400).json({ error: "invalid_body", message: "The selected file could not be read." });
+    if (buffer.length > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({ error: "file_too_large", message: `File must be ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB or less.` });
+    }
+
+    await ensureClientFilesBucket();
+    const storagePath = `${req.profile.client_id}/${Date.now()}-${fileName}`;
+    const { error: uploadError } = await supabase.storage.from(FILE_BUCKET).upload(storagePath, buffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+
+    const { data, error } = await supabase
+      .from("client_files")
+      .insert({
+        client_id: req.profile.client_id,
+        uploaded_by: req.profile.id,
+        uploaded_by_role: "pr_client",
+        file_name: fileName,
+        mime_type: mimeType,
+        size_bytes: buffer.length,
+        storage_bucket: FILE_BUCKET,
+        storage_path: storagePath,
+        notes: String(req.body?.notes || "").trim() || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(await fileRowToApi(data));
   })
 );
 

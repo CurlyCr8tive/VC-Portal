@@ -1,4 +1,4 @@
-import { computeLeadTimeDays, formatCurrency, formatDate } from "../../calculations.js";
+import { leadTimeDaysForPlacement, formatCurrency, formatDate } from "../../calculations.js";
 import { DEMO_FALLBACKS, demoAVEForPlacement } from "../../demoFallbacks.js";
 import { escapeHtml, statusToClass } from "../utils.js";
 import { renderEmptyState } from "./EmptyState.js";
@@ -61,7 +61,7 @@ export function renderPlacementsTable(
   };
 
   const rows = placements.map((p, index) => {
-    const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate) ?? DEMO_FALLBACKS.avgLeadTimeDays;
+    const leadTime = leadTimeDaysForPlacement(p) ?? DEMO_FALLBACKS.avgLeadTimeDays;
     const statusClass = statusToClass(p.status);
     // A row with no link is one of two very different things, and rendering
     // both as plain text made the second look like the first:

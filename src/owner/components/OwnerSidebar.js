@@ -31,8 +31,8 @@ export function renderOwnerSidebar(container, opts) {
     ? ""
     : isRealSession
       ? `<div style="font-size:0.72rem; opacity:0.75; margin-top:2px;">Logged in as ${escapeHtml(sessionEmail)}</div>`
-      : `<div style="font-size:0.72rem; opacity:0.85; margin-top:2px; color:var(--color-coral);">Preview mode — not signed in</div>
-         <div style="font-size:0.68rem; opacity:0.7; margin-top:1px;">Sign in as ${escapeHtml(sessionEmail)} for live features</div>`;
+      : `<div style="font-size:0.72rem; opacity:0.85; margin-top:2px; color:var(--color-coral);">Demo preview</div>
+         <div style="font-size:0.68rem; opacity:0.7; margin-top:1px;">Live account: ${escapeHtml(sessionEmail)}</div>`;
 
   container.innerHTML = `
     <button class="sidebar-close" aria-label="Close menu">✕ Close</button>

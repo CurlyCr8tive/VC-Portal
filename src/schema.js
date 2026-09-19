@@ -11,6 +11,9 @@ export const PLACEMENT_FIELDS = [
   "aveValue",
   "pitchSentDate",
   "landedDate",
+  "leadTimeOverrideDays",
+  "leadTimeSource",
+  "leadTimeNotes",
   "notes",
   "campaign",
   "sentiment",
@@ -39,6 +42,12 @@ function normalizeFields(raw) {
     aveValue: raw.aveValue !== "" && raw.aveValue != null ? Number(raw.aveValue) : null,
     pitchSentDate: raw.pitchSentDate || "",
     landedDate: raw.landedDate || "",
+    leadTimeOverrideDays:
+      raw.leadTimeOverrideDays !== "" && raw.leadTimeOverrideDays != null && Number.isFinite(Number(raw.leadTimeOverrideDays))
+        ? Number(raw.leadTimeOverrideDays)
+        : null,
+    leadTimeSource: ["dates", "manual", "sample", "gmail", "unknown"].includes(raw.leadTimeSource) ? raw.leadTimeSource : "dates",
+    leadTimeNotes: raw.leadTimeNotes?.trim() || "",
     notes: raw.notes?.trim() || "",
     campaign: raw.campaign?.trim() || null,
     // No sentiment agent exists yet (PRD Phase 7, planned) — this is always

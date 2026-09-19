@@ -1,4 +1,4 @@
-import { computeLeadTimeDays } from "./calculations.js";
+import { leadTimeDaysForPlacement } from "./calculations.js";
 import { applyDemoMetricFallbacks } from "./demoFallbacks.js";
 import { getAccessToken } from "./supabaseAuthClient.js";
 
@@ -7,7 +7,7 @@ const CAMPAIGN_STATUS_LABELS = { active: "Active", completed: "Completed", pause
 
 async function authedJsonHeaders() {
   const token = await getAccessToken();
-  if (!token) throw new Error("No active Supabase session found. Please sign in again.");
+  if (!token) throw new Error("Your session needs to be refreshed. Please sign in again.");
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 }
 
@@ -18,7 +18,7 @@ async function apiFetch(path, options = {}) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(body.message || `Client API request failed (${res.status}).`);
+    throw new Error(body.message || "We had trouble loading the latest client data.");
   }
   return body;
 }
@@ -45,7 +45,7 @@ function mapClient(row) {
 
 function mapCampaign(row, placements) {
   const campaignPlacements = placements.filter((p) => p.campaignId === row.id);
-  const leadTimes = campaignPlacements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((v) => v != null);
+  const leadTimes = campaignPlacements.map(leadTimeDaysForPlacement).filter((v) => v != null);
   const milestones = (row.campaign_milestones || []).map((m) => ({
     id: m.id,
     text: m.text,
@@ -78,6 +78,9 @@ function mapPlacement(row, campaignNameById) {
     aveValue: row.ave_value == null ? null : Number(row.ave_value),
     pitchSentDate: row.pitch_sent_date || "",
     landedDate: row.landed_date || "",
+    leadTimeOverrideDays: row.lead_time_override_days == null ? null : Number(row.lead_time_override_days),
+    leadTimeSource: row.lead_time_source || "dates",
+    leadTimeNotes: row.lead_time_notes || "",
     notes: row.notes || "",
     campaignId: row.campaign_id || null,
     campaign: row.campaign_id ? campaignNameById.get(row.campaign_id) || null : null,
@@ -168,7 +171,7 @@ export function buildClientApiChartSeries(placements, range) {
 
 function metricsFrom({ placements, campaigns }) {
   const confirmed = placements.filter((p) => Boolean(p.landedDate));
-  const leadTimes = placements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((v) => v != null);
+  const leadTimes = placements.map(leadTimeDaysForPlacement).filter((v) => v != null);
   const withAve = confirmed.filter((p) => p.aveValue != null);
   return applyDemoMetricFallbacks({
     totalAVE: withAve.length ? withAve.reduce((sum, p) => sum + p.aveValue, 0) : null,
@@ -182,11 +185,12 @@ function metricsFrom({ placements, campaigns }) {
 }
 
 export async function loadClientApiData(range = "30d") {
-  const [me, rawCampaigns, rawPlacements, rawCoaching] = await Promise.all([
+  const [me, rawCampaigns, rawPlacements, rawCoaching, latestReport] = await Promise.all([
     apiFetch("/api/me"),
     apiFetch("/api/campaigns"),
     apiFetch("/api/placements"),
     apiFetch("/api/coaching").catch(() => ({ phases: [], opportunities: [], resources: [] })),
+    apiFetch("/api/reports/latest").catch(() => null),
   ]);
   const campaignNameById = new Map(rawCampaigns.map((c) => [c.id, c.name]));
   const placements = rawPlacements.map((p) => mapPlacement(p, campaignNameById));
@@ -204,7 +208,15 @@ export async function loadClientApiData(range = "30d") {
       resources: (rawCoaching.resources || []).map(mapResource),
     },
     insight: null,
-    report: null,
+    report: latestReport
+      ? {
+          title: latestReport.title,
+          date: latestReport.approvedAt ? latestReport.approvedAt.slice(0, 10) : latestReport.updatedAt?.slice(0, 10) || "",
+          summary: latestReport.executiveSummary,
+          viewUrl: "",
+          pdfUrl: "",
+        }
+      : null,
   };
 }
 
@@ -238,5 +250,27 @@ export async function postClientApiOpportunity({ title, description }) {
   return apiFetch("/api/coaching/opportunities", {
     method: "POST",
     body: JSON.stringify({ title, description }),
+  });
+}
+
+export async function loadClientApiMessages() {
+  return apiFetch("/api/messages");
+}
+
+export async function postClientApiMessage({ subject, body }) {
+  return apiFetch("/api/messages", {
+    method: "POST",
+    body: JSON.stringify({ subject, body }),
+  });
+}
+
+export async function loadClientApiFiles() {
+  return apiFetch("/api/files");
+}
+
+export async function postClientApiFile({ fileName, mimeType, dataBase64, notes }) {
+  return apiFetch("/api/files", {
+    method: "POST",
+    body: JSON.stringify({ fileName, mimeType, dataBase64, notes }),
   });
 }

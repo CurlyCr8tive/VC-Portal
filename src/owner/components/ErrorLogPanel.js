@@ -15,8 +15,8 @@ export function renderErrorLogPanel(container) {
   if (errors.length === 0) {
     renderEmptyState(container, {
       icon: "✅",
-      title: "No errors — nothing has failed yet",
-      message: "Failures from things like corrupted local data or a failed calculation will show up here, with what happened and when — never silently dropped.",
+      title: "System log is clear",
+      message: "Any behind-the-scenes notices from testing will appear here for review.",
     });
     return;
   }

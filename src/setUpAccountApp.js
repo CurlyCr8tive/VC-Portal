@@ -35,9 +35,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   // Honest "not wired up yet" state, same posture as the 503s elsewhere in
   // this build — this page is fully stylable/testable, it just can't talk
   // to a Supabase project that doesn't exist yet.
-  subEl.textContent = "This page isn't connected to a real Supabase project yet — nothing to set up right now.";
+  subEl.textContent = "Account setup is in preview mode right now.";
   submitBtn.disabled = true;
-  submitBtn.textContent = "Not connected yet";
+  submitBtn.textContent = "Preview Mode";
 } else {
   initSupabaseFlow();
 }
@@ -51,7 +51,7 @@ async function initSupabaseFlow() {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch (err) {
-    showError("Couldn't load the Supabase client library. Check your connection and reload this page.");
+    showError("We couldn't finish loading account setup. Check your connection and reload this page.");
     return;
   }
 
@@ -71,7 +71,7 @@ async function initSupabaseFlow() {
   setTimeout(() => {
     if (!sessionReady) {
       subEl.textContent = "";
-      showError("This invite link is invalid or has expired. Ask the owner to resend your invite.");
+      showError("This invite link needs to be refreshed. Ask Verified Consulting to resend your invite.");
     }
   }, 4000);
 

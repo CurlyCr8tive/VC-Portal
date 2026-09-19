@@ -35,6 +35,7 @@ import { createCalendarEvent, isGoogleWorkspaceConfigured, searchGmailForPitchDa
 // dynamically and expect the app to bind to whatever they inject via PORT,
 // not a fixed one. OWNER_API_PORT/4001 stay as the local-dev fallback.
 const PORT = process.env.PORT || process.env.OWNER_API_PORT || 4001;
+const FILE_BUCKET = process.env.CLIENT_FILE_BUCKET || "client-files";
 
 const app = express();
 app.use(express.json());
@@ -148,6 +149,32 @@ function ownerOrLocalDemoAiRoute(handler) {
   };
 }
 
+function profileIdForDb(req) {
+  const id = String(req.profile?.id || "");
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id) ? id : null;
+}
+
+async function logAgentRun(req, { agentType, clientId = null, campaignId = null, placementId = null, status, provider = null, inputSummary = "", outputSummary = "", errorMessage = "", metadata = {} }) {
+  if (!isSupabaseConfigured || !supabase) return;
+  try {
+    await supabase.from("agent_runs").insert({
+      agent_type: agentType,
+      client_id: clientId,
+      campaign_id: campaignId,
+      placement_id: placementId,
+      status,
+      provider,
+      input_summary: inputSummary || null,
+      output_summary: outputSummary || null,
+      error_message: errorMessage || null,
+      metadata,
+      created_by: profileIdForDb(req),
+    });
+  } catch (err) {
+    console.warn(`[agent_runs] could not log ${agentType}: ${err.message}`);
+  }
+}
+
 const CLIENT_STATUSES = new Set(["active", "past", "unconfirmed"]);
 const ENGAGEMENT_TYPES = new Set(["pr", "coaching", "pr_and_coaching"]);
 
@@ -240,6 +267,9 @@ function placementRowToApi(row, { clientName = "", campaignName = null } = {}) {
     aveValue: row.ave_value == null ? null : Number(row.ave_value),
     pitchSentDate: row.pitch_sent_date || "",
     landedDate: row.landed_date || "",
+    leadTimeOverrideDays: row.lead_time_override_days == null ? null : Number(row.lead_time_override_days),
+    leadTimeSource: row.lead_time_source || "dates",
+    leadTimeNotes: row.lead_time_notes || "",
     notes: row.notes || "",
     campaign: campaignName || null,
     sentiment: row.sentiment_tag || null,
@@ -248,6 +278,58 @@ function placementRowToApi(row, { clientName = "", campaignName = null } = {}) {
     // known problem with this figure", so an empty string would render a
     // warning marker on every clean placement.
     aveDataQuality: row.ave_data_quality || null,
+  };
+}
+
+function reportRowToApi(row, clientName = "") {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    client: clientName,
+    title: row.title,
+    periodLabel: row.period_label || "",
+    executiveSummary: row.executive_summary,
+    narrative: row.narrative || "",
+    status: row.status,
+    approvedAt: row.approved_at || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function messageRowToApi(row, clientName = "") {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    client: clientName,
+    authorId: row.author_id,
+    authorRole: row.author_role,
+    subject: row.subject,
+    body: row.body,
+    createdAt: row.created_at,
+  };
+}
+
+async function fileRowToApi(row, clientName = "") {
+  let downloadUrl = "";
+  if (row.storage_bucket && row.storage_path) {
+    const { data } = await supabase.storage.from(row.storage_bucket).createSignedUrl(row.storage_path, 60 * 15);
+    downloadUrl = data?.signedUrl || "";
+  }
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    client: clientName,
+    uploadedBy: row.uploaded_by,
+    uploadedByRole: row.uploaded_by_role,
+    fileName: row.file_name,
+    mimeType: row.mime_type || "application/octet-stream",
+    sizeBytes: row.size_bytes == null ? null : Number(row.size_bytes),
+    storageBucket: row.storage_bucket || FILE_BUCKET,
+    storagePath: row.storage_path,
+    notes: row.notes || "",
+    createdAt: row.created_at,
+    downloadUrl,
   };
 }
 
@@ -382,6 +464,14 @@ async function normalizePlacementPayload(body) {
       ave_value: aveRaw !== "" && aveRaw != null && Number.isFinite(Number(aveRaw)) ? Number(aveRaw) : null,
       pitch_sent_date: body?.pitchSentDate || body?.pitch_sent_date || null,
       landed_date: body?.landedDate || body?.landed_date || null,
+      lead_time_override_days:
+        body?.leadTimeOverrideDays !== "" && body?.leadTimeOverrideDays != null && Number.isFinite(Number(body.leadTimeOverrideDays))
+          ? Number(body.leadTimeOverrideDays)
+          : null,
+      lead_time_source: ["dates", "manual", "sample", "gmail", "unknown"].includes(body?.leadTimeSource || body?.lead_time_source)
+        ? body.leadTimeSource || body.lead_time_source
+        : "dates",
+      lead_time_notes: String(body?.leadTimeNotes || body?.lead_time_notes || "").trim() || null,
       sentiment_tag: sentiment,
       audience_reach: reachRaw !== "" && reachRaw != null && Number.isFinite(Number(reachRaw)) ? Number(reachRaw) : null,
       notes: String(body?.notes || "").trim() || null,
@@ -450,6 +540,116 @@ app.patch(
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "not_found", message: "No client with that id." });
     res.json(clientRowToApi(data));
+  })
+);
+
+app.get(
+  "/api/clients/:clientId/messages",
+  ownerRoute(async (req, res) => {
+    const { data: client, error: clientError } = await supabase.from("clients").select("id, name").eq("id", req.params.clientId).single();
+    if (clientError || !client) return res.status(404).json({ error: "not_found", message: "No client with that id." });
+    const { data, error } = await supabase
+      .from("client_messages")
+      .select("*")
+      .eq("client_id", client.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json((data || []).map((row) => messageRowToApi(row, client.name)));
+  })
+);
+
+app.get(
+  "/api/clients/:clientId/files",
+  ownerRoute(async (req, res) => {
+    const { data: client, error: clientError } = await supabase.from("clients").select("id, name").eq("id", req.params.clientId).single();
+    if (clientError || !client) return res.status(404).json({ error: "not_found", message: "No client with that id." });
+    const { data, error } = await supabase
+      .from("client_files")
+      .select("*")
+      .eq("client_id", client.id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(await Promise.all((data || []).map((row) => fileRowToApi(row, client.name))));
+  })
+);
+
+app.get(
+  "/api/clients/:clientId/reports",
+  ownerRoute(async (req, res) => {
+    const { data: client, error: clientError } = await supabase.from("clients").select("id, name").eq("id", req.params.clientId).single();
+    if (clientError || !client) return res.status(404).json({ error: "not_found", message: "No client with that id." });
+    const { data, error } = await supabase
+      .from("client_reports")
+      .select("*")
+      .eq("client_id", client.id)
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    res.json((data || []).map((row) => reportRowToApi(row, client.name)));
+  })
+);
+
+app.post(
+  "/api/clients/:clientId/reports",
+  ownerRoute(async (req, res) => {
+    const executiveSummary = String(req.body?.executiveSummary || req.body?.executive_summary || "").trim();
+    if (!executiveSummary) return res.status(400).json({ error: "invalid_body", message: "Executive summary is required." });
+    const { data: client, error: clientError } = await supabase.from("clients").select("id, name").eq("id", req.params.clientId).single();
+    if (clientError || !client) return res.status(404).json({ error: "not_found", message: "No client with that id." });
+
+    const { data, error } = await supabase
+      .from("client_reports")
+      .insert({
+        client_id: client.id,
+        title: String(req.body?.title || "Coverage Report").trim() || "Coverage Report",
+        period_label: String(req.body?.periodLabel || req.body?.period_label || "").trim() || null,
+        executive_summary: executiveSummary,
+        narrative: String(req.body?.narrative || "").trim() || null,
+        status: "draft",
+        created_by: req.profile.id,
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json(reportRowToApi(data, client.name));
+  })
+);
+
+app.patch(
+  "/api/reports/:reportId",
+  ownerRoute(async (req, res) => {
+    const patch = { updated_at: new Date().toISOString() };
+    if (typeof req.body?.title === "string") patch.title = req.body.title.trim() || "Coverage Report";
+    if (typeof req.body?.periodLabel === "string" || typeof req.body?.period_label === "string") patch.period_label = String(req.body.periodLabel || req.body.period_label).trim() || null;
+    if (typeof req.body?.executiveSummary === "string" || typeof req.body?.executive_summary === "string") patch.executive_summary = String(req.body.executiveSummary || req.body.executive_summary).trim();
+    if (typeof req.body?.narrative === "string") patch.narrative = req.body.narrative.trim() || null;
+    if (!patch.executive_summary && (req.body?.executiveSummary != null || req.body?.executive_summary != null)) {
+      return res.status(400).json({ error: "invalid_body", message: "Executive summary can't be empty." });
+    }
+    const { data, error } = await supabase.from("client_reports").update(patch).eq("id", req.params.reportId).select().single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No report with that id." });
+    res.json(reportRowToApi(data));
+  })
+);
+
+app.post(
+  "/api/reports/:reportId/approve",
+  ownerRoute(async (req, res) => {
+    const { data, error } = await supabase
+      .from("client_reports")
+      .update({
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        approved_by: req.profile.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", req.params.reportId)
+      .select()
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: "not_found", message: "No report with that id." });
+    res.json(reportRowToApi(data));
   })
 );
 
@@ -1047,8 +1247,22 @@ app.post(
       data: { client_id: client.id, client_name: client.name, role: "pr_client" },
     });
     if (inviteError) {
+      await supabase.from("client_invites").insert({
+        client_id: client.id,
+        email,
+        status: "failed",
+        sent_by: req.profile.id,
+        error_message: inviteError.message,
+      });
       return res.status(502).json({ error: "invite_failed", message: inviteError.message });
     }
+
+    await supabase.from("client_invites").insert({
+      client_id: client.id,
+      email,
+      status: "sent",
+      sent_by: req.profile.id,
+    });
 
     res.status(200).json({ ok: true, invitedEmail: email, clientId: client.id, clientName: client.name });
   })
@@ -1078,6 +1292,12 @@ app.post(
   // placements, so a demo scan can't put anything in front of a client.
   ownerOrLocalDemoAiRoute(async (req, res) => {
     if (!isNewsSearchConfigured) {
+      await logAgentRun(req, {
+        agentType: "discovery_scan",
+        clientId: req.params.clientId,
+        status: "skipped",
+        errorMessage: "No news search API key configured.",
+      });
       return res.status(503).json({
         error: "not_configured",
         message: "Neither CURRENTS_API_KEY nor NEWSDATA_API_KEY is set — sign up for one (both are free) and add it to .env first.",
@@ -1095,6 +1315,12 @@ app.post(
 
     const query = buildSearchQuery(client.keyword_config);
     if (!query) {
+      await logAgentRun(req, {
+        agentType: "discovery_scan",
+        clientId: client.id,
+        status: "skipped",
+        errorMessage: "Client has no keyword configuration.",
+      });
       return res.status(400).json({
         error: "no_keyword_config",
         message: `${client.name} has no keyword_config set (client name, company name, or aliases) — nothing to search for.`,
@@ -1157,6 +1383,22 @@ app.post(
       newsSearchErrors,
       webSearchError,
     });
+    await logAgentRun(req, {
+      agentType: "discovery_scan",
+      clientId: client.id,
+      status: "success",
+      inputSummary: query,
+      outputSummary: `Scanned ${allArticles.length}; matched ${candidates.length}; inserted ${inserted}.`,
+      metadata: {
+        scanned: allArticles.length,
+        structuredSourcesScanned: structuredArticles.length,
+        webSearchSourcesScanned: webSearchArticles.length,
+        matched: candidates.length,
+        inserted,
+        newsSearchErrors,
+        webSearchError,
+      },
+    });
   })
 );
 
@@ -1188,6 +1430,14 @@ app.post(
       return res.status(400).json({ error: "invalid_body", message: "outletName is required." });
     }
     const result = await researchOutletRate(outletName);
+    await logAgentRun(req, {
+      agentType: "ave_rate_research",
+      status: result.available === false ? "skipped" : "success",
+      provider: result.providerUsed || "perplexity",
+      inputSummary: outletName,
+      outputSummary: result.summary || result.error || "",
+      metadata: result,
+    });
     res.status(200).json(result);
   })
 );
@@ -1243,11 +1493,35 @@ app.post(
     // answer alone can be consumed before the answer starts. aiClient
     // now throws on a max_tokens stop rather than returning a truncated
     // string, so getting this wrong is loud instead of silent.
-    const result = await generateText({ prompt, maxTokens: LONG_FORM_TYPES.has(req.params.type) ? 4096 : 2048 });
-    if (result.fellBackFrom) {
-      console.warn(`[generate/${req.params.type}] answered by ${result.providerUsed} after: ${result.fellBackFrom.join("; ")}`);
+    try {
+      const result = await generateText({ prompt, maxTokens: LONG_FORM_TYPES.has(req.params.type) ? 4096 : 2048 });
+      if (result.fellBackFrom) {
+        console.warn(`[generate/${req.params.type}] answered by ${result.providerUsed} after: ${result.fellBackFrom.join("; ")}`);
+      }
+      await logAgentRun(req, {
+        agentType: req.params.type,
+        clientId: req.body?.clientId || null,
+        campaignId: req.body?.campaignId || null,
+        placementId: req.body?.placementId || null,
+        status: "success",
+        provider: result.providerUsed,
+        inputSummary: String(req.body?.client || req.body?.campaignName || req.body?.headline || req.params.type || "").slice(0, 500),
+        outputSummary: String(result.text || "").slice(0, 1000),
+        metadata: { fellBackFrom: result.fellBackFrom || [] },
+      });
+      res.status(200).json(result);
+    } catch (err) {
+      await logAgentRun(req, {
+        agentType: req.params.type,
+        clientId: req.body?.clientId || null,
+        campaignId: req.body?.campaignId || null,
+        placementId: req.body?.placementId || null,
+        status: "error",
+        inputSummary: String(req.body?.client || req.body?.campaignName || req.body?.headline || req.params.type || "").slice(0, 500),
+        errorMessage: err.message,
+      });
+      throw err;
     }
-    res.status(200).json(result);
   })
 );
 

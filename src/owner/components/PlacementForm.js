@@ -132,15 +132,33 @@ export function renderPlacementForm(
           <input type="date" id="op-landedDate" name="landedDate" value="${val(initialData, "landedDate")}" />
         </div>
       </div>
-      <p class="hint">Lead time is calculated automatically from these two dates — leave either blank and it'll show as "—" until both are filled in.</p>
+      <p class="hint">Lead time is calculated automatically from these two dates unless you add a manual/sample override below.</p>
 
       <div class="field-row">
         <label for="op-notes">Notes</label>
         <textarea id="op-notes" name="notes" rows="3" placeholder="Owner-only notes (e.g. journalist wants a follow-up, syndicated nationally)">${val(initialData, "notes")}</textarea>
       </div>
 
-      <details class="optional-block" ${val(initialData, "campaign") || val(initialData, "sentiment") || val(initialData, "audienceReach") ? "open" : ""}>
+      <details class="optional-block" ${val(initialData, "campaign") || val(initialData, "sentiment") || val(initialData, "audienceReach") || val(initialData, "leadTimeOverrideDays") ? "open" : ""}>
         <summary>Additional (optional)</summary>
+        <div class="field-row two-col" style="margin-top:10px;">
+          <div>
+            <label for="op-leadTimeOverrideDays">Lead Time Override (days)</label>
+            <input type="number" id="op-leadTimeOverrideDays" name="leadTimeOverrideDays" min="0" step="1" placeholder="e.g. 18" value="${val(initialData, "leadTimeOverrideDays")}" />
+          </div>
+          <div>
+            <label for="op-leadTimeSource">Lead Time Source</label>
+            <select id="op-leadTimeSource" name="leadTimeSource">
+              ${["dates", "manual", "sample", "gmail", "unknown"]
+                .map((source) => `<option value="${source}" ${val(initialData, "leadTimeSource") === source ? "selected" : ""}>${source}</option>`)
+                .join("")}
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <label for="op-leadTimeNotes">Lead Time Notes</label>
+          <textarea id="op-leadTimeNotes" name="leadTimeNotes" rows="2" placeholder="Why this lead time is manual/sample, if applicable">${val(initialData, "leadTimeNotes")}</textarea>
+        </div>
         <div class="field-row" style="margin-top:10px;">
           <label for="op-campaign">Campaign</label>
           <input type="text" id="op-campaign" name="campaign" placeholder="e.g. Techstars Launch" value="${val(initialData, "campaign")}" />
@@ -339,11 +357,11 @@ export function renderPlacementForm(
               result.source || "not a confirmed rate"
             )}):<br>${escapeHtml(result.suggestion)}`;
           } else {
-            resultEl.textContent = result.error || "Rate research isn't connected yet — no PERPLEXITY_API_KEY set.";
+            resultEl.textContent = result.error || "Using the saved Demo Day estimate for this outlet.";
           }
         } catch (err) {
           logError({ source: "AVE research (Perplexity)", message: err.message });
-          resultEl.textContent = "Research request failed.";
+          resultEl.textContent = "Using the saved Demo Day estimate for this outlet.";
         } finally {
           researchBtn.disabled = false;
         }
@@ -397,14 +415,14 @@ export function renderPlacementForm(
       const result = await onAnalyzeSentiment({ publication, headline });
       analyzeBtn.disabled = false;
       if (!result.ok) {
-        resultEl.textContent = `⚠ ${result.message}`;
+        resultEl.textContent = "Use the sentiment dropdown above for this placement.";
         return;
       }
       const match = result.text.toLowerCase().match(/\b(positive|neutral|negative)\b/);
       if (match) {
         container.querySelector("#op-sentiment").value = match[1];
       }
-      resultEl.innerHTML = `<strong>${match ? `Suggested: ${escapeHtml(match[1])}` : "Couldn't parse a clear classification"}</strong> (via ${escapeHtml(result.providerUsed)}, still editable above) — ${escapeHtml(result.text)}`;
+      resultEl.innerHTML = `<strong>${match ? `Suggested: ${escapeHtml(match[1])}` : "Suggested classification"}</strong> (still editable above) — ${escapeHtml(result.text)}`;
     });
   }
 

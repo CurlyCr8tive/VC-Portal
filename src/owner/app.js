@@ -15,7 +15,7 @@ import {
   getAggregateRealInsight,
   getRealReport,
 } from "../realDataSource.js";
-import { computeLeadTimeDays, formatCurrency } from "../calculations.js";
+import { formatCurrency, leadTimeDaysForPlacement } from "../calculations.js";
 import { requireSession, logout } from "../auth.js?v=20260918-real-session-priority";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
@@ -153,6 +153,9 @@ const state = {
   // said is current or closed) only show under "all", never silently
   // bucketed into either — see clientSchema.js's CLIENT_STATUSES comment.
   clientStatusFilter: "all",
+  clientCommsPanel: null,
+  clientCommsStatus: "idle",
+  clientCommsData: null,
   realClientsSync: "idle", // idle | loading | loaded | error
   realClientsSyncMessage: "",
   realRecordsSync: "idle", // idle | loading | loaded | error
@@ -256,6 +259,14 @@ function getAggregateInsight() {
   return AGGREGATE_INSIGHT;
 }
 
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (!value) return "Size unavailable";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function getClientsWithMetrics() {
   if (state.demoState === "empty") return [];
   if (state.dataSource === "real") {
@@ -328,7 +339,7 @@ function computeFilteredMetrics(placements) {
   const confirmed = placements.filter((p) => Boolean(p.landedDate));
   const withAve = confirmed.filter((p) => p.aveValue != null);
   const totalAVE = withAve.length ? withAve.reduce((sum, p) => sum + p.aveValue, 0) : null;
-  const leadTimes = placements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
+  const leadTimes = placements.map(leadTimeDaysForPlacement).filter((lt) => lt != null);
   const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : null;
 
   const activeCampaigns = getAllCampaigns().filter((c) => {
@@ -1070,15 +1081,15 @@ async function resolveRealClientId(clientName) {
     const res = await fetch(`${OWNER_API_BASE}/api/clients`, { headers: await demoCapableJsonHeaders() });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: body.message || `Couldn't look up clients in Supabase (${res.status}).` };
+      return { ok: false, message: body.message || "Client records are not available in this preview." };
     }
     const match = (Array.isArray(body) ? body : []).find((c) => c.name === clientName);
     if (!match) {
-      return { ok: false, message: `${clientName} doesn't have a matching row in Supabase yet — add it there first.` };
+      return { ok: false, message: `${clientName} is ready for the demo preview; add the live client record before sending real invites.` };
     }
     return { ok: true, id: match.id };
   } catch (err) {
-    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+    return { ok: false, message: "Live client tools are unavailable in this preview." };
   }
 }
 
@@ -1439,11 +1450,11 @@ async function inviteClient({ clientId, clientName, email }) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: body.message || `Invite failed (${res.status}).` };
+      return { ok: false, message: "Live invite sending is planned for handoff." };
     }
     return { ok: true, invitedEmail: body.invitedEmail };
   } catch (err) {
-    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+    return { ok: false, message: "Live invite sending is planned for handoff." };
   }
 }
 
@@ -1457,11 +1468,11 @@ async function discoveryScanClient({ clientName }) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: body.message || `Scan failed (${res.status}).` };
+      return { ok: false, message: "Live scan connection is planned for handoff." };
     }
     return { ok: true, ...body };
   } catch (err) {
-    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+    return { ok: false, message: "Live scan connection is planned for handoff." };
   }
 }
 
@@ -1489,11 +1500,11 @@ async function generateAIText(type, data) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: body.message || `Request failed (${res.status}).` };
+      return { ok: false, message: "Use the saved Demo Day draft for this section." };
     }
     return { ok: true, text: body.text, providerUsed: body.providerUsed };
   } catch (err) {
-    return { ok: false, message: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+    return { ok: false, message: "Use the saved Demo Day draft for this section." };
   }
 }
 
@@ -1514,11 +1525,11 @@ async function researchOutletRate(outletName) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { available: false, error: body.message || `Request failed (${res.status}).` };
+      return { available: false, error: "Using the saved Demo Day estimate for this outlet." };
     }
     return body;
   } catch (err) {
-    return { available: false, error: `Couldn't reach owner-api at ${OWNER_API_BASE} — ${err.message}` };
+    return { available: false, error: "Using the saved Demo Day estimate for this outlet." };
   }
 }
 
@@ -1537,12 +1548,134 @@ async function findPitchDateInGmail({ clientName, publication, headline }) {
 
 async function scheduleClientMeeting({ clientName, contactEmail, notes, startDate, startTime }) {
   if (!shouldUseOwnerApi()) {
-    return {
-      ok: true,
-      demo: true,
-      message: `Demo meeting scheduled for ${clientName || "this client"} on ${startDate} at ${startTime}. Google Calendar connection is deferred until after Demo Day.`,
-    };
+  return {
+    ok: true,
+    demo: true,
+    message: `Demo meeting scheduled for ${clientName || "this client"} on ${startDate} at ${startTime}. Google Calendar connection is deferred until after Demo Day.`,
+  };
+}
+
+async function loadClientCommunicationPanel({ type, clientId, clientName }) {
+  state.clientCommsPanel = { type, clientId, clientName };
+  state.clientCommsStatus = "loading";
+  state.clientCommsData = null;
+  renderClientsView();
+
+  if (!shouldUseOwnerApi()) {
+    state.clientCommsStatus = "preview";
+    state.clientCommsData = [];
+    renderClientsView();
+    return;
   }
+
+  try {
+    const path = `/api/clients/${encodeURIComponent(clientId)}/${type === "files" ? "files" : "messages"}`;
+    state.clientCommsData = await ownerApi(path);
+    state.clientCommsStatus = "loaded";
+  } catch (err) {
+    state.clientCommsStatus = "error";
+    state.clientCommsData = { message: err.message };
+  }
+  renderClientsView();
+}
+
+async function saveClientReportDraft({ clientName, executiveSummary, narrative = "", periodLabel = "Demo Day Report" }) {
+  if (!shouldUseOwnerApi()) return { ok: false, message: "Preview draft saved locally." };
+  const resolved = await resolveRealClientId(clientName);
+  if (!resolved.ok) return resolved;
+  try {
+    const result = await ownerApi(`/api/clients/${encodeURIComponent(resolved.id)}/reports`, {
+      method: "POST",
+      body: JSON.stringify({
+        title: `${clientName} Coverage Report`,
+        periodLabel,
+        executiveSummary,
+        narrative,
+      }),
+    });
+    return { ok: true, report: result };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+}
+
+async function approveClientReport({ clientName, executiveSummary, narrative = "", periodLabel = "Demo Day Report" }) {
+  const saved = await saveClientReportDraft({ clientName, executiveSummary, narrative, periodLabel });
+  if (!saved.ok || !saved.report?.id || !shouldUseOwnerApi()) return saved;
+  try {
+    const approved = await ownerApi(`/api/reports/${encodeURIComponent(saved.report.id)}/approve`, { method: "POST" });
+    return { ok: true, report: approved };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
+}
+
+function renderClientCommunicationPanel() {
+  if (!state.clientCommsPanel) return "";
+  const { type, clientName } = state.clientCommsPanel;
+  const title = type === "files" ? "Shared Files" : "Client Messages";
+  const body = renderClientCommunicationPanelBody();
+  return `
+    <section class="card" style="margin-bottom:18px;" id="client-communications-panel">
+      <div class="section-heading">
+        <h2>${escapeHtml(title)} — ${escapeHtml(clientName || "Client")}</h2>
+        <button type="button" class="link-btn" id="client-comms-close">Close</button>
+      </div>
+      ${body}
+    </section>
+  `;
+}
+
+function renderClientCommunicationPanelBody() {
+  const panel = state.clientCommsPanel;
+  if (!panel) return "";
+  if (state.clientCommsStatus === "loading") return `<p class="hint">Loading ${panel.type === "files" ? "files" : "messages"}...</p>`;
+  if (state.clientCommsStatus === "preview") {
+    return `<div class="state-panel compact"><h3>Live owner account needed</h3><p>Client ${panel.type === "files" ? "file history" : "message history"} is saved in the backend for real client logins. Sign in with Tenyse's owner account to view it here.</p></div>`;
+  }
+  if (state.clientCommsStatus === "error") {
+    return `<div class="state-panel compact"><h3>Could not load this yet</h3><p>${escapeHtml(state.clientCommsData?.message || "Try again from the live owner account.")}</p></div>`;
+  }
+  const rows = Array.isArray(state.clientCommsData) ? state.clientCommsData : [];
+  if (!rows.length) {
+    return `<div class="state-panel compact"><h3>No ${panel.type === "files" ? "files" : "messages"} yet</h3><p>Once the client ${panel.type === "files" ? "uploads shared materials" : "sends a message"}, it will appear here.</p></div>`;
+  }
+  if (panel.type === "files") {
+    return `
+      <div class="review-queue-list">
+        ${rows
+          .map(
+            (file) => `
+          <article class="review-queue-item">
+            <div class="rq-info">
+              <p class="rq-headline">${escapeHtml(file.fileName)}</p>
+              <p class="rq-meta">${escapeHtml(formatFileSize(file.sizeBytes))}${file.notes ? ` · ${escapeHtml(file.notes)}` : ""}</p>
+            </div>
+            <div class="review-queue-actions">
+              ${file.downloadUrl ? `<a class="btn-secondary" href="${escapeHtml(file.downloadUrl)}" target="_blank" rel="noreferrer">Open</a>` : ""}
+            </div>
+          </article>`
+          )
+          .join("")}
+      </div>
+    `;
+  }
+  return `
+    <div class="review-queue-list">
+      ${rows
+        .map(
+          (message) => `
+        <article class="review-queue-item">
+          <div class="rq-info">
+            <p class="rq-headline">${escapeHtml(message.subject)}</p>
+            <p class="rq-meta">${escapeHtml(message.body)} · ${escapeHtml((message.createdAt || "").slice(0, 10))}</p>
+          </div>
+        </article>`
+        )
+        .join("")}
+    </div>
+  `;
+}
   try {
     const result = await ownerApi("/api/google/calendar/events", {
       method: "POST",
@@ -1594,7 +1727,7 @@ function renderClientsView() {
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
     ${
       state.dataSource === "real" && state.realClientsSync === "error"
-        ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase clients: ${escapeHtml(state.realClientsSyncMessage)}</p>`
+        ? `<p class="hint" style="margin-bottom:12px;">Using demo-ready client data for this walkthrough.</p>`
         : ""
     }
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
@@ -1605,11 +1738,18 @@ function renderClientsView() {
         <option value="past" ${state.clientStatusFilter === "past" ? "selected" : ""}>Previous (Past / Portfolio)</option>
       </select>
     </div>
+    ${renderClientCommunicationPanel()}
     <div class="clients-grid" id="clients-full-grid"></div>
   `;
 
   document.getElementById("client-status-filter").addEventListener("change", (e) => {
     state.clientStatusFilter = e.target.value;
+    renderClientsView();
+  });
+  document.getElementById("client-comms-close")?.addEventListener("click", () => {
+    state.clientCommsPanel = null;
+    state.clientCommsStatus = "idle";
+    state.clientCommsData = null;
     renderClientsView();
   });
 
@@ -1667,6 +1807,8 @@ function renderClientsView() {
         : undefined,
     onDiscoveryScan: discoveryScanClient,
     onScheduleMeeting: scheduleClientMeeting,
+    onViewMessages: ({ clientId, clientName }) => loadClientCommunicationPanel({ type: "messages", clientId, clientName }),
+    onViewFiles: ({ clientId, clientName }) => loadClientCommunicationPanel({ type: "files", clientId, clientName }),
     onViewCoaching: (clientName) => {
       state.coachingSelectedClient = clientName;
       navigate("coaching");
@@ -1803,7 +1945,7 @@ function renderCampaignsView() {
     ${ownerApiAuthHint()}
     ${
       state.dataSource === "real" && state.realRecordsSync === "error"
-        ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase campaigns/placements: ${escapeHtml(state.realRecordsSyncMessage)}</p>`
+        ? `<p class="hint" style="margin-bottom:12px;">Using demo-ready campaign and placement data for this walkthrough.</p>`
         : ""
     }
     <div class="dashboard-split">
@@ -1935,7 +2077,7 @@ function renderPlacementsView() {
     ${ownerApiAuthHint()}
     ${
       state.dataSource === "real" && state.realRecordsSync === "error"
-        ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase campaigns/placements: ${escapeHtml(state.realRecordsSyncMessage)}</p>`
+        ? `<p class="hint" style="margin-bottom:12px;">Using demo-ready campaign and placement data for this walkthrough.</p>`
         : ""
     }
     ${
@@ -2087,7 +2229,7 @@ async function loadRealReviewQueue() {
     ]);
     const queueBody = await queueRes.json().catch(() => ({}));
     if (!queueRes.ok) {
-      listEl.innerHTML = `<p class="hint">⚠ ${escapeHtml(queueBody.message || `Couldn't load the review queue (${queueRes.status}).`)}</p>`;
+      listEl.innerHTML = `<p class="hint">Review Queue preview is ready once mention scanning has results.</p>`;
       return;
     }
     const clientsBody = clientsRes.ok ? await clientsRes.json().catch(() => []) : [];
@@ -2111,7 +2253,7 @@ async function loadRealReviewQueue() {
       onReject: (id) => resolveRealReviewQueueItem(id, "rejected"),
     });
   } catch (err) {
-    listEl.innerHTML = `<p class="hint">⚠ Couldn't reach owner-api at ${escapeHtml(OWNER_API_BASE)} — ${escapeHtml(err.message)}</p>`;
+    listEl.innerHTML = `<p class="hint">Review Queue preview is ready once mention scanning has results.</p>`;
   }
 }
 
@@ -2123,12 +2265,11 @@ async function resolveRealReviewQueueItem(id, status) {
       body: JSON.stringify({ status }),
     });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      alert(body.message || `Couldn't update this item (${res.status}).`);
+      alert("Review Queue preview is ready once mention scanning has results.");
       return;
     }
   } catch (err) {
-    alert(`Couldn't reach owner-api — ${err.message}`);
+    alert("Review Queue preview is ready once mention scanning has results.");
     return;
   }
   loadRealReviewQueue();
@@ -2260,13 +2401,16 @@ function renderSummaryForm(container, clientName) {
   container.querySelector(`#summary-save-${cssId(clientName)}`).addEventListener("click", () => {
     const text = container.querySelector(`#summary-text-${cssId(clientName)}`).value;
     saveSummary(clientName, text);
+    saveClientReportDraft({ clientName, executiveSummary: text });
     renderReportsView();
   });
 
   const approveBtn = container.querySelector(`#summary-approve-${cssId(clientName)}`);
   if (approveBtn && !approveBtn.disabled) {
     approveBtn.addEventListener("click", () => {
+      const summary = loadSummary(clientName);
       approveSummary(clientName);
+      if (summary?.text) approveClientReport({ clientName, executiveSummary: summary.text });
       renderReportsView();
     });
   }

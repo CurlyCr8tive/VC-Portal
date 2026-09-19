@@ -2,7 +2,18 @@ import { METRICS, PLACEMENTS, CAMPAIGNS, CHART_SERIES, INSIGHTS, REPORTS, getCli
 import { getRealMetrics, getRealPlacements, getRealCampaigns, getRealChartSeries, getRealInsight, getRealReport, getClientProfile } from "../realDataSource.js";
 import { requireSession, logout, landingPageFor } from "../auth.js?v=20260918-real-session-priority";
 import { signOutReal } from "../supabaseAuthClient.js";
-import { buildClientApiChartSeries, loadClientApiData, loadClientApiNotes, postClientApiNote, postClientApiOpportunity, updateClientApiHomework } from "../clientApiDataSource.js";
+import {
+  buildClientApiChartSeries,
+  loadClientApiData,
+  loadClientApiFiles,
+  loadClientApiMessages,
+  loadClientApiNotes,
+  postClientApiFile,
+  postClientApiMessage,
+  postClientApiNote,
+  postClientApiOpportunity,
+  updateClientApiHomework,
+} from "../clientApiDataSource.js";
 import { renderSidebar } from "./components/ClientSidebar.js";
 import { renderHeader } from "./components/DashboardHeader.js";
 import { renderMetricsGrid } from "./components/MetricCard.js";
@@ -59,7 +70,14 @@ const state = {
   apiData: null,
   apiNotesByCampaign: {},
   apiNotesStatusByCampaign: {},
+  apiMessages: [],
+  apiMessagesStatus: "idle",
+  apiFiles: [],
+  apiFilesStatus: "idle",
 };
+
+const PREVIEW_MESSAGES_KEY = "vc_preview_client_messages_v1";
+const PREVIEW_FILES_KEY = "vc_preview_client_files_v1";
 
 // Real-data mode matches on the logged-in client's display NAME (whatever
 // was typed into the "Client" field on the owner's manual entry form) — the
@@ -73,6 +91,69 @@ function shouldUseClientApi() {
 
 function apiSnapshot() {
   return shouldUseClientApi() ? state.apiData : null;
+}
+
+function previewStorageKey(base) {
+  return `${base}:${state.clientId || "client"}`;
+}
+
+function loadPreviewList(base) {
+  try {
+    const raw = window.localStorage.getItem(previewStorageKey(base));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePreviewList(base, rows) {
+  window.localStorage.setItem(previewStorageKey(base), JSON.stringify(rows));
+}
+
+function addPreviewMessage({ subject, body }) {
+  const rows = loadPreviewList(PREVIEW_MESSAGES_KEY);
+  const row = {
+    id: `preview-message-${Date.now()}`,
+    authorRole: "pr_client",
+    subject,
+    body,
+    createdAt: new Date().toISOString(),
+  };
+  savePreviewList(PREVIEW_MESSAGES_KEY, [row, ...rows]);
+  return row;
+}
+
+function addPreviewFile({ fileName, mimeType, sizeBytes, notes }) {
+  const rows = loadPreviewList(PREVIEW_FILES_KEY);
+  const row = {
+    id: `preview-file-${Date.now()}`,
+    uploadedByRole: "pr_client",
+    fileName,
+    mimeType,
+    sizeBytes,
+    notes,
+    createdAt: new Date().toISOString(),
+    downloadUrl: "",
+  };
+  savePreviewList(PREVIEW_FILES_KEY, [row, ...rows]);
+  return row;
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (!value) return "Size unavailable";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function fileToDataBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(new Error("The selected file could not be read."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function avatarInitials(name) {
@@ -767,7 +848,9 @@ function renderOpportunitiesView() {
 }
 
 function renderMessagesView() {
-  document.getElementById("messages-content").innerHTML = `
+  const target = document.getElementById("messages-content");
+  const messages = shouldUseClientApi() ? state.apiMessages : loadPreviewList(PREVIEW_MESSAGES_KEY);
+  target.innerHTML = `
     <div class="section-heading"><h2>Messages</h2></div>
     <div class="client-message-layout">
       <article class="card">
@@ -782,7 +865,7 @@ function renderMessagesView() {
             <label for="client-message-body">Message</label>
             <textarea id="client-message-body" rows="4" placeholder="Write your note for Tenyse"></textarea>
           </div>
-          <button class="btn-primary" type="button" id="client-message-submit">Prepare Message</button>
+          <button class="btn-primary" type="button" id="client-message-submit">Send Message</button>
           <span id="client-message-result" class="inline-confirmation"></span>
         </div>
       </article>
@@ -794,18 +877,116 @@ function renderMessagesView() {
         </div>
       </article>
     </div>
+    <section class="section" style="margin-top:18px;">
+      <div class="section-heading"><h2>Message History</h2></div>
+      <div id="client-message-list"></div>
+    </section>
   `;
-  document.getElementById("client-message-submit").addEventListener("click", () => {
-    document.getElementById("client-message-result").textContent = "Message prepared for Tenyse.";
+  renderClientMessageList(messages);
+  if (shouldUseClientApi() && state.apiMessagesStatus === "idle") refreshClientMessages();
+  document.getElementById("client-message-submit").addEventListener("click", async () => {
+    const result = document.getElementById("client-message-result");
+    const button = document.getElementById("client-message-submit");
+    const subjectEl = document.getElementById("client-message-subject");
+    const bodyEl = document.getElementById("client-message-body");
+    const subject = subjectEl.value.trim();
+    const body = bodyEl.value.trim();
+    if (!subject || !body) {
+      result.textContent = "Add a subject and message first.";
+      return;
+    }
+    button.disabled = true;
+    result.textContent = "Sending...";
+    try {
+      if (shouldUseClientApi()) {
+        await postClientApiMessage({ subject, body });
+        await refreshClientMessages({ rerender: false });
+      } else {
+        addPreviewMessage({ subject, body });
+        renderClientMessageList(loadPreviewList(PREVIEW_MESSAGES_KEY));
+      }
+      subjectEl.value = "";
+      bodyEl.value = "";
+      result.textContent = "Message sent to Tenyse.";
+    } catch (err) {
+      result.textContent = err.message || "Message could not be sent right now.";
+    } finally {
+      button.disabled = false;
+    }
   });
+}
+
+function renderClientMessageList(messages) {
+  const list = document.getElementById("client-message-list");
+  if (!list) return;
+  if (shouldUseClientApi() && state.apiMessagesStatus === "loading") {
+    list.innerHTML = `<div class="state-panel compact"><p>Loading messages...</p></div>`;
+    return;
+  }
+  if (!messages.length) {
+    list.innerHTML = `<div class="state-panel compact"><div class="state-icon" aria-hidden="true">✉</div><h3>No messages yet</h3><p>Your notes to Tenyse will appear here after you send them.</p></div>`;
+    return;
+  }
+  list.innerHTML = `
+    <div class="review-queue-list">
+      ${messages
+        .map(
+          (message) => `
+        <article class="review-queue-item">
+          <div class="rq-info">
+            <p class="rq-headline">${escapeHtml(message.subject)}</p>
+            <p class="rq-meta">${escapeHtml(message.body)} · ${escapeHtml(formatReadableDate(message.createdAt?.slice(0, 10) || ""))}</p>
+          </div>
+        </article>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+async function refreshClientMessages({ rerender = true } = {}) {
+  if (!shouldUseClientApi()) return;
+  state.apiMessagesStatus = "loading";
+  if (rerender && state.view === "messages") renderClientMessageList(state.apiMessages);
+  try {
+    state.apiMessages = await loadClientApiMessages();
+    state.apiMessagesStatus = "loaded";
+  } catch (err) {
+    state.apiMessagesStatus = "error";
+    state.apiMessages = [];
+  }
+  if (state.view === "messages") renderClientMessageList(state.apiMessages);
 }
 
 function renderFilesView() {
   const snapshot = apiSnapshot();
   const allResources = snapshot?.coaching?.resources || (clientName ? loadResourcesForClient(clientName) : []);
   const checklists = allResources.filter((resource) => resource.kind === "checklist");
+  const files = shouldUseClientApi() ? state.apiFiles : loadPreviewList(PREVIEW_FILES_KEY);
   document.getElementById("files-content").innerHTML = `
     <div class="section-heading"><h2>Files</h2></div>
+    <div class="client-message-layout" style="margin-bottom:18px;">
+      <article class="card">
+        <h3>Upload a File</h3>
+        <p class="hint">Share media kits, brand assets, one-sheets, contracts, or other materials with Tenyse.</p>
+        <div class="entry-form">
+          <div class="field-row">
+            <label for="client-file-input">File</label>
+            <input id="client-file-input" type="file" />
+          </div>
+          <div class="field-row">
+            <label for="client-file-notes">Notes</label>
+            <textarea id="client-file-notes" rows="3" placeholder="Optional context for Tenyse"></textarea>
+          </div>
+          <button class="btn-primary" type="button" id="client-file-submit">Upload File</button>
+          <span id="client-file-result" class="inline-confirmation"></span>
+        </div>
+      </article>
+      <article class="card">
+        <div class="section-heading"><h2>Uploaded Files</h2></div>
+        <div id="client-uploaded-files"></div>
+      </article>
+    </div>
     <div class="resource-library-grid">
       ${
         checklists.length
@@ -824,6 +1005,92 @@ function renderFilesView() {
       }
     </div>
   `;
+  renderClientFilesList(files);
+  if (shouldUseClientApi() && state.apiFilesStatus === "idle") refreshClientFiles();
+  document.getElementById("client-file-submit").addEventListener("click", async () => {
+    const fileInput = document.getElementById("client-file-input");
+    const notesInput = document.getElementById("client-file-notes");
+    const result = document.getElementById("client-file-result");
+    const button = document.getElementById("client-file-submit");
+    const file = fileInput.files?.[0];
+    if (!file) {
+      result.textContent = "Choose a file first.";
+      return;
+    }
+    button.disabled = true;
+    result.textContent = "Uploading...";
+    try {
+      if (shouldUseClientApi()) {
+        const dataBase64 = await fileToDataBase64(file);
+        await postClientApiFile({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          dataBase64,
+          notes: notesInput.value.trim(),
+        });
+        await refreshClientFiles({ rerender: false });
+      } else {
+        addPreviewFile({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          notes: notesInput.value.trim(),
+        });
+        renderClientFilesList(loadPreviewList(PREVIEW_FILES_KEY));
+      }
+      fileInput.value = "";
+      notesInput.value = "";
+      result.textContent = "File uploaded.";
+    } catch (err) {
+      result.textContent = err.message || "File could not be uploaded right now.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+function renderClientFilesList(files) {
+  const list = document.getElementById("client-uploaded-files");
+  if (!list) return;
+  if (shouldUseClientApi() && state.apiFilesStatus === "loading") {
+    list.innerHTML = `<div class="state-panel compact"><p>Loading files...</p></div>`;
+    return;
+  }
+  if (!files.length) {
+    list.innerHTML = `<p class="hint">Uploaded materials will appear here.</p>`;
+    return;
+  }
+  list.innerHTML = `
+    <div class="upcoming-list">
+      ${files
+        .map(
+          (file) => `
+        <div class="upcoming-item">
+          <span class="upcoming-icon">▧</span>
+          <div>
+            <strong>${escapeHtml(file.fileName)}</strong>
+            <small>${escapeHtml(formatFileSize(file.sizeBytes))}${file.notes ? ` · ${escapeHtml(file.notes)}` : ""}</small>
+          </div>
+          ${file.downloadUrl ? `<a class="btn-secondary" href="${escapeHtml(file.downloadUrl)}" target="_blank" rel="noreferrer">Open</a>` : statusBadge("Saved", "success")}
+        </div>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+async function refreshClientFiles({ rerender = true } = {}) {
+  if (!shouldUseClientApi()) return;
+  state.apiFilesStatus = "loading";
+  if (rerender && state.view === "files") renderClientFilesList(state.apiFiles);
+  try {
+    state.apiFiles = await loadClientApiFiles();
+    state.apiFilesStatus = "loaded";
+  } catch (err) {
+    state.apiFilesStatus = "error";
+    state.apiFiles = [];
+  }
+  if (state.view === "files") renderClientFilesList(state.apiFiles);
 }
 
 function renderCurrentView() {
@@ -882,7 +1149,7 @@ function renderCampaignDetailView() {
       .catch((err) => {
         state.apiNotesStatusByCampaign[campaign.id] = "error";
         state.apiNotesByCampaign[campaign.id] = [
-          { id: "notes-error", authorName: "System", authorRole: "system", body: `Couldn't load notes: ${err.message}`, createdAt: new Date().toISOString() },
+          { id: "notes-error", authorName: "Verified Consulting", authorRole: "system", body: "Notes will appear here once the live client connection is active.", createdAt: new Date().toISOString() },
         ];
         if (state.view === "campaign-detail" && state.selectedCampaignId === campaign.id) renderCampaignDetailView();
       });

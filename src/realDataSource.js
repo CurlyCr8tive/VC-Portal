@@ -20,7 +20,7 @@ import { loadPlacements } from "./storage.js";
 import { loadCampaigns } from "./campaignStorage.js";
 import { loadSummary } from "./summaryStorage.js";
 import { loadClients, findClientByName } from "./clientStorage.js";
-import { computeLeadTimeDays } from "./calculations.js";
+import { leadTimeDaysForPlacement } from "./calculations.js";
 import { classifyMediaType } from "./mediaType.js";
 import { DEMO_FALLBACKS, applyDemoMetricFallbacks } from "./demoFallbacks.js";
 
@@ -119,7 +119,7 @@ export function getRealMetrics(clientName) {
   // different statement from "not calculated yet".
   const withAve = confirmed.filter((p) => p.aveValue != null);
   const totalAVE = withAve.length ? withAve.reduce((sum, p) => sum + p.aveValue, 0) : null;
-  const leadTimes = items.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
+  const leadTimes = items.map(leadTimeDaysForPlacement).filter((lt) => lt != null);
   // null (not 0) when no placement has both dates yet — 0 would silently
   // claim "same-day turnaround," which isn't what "no data" means. See
   // getAggregateRealMetrics below for why this distinction also has to
@@ -162,7 +162,7 @@ export function getRealCampaigns(clientName) {
   }
 
   const derived = [...byCampaign.entries()].map(([name, rows]) => {
-    const leadTimes = rows.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((lt) => lt != null);
+    const leadTimes = rows.map(leadTimeDaysForPlacement).filter((lt) => lt != null);
     const record = findRealCampaignRecord(name, clientName);
     return {
       id: record ? record.id : slugify(name),
@@ -393,7 +393,7 @@ export function getAnalyticsSummary() {
         const fallbackCount = placements.filter((p) => p.clientName === c.name).length;
         return fallbackCount ? { client: c.name, avgDays: DEMO_FALLBACKS.avgLeadTimeDays, count: fallbackCount, sample: true } : null;
       }
-      const days = clientPlacements.map((p) => computeLeadTimeDays(p.pitchSentDate, p.landedDate)).filter((d) => d != null);
+      const days = clientPlacements.map(leadTimeDaysForPlacement).filter((d) => d != null);
       if (!days.length) return null;
       return { client: c.name, avgDays: Math.round(days.reduce((a, b) => a + b, 0) / days.length), count: days.length };
     })

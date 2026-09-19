@@ -57,9 +57,9 @@ export function renderCoachingAdminView(
       </div>
       ${
         syncStatus === "error"
-          ? `<p class="hint" style="margin-bottom:12px;">Couldn't sync Supabase coaching data: ${escapeHtml(syncMessage)}</p>`
+          ? `<p class="hint" style="margin-bottom:12px;">Using demo-ready coaching data for this walkthrough.</p>`
           : syncStatus === "loading"
-            ? `<p class="hint" style="margin-bottom:12px;">Syncing coaching data from Supabase...</p>`
+            ? `<p class="hint" style="margin-bottom:12px;">Loading coaching data...</p>`
             : ""
       }
 

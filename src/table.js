@@ -1,4 +1,4 @@
-import { computeLeadTimeDays, formatCurrency, formatDate } from "./calculations.js";
+import { leadTimeDaysForPlacement, formatCurrency, formatDate } from "./calculations.js";
 
 function escapeHtml(str) {
   const div = document.createElement("div");
@@ -15,7 +15,7 @@ export function renderTable(placements, tbodyEl, emptyStateEl, countEl, onDelete
   const sorted = [...placements].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   for (const p of sorted) {
-    const leadTime = computeLeadTimeDays(p.pitchSentDate, p.landedDate);
+    const leadTime = leadTimeDaysForPlacement(p);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(p.publication)}</td>
