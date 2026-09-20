@@ -13,6 +13,7 @@ import { renderPhaseTrackerView } from "./PhaseTrackerView.js?v=20260917-client-
 import { renderOpportunityEvaluator } from "./OpportunityEvaluator.js?v=20260918-info-popover";
 import { renderCoachingResourceLibrary } from "./CoachingResourceLibrary.js?v=20260918-then-fix";
 import { sectionInfoButton } from "./InfoPopover.js";
+import { calculateCoachingProgress } from "../../coachingProgress.js";
 
 const TABS = [
   { id: "phases", label: "Phase Tracker" },
@@ -63,7 +64,6 @@ export function renderCoachingAdminView(
             : ""
       }
 
-      <div class="section-heading"><h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">Enrolled Clients</h3></div>
       ${
         coachingClients.length === 0
           ? `<div class="state-panel" style="margin-bottom:20px;">
@@ -71,25 +71,17 @@ export function renderCoachingAdminView(
         <h3>No coaching clients enrolled yet</h3>
         <p>Add a client via Clients → Edit Info and set Engagement Type to Coaching to enroll them here.</p>
       </div>`
-          : `<div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-        ${coachingClients
-          .map(
-            (c) => `
-          <div class="card" style="${selectedClient === c.name ? "border-color:var(--color-coral);" : ""}">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-              <h3 style="margin:0 0 4px; color:var(--color-navy);">${escapeHtml(c.name)}</h3>
-              ${coachingClients.length > 1 ? `<button type="button" class="btn-secondary" data-select-client="${escapeHtml(c.name)}">${selectedClient === c.name ? "Selected" : "Manage"}</button>` : ""}
-            </div>
-            ${c.industry ? `<p style="margin:0 0 6px; font-size:0.82rem; color:var(--text-secondary);">${escapeHtml(c.industry)}</p>` : ""}
-            ${c.notes ? `<p style="margin:0; font-size:0.85rem;">${escapeHtml(c.notes)}</p>` : ""}
-          </div>`
-          )
-          .join("")}
-      </div>`
+          : ownerClientSwitcherHtml()
       }
 
       ${selectedClient ? programToolsHtml() : ""}
     `;
+
+    container.querySelector("#coaching-client-select")?.addEventListener("change", (event) => {
+      selectedClient = event.target.value;
+      activeTab = "phases";
+      render();
+    });
 
     container.querySelectorAll("[data-select-client]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -102,12 +94,79 @@ export function renderCoachingAdminView(
     if (selectedClient) wireTabs();
   }
 
-  function programToolsHtml() {
+  function ownerClientSwitcherHtml() {
+    const selected = coachingClients.find((client) => client.name === selectedClient) || coachingClients[0];
     return `
-      <div class="section-heading" style="margin-top:24px;">
-        <h3 style="margin:0; font-size:0.95rem; color:var(--color-navy);">${escapeHtml(selectedClient)}'s Program</h3>
-      </div>
-      <div style="display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid var(--border-light); padding-bottom:10px;">
+      <section class="card owner-coaching-switcher">
+        <div>
+          <p class="eyebrow">Owner coaching workspace</p>
+          <h3>Manage one client program at a time</h3>
+          <p class="hint">Tenyse can switch clients here, review progress, update homework, track opportunities, and manage the resources/checklist the client sees.</p>
+        </div>
+        <div class="owner-coaching-select-block">
+          <label for="coaching-client-select">Coaching client</label>
+          <select id="coaching-client-select">
+            ${coachingClients
+              .map((client) => `<option value="${escapeHtml(client.name)}" ${client.name === selectedClient ? "selected" : ""}>${escapeHtml(client.name)}</option>`)
+              .join("")}
+          </select>
+          ${selected?.industry ? `<p>${escapeHtml(selected.industry)}</p>` : ""}
+        </div>
+      </section>
+    `;
+  }
+
+  function programToolsHtml() {
+    const selected = coachingClients.find((client) => client.name === selectedClient);
+    const clientData = coachingDataForClient ? coachingDataForClient(selectedClient) : null;
+    const phases = clientData?.phases || [];
+    const resources = clientData?.resources || [];
+    const opportunities = clientData?.opportunities || [];
+    const homework = phases.flatMap((phase) => (phase.homework || []).map((item) => ({ ...item, phaseName: phase.name, phaseNumber: phase.phaseNumber })));
+    const openHomework = homework.filter((item) => item.type !== "standing" && item.status !== "complete");
+    const completedHomework = homework.filter((item) => item.type !== "standing" && item.status === "complete");
+    const currentPhase = [...phases].reverse().find((phase) => phase.status === "in_progress") || phases.find((phase) => phase.status === "not_started") || phases[phases.length - 1];
+    const progress = calculateCoachingProgress({ phases, resources, opportunities });
+    const reachedPhases = phases.filter((phase) => phase.status === "complete" || phase.status === "in_progress").length;
+    const nextHomework = openHomework[0];
+
+    return `
+      <section class="owner-coaching-hero">
+        <div>
+          <p class="eyebrow">${escapeHtml(selectedClient)}'s program</p>
+          <h3>Visibility to Revenue — 90-Day Sprint</h3>
+          <p>${escapeHtml(selected?.notes || "Track the client’s phases, assignments, resources, incoming opportunities, and communication flow from one owner workspace.")}</p>
+        </div>
+        <div class="owner-coaching-hero-grid">
+          <div><span>${phases.length ? `${reachedPhases}/${phases.length}` : "0/0"}</span><small>Phases reached</small></div>
+          <div><span>${progress.homework.percent}%</span><small>Homework complete</small></div>
+          <div><span>${resources.length}</span><small>Resources/checklist</small></div>
+          <div><span>${opportunities.length}</span><small>Opportunities logged</small></div>
+        </div>
+      </section>
+
+      <section class="owner-coaching-detail-grid">
+        <article class="card live-card" tabindex="0" data-live-tip="${escapeHtml(currentPhase ? `Current phase: ${currentPhase.name}` : "Load a program template to begin tracking phases.")}">
+          <p class="eyebrow">Current focus</p>
+          <h3>${currentPhase ? `Phase ${escapeHtml(String(currentPhase.phaseNumber))}: ${escapeHtml(currentPhase.name)}` : "No phases loaded yet"}</h3>
+          <p>${escapeHtml(currentPhase?.goal || "Load the VAAM program template, then customize the phase goals and deliverables for this client.")}</p>
+          <div class="live-tip-panel" role="tooltip"><strong>Current focus</strong><p>${escapeHtml(currentPhase?.notes || "This gives Tenyse the coaching context before the next call.")}</p><span>Use Phase Tracker below to edit details.</span></div>
+        </article>
+        <article class="card live-card" tabindex="0" data-live-tip="${escapeHtml(nextHomework ? `Next assignment: ${nextHomework.text}` : "No open homework right now.")}">
+          <p class="eyebrow">Homework & assignments</p>
+          <h3>${openHomework.length} open · ${completedHomework.length} complete</h3>
+          <p>${nextHomework ? `${nextHomework.text}${nextHomework.dueDate ? ` · due ${nextHomework.dueDate}` : ""}` : "Add homework in the Phase Tracker to make the between-call workflow visible."}</p>
+          <div class="live-tip-panel" role="tooltip"><strong>Assignment tracking</strong><p>Homework belongs to phases, can be marked not started/in progress/complete, and reflection responses show up for Tenyse to review.</p><span>Open Phase Tracker → Homework.</span></div>
+        </article>
+        <article class="card live-card" tabindex="0" data-live-tip="Communication stays tied to coaching context: homework, reflections, opportunity review, and files/resources.">
+          <p class="eyebrow">Communication flow</p>
+          <h3>Coach follows up from the work</h3>
+          <p>Client reflections, opportunity submissions, shared resources, and missing assets all live beside the roadmap so Tenyse can prepare for the next call without searching across tools.</p>
+          <div class="live-tip-panel" role="tooltip"><strong>Communication flow</strong><p>This is the operating layer: what the client owes, what Tenyse reviews, and what needs follow-up.</p><span>Use Resources & Checklist plus Opportunity Evaluator.</span></div>
+        </article>
+      </section>
+
+      <div class="coaching-admin-tabs">
         ${TABS.map(
           (t) => `<button type="button" class="${activeTab === t.id ? "btn-primary" : "btn-secondary"}" data-tab="${t.id}">${t.label}</button>`
         ).join("")}

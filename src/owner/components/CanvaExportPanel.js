@@ -25,23 +25,30 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
 
       <div class="entry-form">
         <div class="field-row">
-          <label for="canva-export-client">Client</label>
+          <label for="canva-export-client">Report package</label>
           <select id="canva-export-client">
             ${clients.length === 0 ? `<option value="">No clients yet</option>` : ""}
-            ${clients.map((c) => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join("")}
+            ${clients.map((c) => `<option value="${escapeHtml(c.name)}" data-report-target="${escapeHtml(c.id || "")}">${escapeHtml(c.name)}</option>`).join("")}
           </select>
+        </div>
+        <div id="canva-window-helper" class="report-window-helper"></div>
+        <div class="report-date-presets" aria-label="Quick reporting windows">
+          <button type="button" class="btn-secondary" data-range-preset="full">Use full coverage window</button>
+          <button type="button" class="btn-secondary" data-range-preset="90">Last 90 days</button>
+          <button type="button" class="btn-secondary" data-range-preset="year">This year</button>
         </div>
         <div class="field-row two-col">
           <div>
-            <label for="canva-export-start">From (publication date)</label>
+            <label for="canva-export-start">Report starts</label>
             <input type="date" id="canva-export-start" />
           </div>
           <div>
-            <label for="canva-export-end">To</label>
+            <label for="canva-export-end">Report ends</label>
             <input type="date" id="canva-export-end" />
           </div>
         </div>
-        <div class="form-actions">
+        <div class="form-actions report-export-actions">
+          <button type="button" class="btn-secondary" id="canva-export-review-summary" ${clients.length === 0 ? "disabled" : ""}>Review + approve summary</button>
           <button type="button" class="btn-primary" id="canva-export-generate" ${clients.length === 0 ? "disabled" : ""}>Download Canva CSV</button>
         </div>
       </div>
@@ -55,6 +62,7 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
   const summaryStatusEl = container.querySelector("#canva-summary-status");
   const startInput = container.querySelector("#canva-export-start");
   const endInput = container.querySelector("#canva-export-end");
+  const windowHelper = container.querySelector("#canva-window-helper");
 
   // Shown before generating, not after — silently exporting without an
   // approved summary should read as a visible choice, not a surprise
@@ -70,6 +78,37 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     const range = clientName && getDateRangeForClient ? getDateRangeForClient(clientName) : null;
     startInput.value = range?.startDate || "";
     endInput.value = range?.endDate || "";
+    renderWindowHelper(windowHelper, range);
+  }
+
+  function selectedCoverageRange() {
+    const clientName = clientSelect.value;
+    return clientName && getDateRangeForClient ? getDateRangeForClient(clientName) : null;
+  }
+
+  function applyPreset(preset) {
+    const range = selectedCoverageRange();
+    if (!range?.startDate || !range?.endDate) {
+      startInput.value = "";
+      endInput.value = "";
+      renderWindowHelper(windowHelper, null);
+      return;
+    }
+    const end = new Date(`${range.endDate}T00:00:00`);
+    let start = new Date(`${range.startDate}T00:00:00`);
+    if (preset === "90") {
+      start = new Date(end);
+      start.setDate(start.getDate() - 89);
+      const floor = new Date(`${range.startDate}T00:00:00`);
+      if (start < floor) start = floor;
+    }
+    if (preset === "year") {
+      start = new Date(end.getFullYear(), 0, 1);
+      const floor = new Date(`${range.startDate}T00:00:00`);
+      if (start < floor) start = floor;
+    }
+    startInput.value = start.toISOString().slice(0, 10);
+    endInput.value = range.endDate;
   }
 
   if (clients.length > 0) {
@@ -82,6 +121,24 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     updateSummaryStatus();
   }
 
+  container.querySelectorAll("[data-range-preset]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyPreset(btn.dataset.rangePreset);
+      resultEl.innerHTML = "";
+    });
+  });
+
+  container.querySelector("#canva-export-review-summary").addEventListener("click", () => {
+    const selected = clientSelect.selectedOptions[0];
+    const targetId = selected?.dataset.reportTarget;
+    const target = targetId ? document.getElementById(`summary-form-${targetId}`) : null;
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.classList.add("report-work-card-highlight");
+      window.setTimeout(() => target.classList.remove("report-work-card-highlight"), 1600);
+    }
+  });
+
   container.querySelector("#canva-export-generate").addEventListener("click", () => {
     const clientName = clientSelect.value;
     const startDate = container.querySelector("#canva-export-start").value;
@@ -91,11 +148,22 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
   });
 }
 
+function renderWindowHelper(el, range) {
+  if (!el) return;
+  if (!range?.startDate || !range?.endDate) {
+    el.innerHTML = `<p class="hint">No dated placements found yet for this client. Approving the summary can still create a summary-only Canva file.</p>`;
+    return;
+  }
+  el.innerHTML = `
+    <p class="hint">Available coverage window: <strong>${escapeHtml(range.startDate)}</strong> to <strong>${escapeHtml(range.endDate)}</strong>. Use the full window for demo day unless you want a narrower report.</p>
+  `;
+}
+
 function renderSummaryStatus(el, approvedSummary) {
   if (!approvedSummary) {
     el.innerHTML = `
       <div class="warn" style="background:#fff8e6; border:1px solid #f0ddab; color:#7a5c15; border-radius:var(--radius-md); padding:10px 14px; font-size:0.82rem;">
-        No approved executive summary yet. The placement rows can still export, but approve the summary below first if this report should include the narrative headline.
+        <strong>Approval needed:</strong> review the Executive Summary below, click <strong>Save Draft</strong>, then <strong>Approve</strong>. Placement rows can still export, but the approved summary is what gives the Canva report its client-ready narrative.
       </div>
     `;
     return;

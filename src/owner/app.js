@@ -35,7 +35,7 @@ import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
 import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260919-dashboard-alive";
-import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-report-builder";
+import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-analytics-clicks";
 import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-live-ui";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-live-ui";
 import { renderPlacementForm } from "./components/PlacementForm.js";
@@ -43,7 +43,7 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js?v=20260919-report-builder";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260919-live-ui";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
-import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260918-then-fix";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260920-owner-coaching-workspace";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js?v=20260919-report-builder";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-live-ui";
@@ -1587,11 +1587,23 @@ async function findPitchDateInGmail({ clientName, publication, headline }) {
 
 async function scheduleClientMeeting({ clientName, contactEmail, notes, startDate, startTime }) {
   if (!shouldUseOwnerApi()) {
-  return {
-    ok: true,
-    demo: true,
-    message: `Demo meeting scheduled for ${clientName || "this client"} on ${startDate} at ${startTime}. Google Calendar connection is deferred until after Demo Day.`,
-  };
+    return {
+      ok: true,
+      demo: true,
+      message: `Demo meeting scheduled for ${clientName || "this client"} on ${startDate} at ${startTime}. Google Calendar connection is deferred until after Demo Day.`,
+    };
+  }
+
+  try {
+    const result = await ownerApi("/api/google/calendar/events", {
+      method: "POST",
+      body: JSON.stringify({ clientName, contactEmail, notes, startDate, startTime, durationMinutes: 30 }),
+    });
+    if (result.available === false) return { ok: false, ...result };
+    return { ok: true, ...result };
+  } catch (err) {
+    return { ok: false, message: err.message };
+  }
 }
 
 async function loadClientCommunicationPanel({ type, clientId, clientName }) {
@@ -1715,17 +1727,6 @@ function renderClientCommunicationPanelBody() {
     </div>
   `;
 }
-  try {
-    const result = await ownerApi("/api/google/calendar/events", {
-      method: "POST",
-      body: JSON.stringify({ clientName, contactEmail, notes, startDate, startTime, durationMinutes: 30 }),
-    });
-    if (result.available === false) return { ok: false, ...result };
-    return { ok: true, ...result };
-  } catch (err) {
-    return { ok: false, message: err.message };
-  }
-}
 
 async function loadGoogleWorkspaceStatus() {
   const statusEl = document.getElementById("google-workspace-status");
@@ -1775,6 +1776,7 @@ function renderClientsView() {
         <option value="all" ${state.clientStatusFilter === "all" ? "selected" : ""}>All clients</option>
         <option value="active" ${state.clientStatusFilter === "active" ? "selected" : ""}>Current (Active)</option>
         <option value="past" ${state.clientStatusFilter === "past" ? "selected" : ""}>Previous (Past / Portfolio)</option>
+        <option value="unconfirmed" ${state.clientStatusFilter === "unconfirmed" ? "selected" : ""}>Needs confirmation</option>
       </select>
     </div>
     ${renderClientCommunicationPanel()}
@@ -2463,7 +2465,7 @@ function renderSummaryForm(container, clientName) {
     ${statusLine}
     <div class="entry-form">
       <div class="field-row" style="margin-bottom:10px;">
-        <textarea id="summary-text-${cssId(clientName)}" rows="4" placeholder="e.g. [Problem] Coverage was limited to local outlets. [Solution] We pitched an industry-specific angle to trade press. [Results] Landed 3 placements reaching 200K+ readers, building toward national pickup next period.">${existing ? existing.text : ""}</textarea>
+        <textarea id="summary-text-${cssId(clientName)}" class="report-ai-textarea" rows="10" placeholder="e.g. [Problem] Coverage was limited to local outlets. [Solution] We pitched an industry-specific angle to trade press. [Results] Landed 3 placements reaching 200K+ readers, building toward national pickup next period.">${existing ? existing.text : ""}</textarea>
       </div>
       <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
@@ -2534,7 +2536,7 @@ function renderReportNarrativeForm(container, clientName) {
     <p class="hint" style="margin:0 0 10px;">The fuller campaign story for the report document — longer and more scene-setting than the Executive Summary card above. Generate it from the same placement data, review it, then copy it into Tenyse's final client-facing report.</p>
     <div class="entry-form">
       <div class="field-row" style="margin-bottom:10px;">
-        <textarea id="narrative-text-${cssId(clientName)}" rows="4" placeholder="Click Generate to draft this from ${escapeHtml(clientName)}'s real confirmed placements." readonly></textarea>
+        <textarea id="narrative-text-${cssId(clientName)}" class="report-ai-textarea report-narrative-textarea" rows="12" placeholder="Click Generate to draft this from ${escapeHtml(clientName)}'s real confirmed placements." readonly></textarea>
       </div>
       <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">Generate</button>
@@ -2922,6 +2924,35 @@ function renderAnalyticsView() {
   renderStatusBreakdownChart(document.getElementById("analytics-status"), summary.statusBreakdown);
   renderSentimentChart(document.getElementById("analytics-sentiment"), summary.sentimentBreakdown);
   renderLeadTimeSection(document.getElementById("analytics-lead-time"), summary.leadTime);
+
+  const openAnalyticsDrilldown = (el) => {
+    const action = el.dataset.analyticsAction;
+    const value = el.dataset.analyticsValue;
+    if (action === "client") {
+      state.dashboardClientFilter = value;
+      state.dashboardDateFrom = "";
+      state.dashboardDateTo = "";
+      navigate("dashboard");
+      return;
+    }
+    if (action === "status") {
+      state.clientStatusFilter = value === "past" || value === "active" || value === "unconfirmed" ? value : "all";
+      navigate("clients");
+      return;
+    }
+    if (action === "sentiment") {
+      navigate("placements");
+    }
+  };
+
+  container.querySelectorAll("[data-analytics-action]").forEach((el) => {
+    el.addEventListener("click", () => openAnalyticsDrilldown(el));
+    el.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      openAnalyticsDrilldown(el);
+    });
+  });
 }
 
 function renderSettingsView() {

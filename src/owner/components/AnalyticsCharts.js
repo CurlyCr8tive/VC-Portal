@@ -11,10 +11,13 @@
 import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 import { escapeHtml } from "../../client/utils.js";
 
-function barRow({ label, value, max, formatValue, color, sublabel }) {
+function barRow({ label, value, max, formatValue, color, sublabel, actionType = "", actionValue = "", tip = "" }) {
   const pct = max > 0 ? Math.max(2, Math.round((value / max) * 100)) : 0;
+  const interactiveAttrs = actionType
+    ? ` role="button" tabindex="0" data-analytics-action="${escapeHtml(actionType)}" data-analytics-value="${escapeHtml(actionValue || label)}" data-live-tip="${escapeHtml(tip || `${label}: ${formatValue(value)}`)}"`
+    : "";
   return `
-    <div class="analytics-bar-row">
+    <div class="analytics-bar-row ${actionType ? "analytics-bar-button" : ""}"${interactiveAttrs}>
       <div class="analytics-bar-label">
         <span>${escapeHtml(label)}</span>
         <strong>${escapeHtml(formatValue(value))}</strong>
@@ -23,6 +26,7 @@ function barRow({ label, value, max, formatValue, color, sublabel }) {
         <div class="analytics-bar-fill" style="width:${pct}%; background:${color};"></div>
       </div>
       ${sublabel ? `<div class="hint" style="margin-top:2px;">${sublabel}</div>` : ""}
+      ${actionType ? `<div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(label)}</strong><p>${escapeHtml(tip || `${label}: ${formatValue(value)}`)}</p><span>Click to drill into this slice.</span></div>` : ""}
     </div>`;
 }
 
@@ -43,7 +47,7 @@ export function renderAveByClientChart(container, aveByClient) {
       const flaggedPct = 100 - confirmedPct;
       const widthPct = Math.max(2, Math.round((r.total / max) * 100));
       return `
-      <div class="analytics-bar-row">
+      <div class="analytics-bar-row analytics-bar-button" role="button" tabindex="0" data-analytics-action="client" data-analytics-value="${escapeHtml(r.client)}" data-live-tip="${escapeHtml(`${r.client}: ${formatCurrency(r.total)} total publicity value. Click to filter the dashboard to this client.`)}">
         <div class="analytics-bar-label">
           <span>${escapeHtml(r.client)}</span>
           <strong>${escapeHtml(formatCurrency(r.total))}</strong>
@@ -53,6 +57,7 @@ export function renderAveByClientChart(container, aveByClient) {
           ${r.flagged > 0 ? `<div class="analytics-bar-fill" style="width:${flaggedPct}%; background:#b8860b;" title="Flagged (estimate or data-quality issue): ${escapeHtml(formatCurrency(r.flagged))}"></div>` : ""}
         </div>
         ${r.flagged > 0 ? `<div class="hint" style="margin-top:2px;">${escapeHtml(formatCurrency(r.flagged))} of this rests on an estimated or flagged figure — see Press Placements for which.</div>` : ""}
+        <div class="live-tip-panel" role="tooltip"><strong>${escapeHtml(r.client)}</strong><p>${escapeHtml(`${formatCurrency(r.total)} total publicity value. Confirmed: ${formatCurrency(r.confirmed)}. Estimated/flagged: ${formatCurrency(r.flagged)}.`)}</p><span>Click to filter the owner dashboard to this client.</span></div>
       </div>`;
     })
     .join("");
@@ -84,6 +89,9 @@ export function renderStatusBreakdownChart(container, statusBreakdown) {
         max,
         formatValue: (v) => `${v} client${v === 1 ? "" : "s"}`,
         color: STATUS_COLORS[r.status] || "var(--color-navy)",
+        actionType: "status",
+        actionValue: r.status,
+        tip: `${STATUS_LABELS[r.status] || r.status}: ${r.count} client${r.count === 1 ? "" : "s"}. Click to open the Clients page.`,
       })
     )
     .join("");
@@ -108,6 +116,9 @@ export function renderSentimentChart(container, sentimentBreakdown) {
           max,
           formatValue: (v) => `${v} placement${v === 1 ? "" : "s"}`,
           color: SENTIMENT_COLORS[r.sentiment] || "var(--color-navy)",
+          actionType: "sentiment",
+          actionValue: r.sentiment,
+          tip: `${r.sentiment === "not set" ? "Not set" : r.sentiment[0].toUpperCase() + r.sentiment.slice(1)}: ${r.count} placement${r.count === 1 ? "" : "s"}. Click to inspect placements.`,
         })
       )
       .join("") +
@@ -132,6 +143,9 @@ export function renderLeadTimeSection(container, leadTime) {
             max: Math.max(...byClient.map((x) => x.avgDays), 1),
             formatValue: (v) => `${v} day${v === 1 ? "" : "s"} avg`,
             color: "var(--color-navy)",
+            actionType: "client",
+            actionValue: r.client,
+            tip: `${r.client}: ${r.avgDays} day average lead time, based on ${r.count} placement${r.count === 1 ? "" : "s"}. Click to filter the dashboard to this client.`,
             sublabel: r.sample
               ? `Demo Day sample based on ${r.count} placement${r.count === 1 ? "" : "s"} missing pitch dates`
               : `based on ${r.count} placement${r.count === 1 ? "" : "s"} with both a pitch and landed date`,

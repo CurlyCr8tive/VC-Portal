@@ -1979,6 +1979,18 @@ table.placements-table {
   margin-top: 14px;
 }
 
+.entry-form textarea.report-ai-textarea {
+  min-height: 220px;
+  max-height: 560px;
+  resize: vertical;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.entry-form textarea.report-narrative-textarea {
+  min-height: 260px;
+}
+
 .report-export-card {
   border-color: #f0d4ca;
   background: linear-gradient(135deg, #fff, #fff8f5);
@@ -1992,6 +2004,46 @@ table.placements-table {
   padding: 10px 14px;
   margin-bottom: 14px;
   font-size: 0.82rem;
+}
+
+.report-window-helper {
+  margin: -4px 0 12px;
+}
+
+.report-window-helper .hint {
+  margin: 0;
+}
+
+.report-date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.report-date-presets .btn-secondary {
+  padding: 7px 12px;
+  font-size: 0.78rem;
+}
+
+.report-export-actions {
+  align-items: center;
+}
+
+.report-work-card-highlight {
+  animation: reportFocusPulse 1.5s ease;
+}
+
+@keyframes reportFocusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(231, 109, 84, 0.35);
+  }
+  45% {
+    box-shadow: 0 0 0 8px rgba(231, 109, 84, 0.12);
+  }
+  100% {
+    box-shadow: var(--shadow-sm);
+  }
 }
 
 .btn-primary,
@@ -2120,6 +2172,56 @@ table.placements-table {
 .client-dashboard-grid .card {
   border-radius: var(--radius-md);
   padding: 16px;
+}
+
+.coaching-interest-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  border-color: rgba(232, 108, 84, 0.34);
+  background:
+    linear-gradient(135deg, rgba(232, 108, 84, 0.1), rgba(255, 255, 255, 0) 46%),
+    #fff;
+}
+
+.coaching-interest-copy h2 {
+  margin: 4px 0 8px;
+  color: var(--color-navy);
+  font-size: 1.34rem;
+}
+
+.coaching-interest-copy p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.coaching-interest-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.coaching-request-form,
+.coaching-request-confirmation {
+  grid-column: 1 / -1;
+}
+
+.coaching-request-form {
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.coaching-request-confirmation {
+  padding: 12px 14px;
+  border: 1px solid rgba(69, 163, 151, 0.35);
+  border-radius: var(--radius-sm);
+  background: var(--color-teal-tint);
+  color: var(--color-deep-teal);
+  font-weight: 700;
 }
 
 /* ---------- Client coaching program page ---------- */
@@ -2583,6 +2685,128 @@ table.placements-table {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
+}
+
+.owner-coaching-switcher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.35fr);
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.owner-coaching-switcher h3 {
+  color: var(--color-navy);
+  margin: 2px 0 6px;
+}
+
+.owner-coaching-select-block label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.owner-coaching-select-block select {
+  width: 100%;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--color-navy);
+  background: #fff;
+}
+
+.owner-coaching-select-block p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.owner-coaching-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.55fr);
+  gap: 20px;
+  align-items: center;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin: 0 0 18px;
+  background: linear-gradient(135deg, #fff, #fff8f4);
+  box-shadow: var(--shadow-sm);
+}
+
+.owner-coaching-hero h3 {
+  color: var(--color-navy);
+  font-size: 1.5rem;
+  margin: 2px 0 8px;
+}
+
+.owner-coaching-hero p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.owner-coaching-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.owner-coaching-hero-grid div {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.owner-coaching-hero-grid span {
+  display: block;
+  color: var(--color-navy);
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.owner-coaching-hero-grid small {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
+.owner-coaching-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.owner-coaching-detail-grid .card {
+  position: relative;
+}
+
+.owner-coaching-detail-grid h3 {
+  color: var(--color-navy);
+  margin: 2px 0 8px;
+  font-size: 1.05rem;
+}
+
+.owner-coaching-detail-grid p:not(.eyebrow) {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.42;
+}
+
+.coaching-admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .cp-action-card {
@@ -3425,7 +3649,10 @@ table.placements-table {
 
   .cp-hero,
   .cp-layout,
-  .cp-phase-content {
+  .cp-phase-content,
+  .owner-coaching-switcher,
+  .owner-coaching-hero,
+  .owner-coaching-detail-grid {
     grid-template-columns: 1fr;
   }
 
@@ -3608,6 +3835,38 @@ table.placements-table {
 
 .analytics-bar-row {
   width: 100%;
+  position: relative;
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
+  transition:
+    background 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.analytics-bar-button {
+  cursor: pointer;
+}
+
+.analytics-bar-button:hover,
+.analytics-bar-button:focus-visible {
+  background: #fff8f4;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(31, 42, 82, 0.08);
+  outline: none;
+  z-index: 35;
+}
+
+.analytics-bar-button:hover .analytics-bar-fill,
+.analytics-bar-button:focus-visible .analytics-bar-fill {
+  filter: saturate(1.15);
+}
+
+.analytics-bar-button:hover .live-tip-panel,
+.analytics-bar-button:focus-visible .live-tip-panel,
+.analytics-bar-button:focus-within .live-tip-panel {
+  opacity: 1;
+  transform: translateY(6px);
 }
 
 .analytics-bar-label {

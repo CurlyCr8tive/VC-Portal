@@ -74,6 +74,8 @@ const state = {
   apiMessagesStatus: "idle",
   apiFiles: [],
   apiFilesStatus: "idle",
+  coachingRequestOpen: false,
+  coachingRequestStatus: "",
 };
 
 const PREVIEW_MESSAGES_KEY = "vc_preview_client_messages_v1";
@@ -121,6 +123,15 @@ function addPreviewMessage({ subject, body }) {
   };
   savePreviewList(PREVIEW_MESSAGES_KEY, [row, ...rows]);
   return row;
+}
+
+async function sendClientMessage({ subject, body }) {
+  if (shouldUseClientApi()) {
+    await postClientApiMessage({ subject, body });
+    await refreshClientMessages({ rerender: false });
+    return;
+  }
+  addPreviewMessage({ subject, body });
 }
 
 function addPreviewFile({ fileName, mimeType, sizeBytes, notes }) {
@@ -449,6 +460,7 @@ function renderClientPrDashboard(target) {
       </section>
     </div>
     <section class="section" id="dashboard-insight-wrap"></section>
+    ${!supportsCoaching() ? renderCoachingInterestCard() : ""}
     <section class="section">
       <div class="section-heading">
         <h2>Latest Report</h2>
@@ -479,8 +491,87 @@ function renderClientPrDashboard(target) {
   renderInsightCard(document.getElementById("dashboard-insight-wrap"), getInsight(state.clientId));
   renderReportCard(document.getElementById("dashboard-report"), getReport(state.clientId));
 
+  wireCoachingInterestCard(target);
+
   target.querySelectorAll("[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.goto));
+  });
+}
+
+function renderCoachingInterestCard() {
+  const statusMarkup = state.coachingRequestStatus
+    ? `<div class="coaching-request-confirmation" role="status">${escapeHtml(state.coachingRequestStatus)}</div>`
+    : "";
+
+  return `
+    <section class="section">
+      <article class="card coaching-interest-card live-card" tabindex="0" data-live-tip="Coaching requests are saved as messages for Tenyse so she can follow up from the owner portal.">
+        <div class="coaching-interest-copy">
+          <span class="eyebrow">Next growth step</span>
+          <h2>Want help turning visibility into revenue?</h2>
+          <p>Ask Tenyse about adding the Visibility to Revenue coaching track. She can review your current press momentum, talk through goals, and recommend the right next step.</p>
+        </div>
+        <div class="coaching-interest-actions">
+          <button class="new-client-btn" type="button" data-open-coaching-request>${state.coachingRequestOpen ? "Hide Request Form" : "Request Coaching Info"}</button>
+          <button class="btn-secondary" type="button" data-goto="messages">Message Tenyse</button>
+        </div>
+        ${
+          state.coachingRequestOpen
+            ? `<div class="coaching-request-form entry-form">
+                <div class="field-row">
+                  <label for="coaching-request-goal">What would you like coaching support with?</label>
+                  <textarea id="coaching-request-goal" rows="4" placeholder="Example: I want help turning recent press into partnerships, better positioning, or a revenue opportunity."></textarea>
+                </div>
+                <div class="report-export-actions">
+                  <button class="btn-primary" type="button" data-submit-coaching-request>Send Request to Tenyse</button>
+                  <span class="hint">This becomes a client message in the portal.</span>
+                </div>
+              </div>`
+            : ""
+        }
+        ${statusMarkup}
+        <div class="live-tip-panel" role="tooltip">
+          <strong>What happens next</strong>
+          <p>The request is saved as a client message for Tenyse. In a live setup, the same route can also trigger an email notification.</p>
+          <span>Client only sees their own request history.</span>
+        </div>
+      </article>
+    </section>
+  `;
+}
+
+function wireCoachingInterestCard(target) {
+  target.querySelector("[data-open-coaching-request]")?.addEventListener("click", () => {
+    state.coachingRequestOpen = !state.coachingRequestOpen;
+    state.coachingRequestStatus = "";
+    renderDashboard();
+  });
+
+  target.querySelector("[data-submit-coaching-request]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const textarea = document.getElementById("coaching-request-goal");
+    const goal = textarea?.value.trim() || "";
+    if (!goal) {
+      state.coachingRequestStatus = "Add a quick note so Tenyse knows what you want help with.";
+      renderDashboard();
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Sending...";
+    try {
+      const client = currentClientForChrome();
+      await sendClientMessage({
+        subject: "Coaching request: Visibility to Revenue",
+        body: `${client.name} is interested in learning more about the Visibility to Revenue coaching track.\n\nClient goal:\n${goal}\n\nRequested from the PR dashboard.`,
+      });
+      state.coachingRequestOpen = false;
+      state.coachingRequestStatus = "Request sent to Tenyse. She can follow up from Messages.";
+      renderDashboard();
+    } catch (err) {
+      state.coachingRequestStatus = err.message || "The request could not be sent right now. Try again from Messages.";
+      renderDashboard();
+    }
   });
 }
 
@@ -898,13 +989,8 @@ function renderMessagesView() {
     button.disabled = true;
     result.textContent = "Sending...";
     try {
-      if (shouldUseClientApi()) {
-        await postClientApiMessage({ subject, body });
-        await refreshClientMessages({ rerender: false });
-      } else {
-        addPreviewMessage({ subject, body });
-        renderClientMessageList(loadPreviewList(PREVIEW_MESSAGES_KEY));
-      }
+      await sendClientMessage({ subject, body });
+      renderClientMessageList(shouldUseClientApi() ? state.apiMessages : loadPreviewList(PREVIEW_MESSAGES_KEY));
       subjectEl.value = "";
       bodyEl.value = "";
       result.textContent = "Message sent to Tenyse.";
