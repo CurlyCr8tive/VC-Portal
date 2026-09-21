@@ -33,10 +33,11 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
         </div>
         <div id="canva-window-helper" class="report-window-helper"></div>
         <div class="report-date-presets" aria-label="Quick reporting windows">
-          <button type="button" class="btn-secondary" data-range-preset="full">Use full coverage window</button>
-          <button type="button" class="btn-secondary" data-range-preset="90">Last 90 days</button>
-          <button type="button" class="btn-secondary" data-range-preset="year">This year</button>
+          <button type="button" class="btn-secondary report-window-button" data-range-preset="full" aria-pressed="false">Use full coverage window</button>
+          <button type="button" class="btn-secondary report-window-button" data-range-preset="90" aria-pressed="false">Last 90 days</button>
+          <button type="button" class="btn-secondary report-window-button" data-range-preset="year" aria-pressed="false">This year</button>
         </div>
+        <div id="canva-window-feedback" class="report-window-feedback" aria-live="polite"></div>
         <div class="field-row two-col">
           <div>
             <label for="canva-export-start">Report starts</label>
@@ -63,6 +64,8 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
   const startInput = container.querySelector("#canva-export-start");
   const endInput = container.querySelector("#canva-export-end");
   const windowHelper = container.querySelector("#canva-window-helper");
+  const windowFeedback = container.querySelector("#canva-window-feedback");
+  const presetButtons = Array.from(container.querySelectorAll("[data-range-preset]"));
 
   // Shown before generating, not after — silently exporting without an
   // approved summary should read as a visible choice, not a surprise
@@ -79,6 +82,8 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     startInput.value = range?.startDate || "";
     endInput.value = range?.endDate || "";
     renderWindowHelper(windowHelper, range);
+    setActivePreset("full");
+    renderWindowFeedback(windowFeedback, range, "full");
   }
 
   function selectedCoverageRange() {
@@ -92,7 +97,9 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
       startInput.value = "";
       endInput.value = "";
       renderWindowHelper(windowHelper, null);
-      return;
+      setActivePreset(preset);
+      renderWindowFeedback(windowFeedback, null, preset);
+      return null;
     }
     const end = new Date(`${range.endDate}T00:00:00`);
     let start = new Date(`${range.startDate}T00:00:00`);
@@ -107,8 +114,25 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
       const floor = new Date(`${range.startDate}T00:00:00`);
       if (start < floor) start = floor;
     }
-    startInput.value = start.toISOString().slice(0, 10);
+    const selectedRange = {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: range.endDate,
+      coverageStartDate: range.startDate,
+      coverageEndDate: range.endDate,
+    };
+    startInput.value = selectedRange.startDate;
     endInput.value = range.endDate;
+    setActivePreset(preset);
+    renderWindowFeedback(windowFeedback, selectedRange, preset);
+    return selectedRange;
+  }
+
+  function setActivePreset(preset) {
+    presetButtons.forEach((btn) => {
+      const active = btn.dataset.rangePreset === preset;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", String(active));
+    });
   }
 
   if (clients.length > 0) {
@@ -121,9 +145,17 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     updateSummaryStatus();
   }
 
-  container.querySelectorAll("[data-range-preset]").forEach((btn) => {
+  presetButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       applyPreset(btn.dataset.rangePreset);
+      resultEl.innerHTML = "";
+    });
+  });
+
+  [startInput, endInput].forEach((input) => {
+    input.addEventListener("change", () => {
+      setActivePreset("");
+      renderWindowFeedback(windowFeedback, { startDate: startInput.value, endDate: endInput.value }, "custom");
       resultEl.innerHTML = "";
     });
   });
@@ -136,7 +168,20 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
       target.scrollIntoView({ behavior: "smooth", block: "center" });
       target.classList.add("report-work-card-highlight");
       window.setTimeout(() => target.classList.remove("report-work-card-highlight"), 1600);
+      resultEl.innerHTML = `
+        <div class="report-action-feedback success">
+          <strong>Summary workspace opened for ${escapeHtml(clientSelect.value)}.</strong>
+          Review the AI draft, click <strong>Save Draft</strong>, then <strong>Approve</strong> so Canva receives the client-ready narrative.
+        </div>
+      `;
+      return;
     }
+    resultEl.innerHTML = `
+      <div class="report-action-feedback warn">
+        <strong>No summary editor found for ${escapeHtml(clientSelect.value || "this client")}.</strong>
+        Try another report package, or export placement rows without a narrative summary.
+      </div>
+    `;
   });
 
   container.querySelector("#canva-export-generate").addEventListener("click", () => {
@@ -146,6 +191,38 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
     const result = onGenerate({ clientName, startDate, endDate });
     renderResult(resultEl, result);
   });
+}
+
+function renderWindowFeedback(el, range, preset) {
+  if (!el) return;
+  const labels = {
+    full: "Full coverage window selected",
+    90: "Last 90 days selected",
+    year: "This year selected",
+    custom: "Custom report window selected",
+  };
+
+  if (!range?.startDate || !range?.endDate) {
+    el.innerHTML = `
+      <p><strong>${escapeHtml(labels[preset] || "Report window selected")}:</strong> no dated placements are available yet, so this can only export an approved summary.</p>
+    `;
+    return;
+  }
+
+  const sameAsFull =
+    range.coverageStartDate &&
+    range.coverageEndDate &&
+    range.startDate === range.coverageStartDate &&
+    range.endDate === range.coverageEndDate &&
+    preset !== "full";
+
+  el.innerHTML = `
+    <p>
+      <strong>${escapeHtml(labels[preset] || "Report window selected")}:</strong>
+      ${escapeHtml(range.startDate)} to ${escapeHtml(range.endDate)}.
+      ${sameAsFull ? "This client only has coverage inside that available window, so the preset resolves to the full demo range." : ""}
+    </p>
+  `;
 }
 
 function renderWindowHelper(el, range) {

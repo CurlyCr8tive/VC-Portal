@@ -2153,8 +2153,63 @@ table.placements-table {
   font-size: 0.78rem;
 }
 
+.report-window-button {
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.report-window-button:hover,
+.report-window-button:focus-visible {
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 3px rgba(69, 166, 157, 0.14);
+  transform: translateY(-1px);
+}
+
+.report-window-button.active {
+  background: #f0fbf8;
+  border-color: var(--color-teal);
+  box-shadow: inset 3px 0 0 var(--color-teal);
+  color: var(--color-navy);
+}
+
+.report-window-feedback {
+  min-height: 34px;
+  margin: -2px 0 12px;
+  border-radius: var(--radius-md);
+  background: #f7fbfa;
+  border: 1px solid #cfe9e4;
+  color: #2c6e65;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+}
+
+.report-window-feedback p {
+  margin: 0;
+}
+
 .report-export-actions {
   align-items: center;
+}
+
+.report-action-feedback {
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 0.84rem;
+}
+
+.report-action-feedback.success {
+  background: #eafaf6;
+  border: 1px solid #bfe8dc;
+  color: #146c56;
+}
+
+.report-action-feedback.warn {
+  background: #fff8e6;
+  border: 1px solid #f0ddab;
+  color: #7a5c15;
 }
 
 .report-work-card-highlight {
