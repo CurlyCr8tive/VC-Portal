@@ -444,20 +444,12 @@ function ownerMetricCard({ label, value, note, icon, iconBg, tooltip, target, ac
   return `
     <div class="card metric-card owner-metric-card${interactiveClass}"${interactionAttrs}>
       <div class="metric-top">
-        <span class="metric-label">${escapeHtml(label)}${tooltip ? ` <span class="info-icon metric-info-icon" aria-hidden="true">i</span>` : ""}</span>
+        <span class="metric-label">${escapeHtml(label)}</span>
         <span class="metric-icon" style="background:${iconBg}">${icon}</span>
       </div>
       <p class="metric-value">${escapeHtml(String(value))}</p>
       ${note ? `<p class="metric-delta positive">${escapeHtml(note)}</p>` : ""}
-      ${
-        tooltip
-          ? `<div class="metric-hover-panel" role="tooltip">
-        <strong>${escapeHtml(label)}</strong>
-        <p>${escapeHtml(tooltip)}</p>
-        ${actionLabel ? `<button type="button" class="metric-hover-action" data-metric-action="${escapeHtml(target || "")}">${escapeHtml(actionLabel)}</button>` : ""}
-      </div>`
-          : ""
-      }
+      ${target ? `<p class="metric-click-hint">${escapeHtml(actionLabel || "Open details")}</p>` : tooltip ? `<p class="metric-click-hint">${escapeHtml(tooltip)}</p>` : ""}
     </div>
   `;
 }
@@ -723,16 +715,9 @@ function renderOwnerMetrics(container, metrics) {
 function wireMetricCardNavigation(container) {
   container.querySelectorAll("[data-metric-goto]").forEach((card) => {
     const openTarget = (target = card.dataset.metricGoto) => {
-      card.classList.remove("show-hover-panel");
       navigate(target);
     };
-    card.querySelector(".metric-hover-action")?.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openTarget(event.currentTarget.dataset.metricAction || card.dataset.metricGoto);
-    });
     card.addEventListener("click", (event) => {
-      if (event.target.closest(".metric-hover-panel")) return;
       openTarget();
     });
     card.addEventListener("keydown", (e) => {
@@ -740,10 +725,6 @@ function wireMetricCardNavigation(container) {
       e.preventDefault();
       openTarget();
     });
-  });
-  document.addEventListener("click", (event) => {
-    if (event.target.closest(".owner-metric-card")) return;
-    document.querySelectorAll(".owner-metric-card.show-hover-panel").forEach((card) => card.classList.remove("show-hover-panel"));
   });
 }
 
@@ -2712,20 +2693,12 @@ function reportsMetricCard({ label, value, delta, icon, iconBg, tooltip, target,
   return `
     <div class="card metric-card owner-metric-card${interactiveClass}"${interactionAttrs}>
       <div class="metric-top">
-        <span class="metric-label">${escapeHtml(label)}${tooltip ? ` <span class="info-icon metric-info-icon" aria-hidden="true">i</span>` : ""}</span>
+        <span class="metric-label">${escapeHtml(label)}</span>
         <span class="metric-icon" style="background:${iconBg}">${icon}</span>
       </div>
       <p class="metric-value">${escapeHtml(value)}</p>
       ${deltaHtml}
-      ${
-        tooltip
-          ? `<div class="metric-hover-panel" role="tooltip">
-        <strong>${escapeHtml(label)}</strong>
-        <p>${escapeHtml(tooltip)}</p>
-        ${actionLabel ? `<button type="button" class="metric-hover-action" data-metric-action="${escapeHtml(target || "")}">${escapeHtml(actionLabel)}</button>` : ""}
-      </div>`
-          : ""
-      }
+      ${target ? `<p class="metric-click-hint">${escapeHtml(actionLabel || "Open details")}</p>` : tooltip ? `<p class="metric-click-hint">${escapeHtml(tooltip)}</p>` : ""}
     </div>
   `;
 }

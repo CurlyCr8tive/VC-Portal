@@ -33,6 +33,9 @@ export function renderCampaignDetail(
     .sort((a, b) => b.value - a.value)
     .slice(0, 3)
     .filter(({ placement }) => placement.publication || placement.headline);
+  const allProofPoints = placementValues
+    .filter(({ placement }) => placement.publication || placement.headline)
+    .sort((a, b) => b.value - a.value);
   const formatMoney = (value) =>
     new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -78,7 +81,7 @@ export function renderCampaignDetail(
       showAiTools
         ? `<div class="section-heading"><h2>Campaign Value Workspace</h2></div>
     <div class="campaign-value-workspace">
-      <div class="campaign-value-story-card live-card" tabindex="0" data-live-tip="${escapeHtml(`${campaign.name} created ${formatMoney(totalValue)} in estimated publicity value across ${publishedPlacements} visible press wins.`)}">
+      <div class="campaign-value-story-card">
         <p class="section-kicker">What Tenyse can show</p>
         <h3>${escapeHtml(campaign.name)} created ${formatMoney(totalValue)} in estimated publicity value.</h3>
         <p>
@@ -88,19 +91,20 @@ export function renderCampaignDetail(
           ${hasEstimatedValue ? " Estimated value is shown where the source data gives reach but not a stored dollar amount." : ""}
         </p>
         <div class="campaign-value-metrics">
-          <div class="mini-live-stat" data-live-tip="${escapeHtml(`Estimated publicity value: ${formatMoney(totalValue)}.`)}">
+          <button type="button" class="mini-live-stat campaign-metric-button active" data-campaign-metric="value">
             <span>Estimated value</span>
             <strong>${formatMoney(totalValue)}</strong>
-          </div>
-          <div class="mini-live-stat" data-live-tip="${escapeHtml(`${publishedPlacements} visible press wins are counted in this campaign story.`)}">
+          </button>
+          <button type="button" class="mini-live-stat campaign-metric-button" data-campaign-metric="placements">
             <span>Press wins</span>
             <strong>${publishedPlacements}</strong>
-          </div>
-          <div class="mini-live-stat" data-live-tip="${escapeHtml(avgLeadTime ? `Average lead time is ${avgLeadTime} days from pitch activity to coverage.` : "Lead time needs pitch and landed dates.")}">
+          </button>
+          <button type="button" class="mini-live-stat campaign-metric-button" data-campaign-metric="lead-time">
             <span>Avg. lead time</span>
             <strong>${avgLeadTime ? `${avgLeadTime} days` : "Needs dates"}</strong>
-          </div>
+          </button>
         </div>
+        <div id="campaign-metric-detail" class="campaign-metric-detail" aria-live="polite"></div>
         ${
           strongestPlacements.length
             ? `<div class="campaign-proof-points">
@@ -119,7 +123,6 @@ export function renderCampaignDetail(
         </div>`
             : ""
         }
-        <div class="live-tip-panel" role="tooltip"><strong>Campaign Value Workspace</strong><p>${escapeHtml(`This turns placements into a client-ready value story: ${formatMoney(totalValue)}, ${publishedPlacements} wins, and ${avgLeadTime ? `${avgLeadTime} day average lead time` : "lead time still needing dates"}.`)}</p><span>Use the AI cards to draft the update and next pitch.</span></div>
       </div>
       ${
         onGenerateActivitySummary
@@ -185,6 +188,7 @@ export function renderCampaignDetail(
   renderPlacementsTable(document.getElementById("campaign-detail-placements"), placements, { showClient });
 
   container.querySelector("#campaign-detail-back").addEventListener("click", onBack);
+  wireCampaignMetricDetails();
 
   if (onGenerateActivitySummary) {
     const btn = container.querySelector("#campaign-activity-generate");
@@ -221,4 +225,56 @@ export function renderCampaignDetail(
     const textarea = document.getElementById("campaign-note-body");
     await onAddNote(textarea.value, currentUser);
   });
+
+  function wireCampaignMetricDetails() {
+    const detailEl = container.querySelector("#campaign-metric-detail");
+    const metricButtons = container.querySelectorAll("[data-campaign-metric]");
+    if (!detailEl || !metricButtons.length) return;
+    const details = {
+      value: {
+        title: "What feeds this value",
+        body:
+          totalValue > 0
+            ? `${formatMoney(totalValue)} is calculated from the tracked placement value rows in this campaign. ${hasEstimatedValue ? "Some rows use estimated/demo-ready value because the source data does not include a confirmed per-outlet AVE." : "The value shown comes from saved placement AVE values."}`
+            : "No placement value is saved for this campaign yet.",
+        rows: allProofPoints.map(({ placement, value, estimated }) => `${placement.publication || "Placement"}${placement.headline ? ` — ${placement.headline}` : ""}: ${formatMoney(value)}${estimated ? " estimated" : ""}`),
+      },
+      placements: {
+        title: "Which press wins count",
+        body: `${publishedPlacements} placement${publishedPlacements === 1 ? "" : "s"} count because they have a published status, landed date, or source URL. This is what feeds the report and client update story.`,
+        rows: placements
+          .filter((placement) => placement.status === "published" || placement.landedDate || placement.url || placement.articleUrl)
+          .map((placement) => `${placement.publication || "Outlet not named"}${placement.headline ? ` — ${placement.headline}` : ""}${placement.landedDate ? ` (${placement.landedDate})` : ""}`),
+      },
+      "lead-time": {
+        title: "How lead time is calculated",
+        body: avgLeadTime
+          ? `${avgLeadTime} days is the average path from pitch date to landed date across placements where both dates are available.`
+          : "Lead time needs both pitch and landed dates before it can be calculated.",
+        rows: placements
+          .map((placement) => {
+            const days = leadTimeDaysForPlacement(placement);
+            return Number.isFinite(days) && days > 0 ? `${placement.publication || "Placement"}: ${days} days` : null;
+          })
+          .filter(Boolean),
+      },
+    };
+    const renderDetail = (key) => {
+      const detail = details[key] || details.value;
+      detailEl.innerHTML = `
+        <strong>${escapeHtml(detail.title)}</strong>
+        <p>${escapeHtml(detail.body)}</p>
+        ${
+          detail.rows.length
+            ? `<ul>${detail.rows.slice(0, 6).map((row) => `<li>${escapeHtml(row)}</li>`).join("")}</ul>`
+            : `<p class="hint">No source rows available yet.</p>`
+        }
+      `;
+      metricButtons.forEach((button) => button.classList.toggle("active", button.dataset.campaignMetric === key));
+    };
+    metricButtons.forEach((button) => {
+      button.addEventListener("click", () => renderDetail(button.dataset.campaignMetric));
+    });
+    renderDetail("value");
+  }
 }
