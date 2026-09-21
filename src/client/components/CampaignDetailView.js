@@ -195,7 +195,7 @@ export function renderCampaignDetail(
       const result = await onGenerateActivitySummary({ campaign, placements, notes });
       btn.disabled = false;
       resultEl.innerHTML = result.ok
-        ? `<strong>Suggested client update</strong><p>${escapeHtml(result.text)}</p>`
+        ? `<strong>Suggested client update</strong><p>${escapeHtml(result.text).replace(/\n/g, "<br>")}</p>`
         : `<p>${escapeHtml(result.message)}</p>`;
     });
   }

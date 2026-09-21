@@ -60,7 +60,7 @@ import { createPhase, applyPhaseEdit, addHomeworkItem, updateHomeworkStatus, res
 import { createOpportunity, applyOpportunityEdit } from "../opportunitySchema.js";
 import { createResource, applyResourceEdit } from "../coachingResourceSchema.js";
 import { calculateCoachingProgress } from "../coachingProgress.js";
-import { applyDemoMetricFallbacks } from "../demoFallbacks.js";
+import { applyDemoMetricFallbacks, demoAVEForPlacement } from "../demoFallbacks.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
@@ -3271,11 +3271,34 @@ function renderCampaignDetailView() {
       // prompt's own "near-real-time check-in" framing.
       const sinceDate = camp.startDate || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const newPlacements = campPlacements.filter((p) => p.landedDate && p.landedDate >= sinceDate);
+      const enrichedPlacements = campPlacements.map((placement, index) => ({
+        publication: placement.publication,
+        headline: placement.headline,
+        publicationDate: placement.publicationDate || placement.landedDate || "",
+        landedDate: placement.landedDate || "",
+        articleUrl: placement.articleUrl || placement.url || "",
+        audienceReach: placement.audienceReach,
+        ave: placement.ave ?? placement.aveValue ?? demoAVEForPlacement(placement, index),
+        sentiment: placement.sentiment || "",
+      }));
+      const campaignValue = enrichedPlacements.reduce((sum, placement) => sum + (Number(placement.ave) || 0), 0);
+      const leadTimes = campPlacements.map(leadTimeDaysForPlacement).filter((days) => Number.isFinite(days) && days > 0);
+      const averageLeadTimeDays = leadTimes.length ? Math.round(leadTimes.reduce((sum, days) => sum + days, 0) / leadTimes.length) : null;
+      const proofPoints = enrichedPlacements
+        .filter((placement) => placement.publication || placement.headline)
+        .sort((a, b) => (Number(b.ave) || 0) - (Number(a.ave) || 0))
+        .slice(0, 6)
+        .map((placement) => `${placement.publication || "Placement"}${placement.headline ? ` — ${placement.headline}` : ""}${placement.ave ? ` ($${Number(placement.ave).toLocaleString()})` : ""}`);
       return generateAIText("campaign-activity-summary", {
         client: camp.clientName,
         campaignName: camp.name,
         sinceDate,
         newPlacements,
+        placements: enrichedPlacements,
+        campaignValue,
+        publishedPlacements: campPlacements.filter((p) => p.status === "published" || p.landedDate || p.url || p.articleUrl).length,
+        averageLeadTimeDays,
+        proofPoints,
         milestonesUpdated: [], // no per-milestone timestamp exists yet to say which changed "since" a date
         recentNotes: notes,
       });
