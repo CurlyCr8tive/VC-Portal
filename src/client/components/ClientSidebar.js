@@ -7,6 +7,8 @@ const PR_NAV_ITEMS = [
   { id: "reports", label: "Reports & Results", icon: "▥" },
   { id: "analytics", label: "Analytics", icon: "⌘" },
   { id: "resources", label: "Resources", icon: "□" },
+  { id: "messages", label: "Messages", icon: "✉" },
+  { id: "files", label: "Files", icon: "▱" },
 ];
 const COACHING_NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "⌂" },

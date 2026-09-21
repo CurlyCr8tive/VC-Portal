@@ -49,7 +49,13 @@ import { renderOutletRatesView } from "./components/OutletRatesView.js?v=2026091
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-live-ui";
 import { loadPhasesForClient, addPhase as addLocalPhase, updatePhase as updateLocalPhase } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient, addResource as addLocalResource, updateResource as updateLocalResource, deleteResource as deleteLocalResource } from "../coachingResourceStorage.js";
-import { loadOpportunitiesForClient, addOpportunity as addLocalOpportunity, updateOpportunity as updateLocalOpportunity, deleteOpportunity as deleteLocalOpportunity } from "../opportunityStorage.js";
+import {
+  isRehearsalPlaceholderOpportunity,
+  loadOpportunitiesForClient,
+  addOpportunity as addLocalOpportunity,
+  updateOpportunity as updateLocalOpportunity,
+  deleteOpportunity as deleteLocalOpportunity,
+} from "../opportunityStorage.js?v=20260921-pr-clickflow";
 import { createPhase, applyPhaseEdit, addHomeworkItem, updateHomeworkStatus, respondToReflection, removeHomeworkItem } from "../coachingPhaseSchema.js";
 import { createOpportunity, applyOpportunityEdit } from "../opportunitySchema.js";
 import { createResource, applyResourceEdit } from "../coachingResourceSchema.js";
@@ -193,6 +199,7 @@ const state = {
       discoveredDate: "2026-04-10",
     },
   ],
+  demoDiscoveryQueue: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -447,7 +454,7 @@ function ownerMetricCard({ label, value, note, icon, iconBg, tooltip, target, ac
           ? `<div class="metric-hover-panel" role="tooltip">
         <strong>${escapeHtml(label)}</strong>
         <p>${escapeHtml(tooltip)}</p>
-        ${actionLabel ? `<span>${escapeHtml(actionLabel)}</span>` : ""}
+        ${actionLabel ? `<button type="button" class="metric-hover-action" data-metric-action="${escapeHtml(target || "")}">${escapeHtml(actionLabel)}</button>` : ""}
       </div>`
           : ""
       }
@@ -715,13 +722,28 @@ function renderOwnerMetrics(container, metrics) {
 
 function wireMetricCardNavigation(container) {
   container.querySelectorAll("[data-metric-goto]").forEach((card) => {
-    const openTarget = () => navigate(card.dataset.metricGoto);
-    card.addEventListener("click", openTarget);
+    const openTarget = (target = card.dataset.metricGoto) => {
+      card.classList.remove("show-hover-panel");
+      navigate(target);
+    };
+    card.querySelector(".metric-hover-action")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openTarget(event.currentTarget.dataset.metricAction || card.dataset.metricGoto);
+    });
+    card.addEventListener("click", (event) => {
+      if (event.target.closest(".metric-hover-panel")) return;
+      openTarget();
+    });
     card.addEventListener("keydown", (e) => {
       if (e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
       openTarget();
     });
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest(".owner-metric-card")) return;
+    document.querySelectorAll(".owner-metric-card.show-hover-panel").forEach((card) => card.classList.remove("show-hover-panel"));
   });
 }
 
@@ -1213,7 +1235,7 @@ function coachingDataForClient(clientName) {
   const data = state.realCoachingData || { phases: [], opportunities: [], resources: [] };
   return {
     phases: (data.phases || []).filter((phase) => phase.client === clientName).sort((a, b) => a.phaseNumber - b.phaseNumber),
-    opportunities: (data.opportunities || []).filter((opportunity) => opportunity.client === clientName),
+    opportunities: (data.opportunities || []).filter((opportunity) => opportunity.client === clientName && !isRehearsalPlaceholderOpportunity(opportunity)),
     resources: (data.resources || []).filter((resource) => resource.client === clientName),
   };
 }
@@ -1499,7 +1521,7 @@ async function inviteClient({ clientId, clientName, email }) {
 
 async function discoveryScanClient({ clientName }) {
   const resolved = await resolveRealClientId(clientName);
-  if (!resolved.ok) return resolved;
+  if (!resolved.ok) return demoDiscoveryPreviewResult(clientName, resolved.message);
   try {
     const res = await fetch(`${OWNER_API_BASE}/api/clients/${encodeURIComponent(resolved.id)}/discovery-scan`, {
       method: "POST",
@@ -1507,12 +1529,37 @@ async function discoveryScanClient({ clientName }) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: body.message || "Scan could not complete. Check search setup and try again." };
+      return demoDiscoveryPreviewResult(clientName, body.message || "Live scan could not complete.");
     }
     return { ok: true, ...body };
   } catch (err) {
-    return { ok: false, message: "Scan could not complete. Check search setup and try again." };
+    return demoDiscoveryPreviewResult(clientName, "Live scan could not complete.");
   }
+}
+
+function demoDiscoveryPreviewResult(clientName, reason = "") {
+  const name = clientName || "this client";
+  const existing = state.demoDiscoveryQueue.some((item) => item.client === name);
+  if (!existing) {
+    state.demoDiscoveryQueue.unshift({
+      id: `demo-discovery-${Date.now()}`,
+      publication: "Demo Discovery Source",
+      headline: `${name} mention surfaced for owner review`,
+      articleUrl: "https://example.com/demo-discovery-source",
+      client: name,
+      matchedOn: `${name} + configured keywords`,
+      discoveredDate: new Date().toISOString().slice(0, 10),
+      demoOnly: true,
+    });
+  }
+  return {
+    ok: true,
+    demoPreview: true,
+    scanned: 3,
+    matched: 1,
+    inserted: existing ? 0 : 1,
+    message: reason ? `Demo-safe scan preview added to Review Queue. ${reason}` : "Demo-safe scan preview added to Review Queue.",
+  };
 }
 
 /**
@@ -1564,12 +1611,23 @@ async function researchOutletRate(outletName) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { available: false, error: "Using the saved Demo Day estimate for this outlet." };
+      return demoAveResearchResult(outletName);
     }
-    return body;
+    if (body.available) return body;
+    return demoAveResearchResult(outletName, body.error);
   } catch (err) {
-    return { available: false, error: "Using the saved Demo Day estimate for this outlet." };
+    return demoAveResearchResult(outletName);
   }
+}
+
+function demoAveResearchResult(outletName, reason = "") {
+  const outlet = outletName || "this outlet";
+  return {
+    available: true,
+    demoPreview: true,
+    source: "Demo Day fallback estimate, review before saving",
+    suggestion: `${outlet}: live research is unavailable in this moment${reason ? ` (${reason})` : ""}. For the demo, use this as a review-only fallback: compare the outlet against similar digital publication placements, enter a conservative AVE manually, and save it only after Tenyse approves the source. This keeps the AVE workflow alive without inventing a confirmed rate.`,
+  };
 }
 
 async function findPitchDateInGmail({ clientName, publication, headline }) {
@@ -1748,6 +1806,48 @@ async function loadGoogleWorkspaceStatus() {
       "<strong>Deferred until after Demo Day:</strong> sample lead-time data is active now. Add Google OAuth credentials later for Gmail search, note notifications, and Calendar scheduling.";
   } catch (err) {
     statusEl.textContent = `Could not check Google Workspace status: ${err.message}`;
+  }
+}
+
+function renderAgentStatusCards(status) {
+  const agents = Object.values(status?.agents || {});
+  if (!agents.length) {
+    return `<p class="hint">Agent readiness is unavailable until the owner API is running.</p>`;
+  }
+  return `
+    <div class="agent-status-grid">
+      ${agents
+        .map(
+          (agent) => `
+          <article class="agent-status-card ${agent.canRunLive ? "ready" : "needs-config"}">
+            <span>${agent.canRunLive ? "Live" : "Needs key"}</span>
+            <h3>${escapeHtml(agent.label)}</h3>
+            <p>${escapeHtml(agent.note || "")}</p>
+            <small>${escapeHtml(agent.requiredEnv?.join(" + ") || "")}</small>
+          </article>`
+        )
+        .join("")}
+    </div>
+    <p class="hint" style="margin-top:10px;">Demo-safe means the UI can be rehearsed without writing client-facing data automatically. Live means the external service is configured for fresh runs.</p>
+  `;
+}
+
+async function loadAgentReadinessStatus() {
+  const statusEl = document.getElementById("agent-readiness-status");
+  if (!statusEl) return;
+  statusEl.innerHTML = `<p class="hint">Checking agent readiness...</p>`;
+  try {
+    const res = await fetch(`${OWNER_API_BASE}/api/agent-status`, { headers: await demoCapableJsonHeaders() });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.message || `Agent status unavailable (${res.status}).`);
+    statusEl.innerHTML = renderAgentStatusCards(body);
+  } catch (err) {
+    statusEl.innerHTML = `
+      <div class="state-panel compact">
+        <h3>Owner API is not reachable</h3>
+        <p>Start the owner API to check live agent credentials. The local demo still has seeded report, AVE, sentiment, and discovery preview paths.</p>
+      </div>
+    `;
   }
 }
 
@@ -2324,7 +2424,7 @@ async function loadRealReviewQueue() {
       discoveredDate: row.discovered_at ? row.discovered_at.slice(0, 10) : "",
     }));
 
-    renderReviewQueue(listEl, items, {
+    renderReviewQueue(listEl, [...state.demoDiscoveryQueue, ...items], {
       confirmLabel: "Create Placement",
       showPlacementDetails: true,
       onConfirm: (id, details) => createPlacementFromReviewQueueItem(id, details),
@@ -2336,6 +2436,11 @@ async function loadRealReviewQueue() {
 }
 
 async function resolveRealReviewQueueItem(id, status) {
+  if (String(id).startsWith("demo-discovery-")) {
+    state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
+    loadRealReviewQueue();
+    return;
+  }
   try {
     const res = await fetch(`${OWNER_API_BASE}/api/review-queue/${encodeURIComponent(id)}`, {
       method: "PATCH",
@@ -2354,6 +2459,10 @@ async function resolveRealReviewQueueItem(id, status) {
 }
 
 async function createPlacementFromReviewQueueItem(id, details = {}) {
+  if (String(id).startsWith("demo-discovery-")) {
+    alert("Demo discovery candidate reviewed. Sign in as the live owner before creating a client-facing placement from a candidate source.");
+    return;
+  }
   // Deliberately real-auth only, unlike the rest of this view — turning a
   // candidate into a real placement is the one write here a client could
   // eventually see, so a demo session can review and reject but not finalize.
@@ -2613,7 +2722,7 @@ function reportsMetricCard({ label, value, delta, icon, iconBg, tooltip, target,
           ? `<div class="metric-hover-panel" role="tooltip">
         <strong>${escapeHtml(label)}</strong>
         <p>${escapeHtml(tooltip)}</p>
-        ${actionLabel ? `<span>${escapeHtml(actionLabel)}</span>` : ""}
+        ${actionLabel ? `<button type="button" class="metric-hover-action" data-metric-action="${escapeHtml(target || "")}">${escapeHtml(actionLabel)}</button>` : ""}
       </div>`
           : ""
       }
@@ -2977,6 +3086,11 @@ function renderSettingsView() {
           </div>`
         : ""
     }
+    <div class="section-heading" style="margin-top:24px;"><h2>AI Agent Readiness</h2></div>
+    <div class="card">
+      <p class="hint" style="margin:0 0 12px;">Shows which agent workflows can run live from configured services and which are currently using demo-safe fallbacks.</p>
+      <div id="agent-readiness-status"></div>
+    </div>
     <div class="section-heading" style="margin-top:24px;"><h2>Google Workspace</h2></div>
     <div class="card">
       <p style="margin:0 0 10px;">Google Workspace connection is on hold until after Demo Day.</p>
@@ -3010,6 +3124,7 @@ function renderSettingsView() {
 
   renderOutletRatesView(document.getElementById("outlet-rates-wrap"));
   if (devTools) renderErrorLogPanel(document.getElementById("error-log-wrap"));
+  loadAgentReadinessStatus();
   loadGoogleWorkspaceStatus();
 
   document.getElementById("seed-real-case-study-btn")?.addEventListener("click", () => {

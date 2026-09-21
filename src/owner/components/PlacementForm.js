@@ -168,8 +168,9 @@ export function renderPlacementForm(
           <input type="number" id="op-audienceReach" name="audienceReach" min="0" step="1" placeholder="e.g. 1500000" value="${val(initialData, "audienceReach")}" />
           <p class="hint" style="margin-top:6px;">Leave blank unless you have a real reach figure for this specific placement — an unknown reach shouldn't be entered as 0.</p>
         </div>
-        <div class="field-row" style="margin-bottom:0;">
-          <label for="op-sentiment">Sentiment</label>
+        <div class="field-row sentiment-agent-box" style="margin-bottom:0;">
+          <label for="op-sentiment">Sentiment Agent</label>
+          <p class="hint" style="margin:0 0 8px;">Analyze the publication/headline, suggest the coverage tone, then let Tenyse confirm or edit it before saving.</p>
           <div style="display:flex; gap:6px;">
             <select id="op-sentiment" name="sentiment" style="flex:1;">
               <option value="" ${!val(initialData, "sentiment") ? "selected" : ""}>Not set</option>
@@ -177,9 +178,8 @@ export function renderPlacementForm(
               <option value="neutral" ${val(initialData, "sentiment") === "neutral" ? "selected" : ""}>Neutral</option>
               <option value="negative" ${val(initialData, "sentiment") === "negative" ? "selected" : ""}>Negative</option>
             </select>
-            ${onAnalyzeSentiment ? `<button type="button" class="btn-secondary" id="op-sentiment-analyze">Analyze</button>` : ""}
+            ${onAnalyzeSentiment ? `<button type="button" class="btn-secondary" id="op-sentiment-analyze">Analyze Tone</button>` : ""}
           </div>
-          <p class="hint" style="margin-top:6px;">This is your own read on the coverage's tone${onAnalyzeSentiment ? " — or click Analyze for an AI suggestion, still editable after" : ", set by hand"}.</p>
           ${onAnalyzeSentiment ? `<div id="op-sentiment-result" style="margin-top:6px; font-size:0.8rem;"></div>` : ""}
         </div>
       </details>
@@ -415,14 +415,14 @@ export function renderPlacementForm(
       const result = await onAnalyzeSentiment({ publication, headline });
       analyzeBtn.disabled = false;
       if (!result.ok) {
-        resultEl.textContent = "Use the sentiment dropdown above for this placement.";
+        resultEl.textContent = "Live sentiment analysis is unavailable; choose the tone manually for this placement.";
         return;
       }
       const match = result.text.toLowerCase().match(/\b(positive|neutral|negative)\b/);
       if (match) {
         container.querySelector("#op-sentiment").value = match[1];
       }
-      resultEl.innerHTML = `<strong>${match ? `Suggested: ${escapeHtml(match[1])}` : "Suggested classification"}</strong> (still editable above) — ${escapeHtml(result.text)}`;
+      resultEl.innerHTML = `<strong>${match ? `Suggested: ${escapeHtml(match[1])}` : "Suggested classification"}</strong> — ${escapeHtml(result.text)} <span class="hint">Review or change the dropdown before saving.</span>`;
     });
   }
 

@@ -21,6 +21,7 @@
 // section 2) exactly. The owner reads it and decides whether to use it.
 
 const PERPLEXITY_MODEL = process.env.PERPLEXITY_MODEL || "sonar";
+export const isPerplexityResearchConfigured = Boolean(process.env.PERPLEXITY_API_KEY);
 
 /**
  * Asks Perplexity what a single press mention/feature in `outletName`

@@ -32,6 +32,7 @@ import { logSearchUsage } from "./searchUsageLog.js";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const ANTHROPIC_WORKSPACE_ID = process.env.ANTHROPIC_WORKSPACE_ID;
 
 function buildSearchPrompt(query) {
   return `Search the web for recent news articles, blog posts, or press mentions matching: ${query}
@@ -46,6 +47,7 @@ async function searchViaClaude({ query, maxUses }) {
       "content-type": "application/json",
       "x-api-key": ANTHROPIC_API_KEY,
       "anthropic-version": "2023-06-01",
+      ...(ANTHROPIC_WORKSPACE_ID ? { "anthropic-workspace-id": ANTHROPIC_WORKSPACE_ID } : {}),
     },
     body: JSON.stringify({
       model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",

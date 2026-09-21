@@ -62,12 +62,14 @@ export async function generateText({ prompt, maxTokens = 2048 }) {
 
 async function callClaude({ prompt, maxTokens, apiKey }) {
   const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      ...(workspaceId ? { "anthropic-workspace-id": workspaceId } : {}),
     },
     body: JSON.stringify({
       model,

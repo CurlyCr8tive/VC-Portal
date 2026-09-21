@@ -252,7 +252,9 @@ export function renderClientsList(
         try {
           const result = await onDiscoveryScan({ clientId, clientName: client?.name });
           statusEl.textContent = result.ok
-            ? `Scanned ${result.scanned ?? 0}, matched ${result.matched ?? 0}, added ${result.inserted ?? 0} to Review Queue.`
+            ? `${
+                result.demoPreview ? "Demo-safe scan preview: " : ""
+              }Scanned ${result.scanned ?? 0}, matched ${result.matched ?? 0}, added ${result.inserted ?? 0} to Review Queue.`
             : result.message || "Scan could not complete. Check search setup and try again.";
         } catch (err) {
           statusEl.textContent = "Scan could not complete. Check search setup and try again.";

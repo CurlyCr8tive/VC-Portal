@@ -15,7 +15,8 @@
 // schema.js's current manual sentiment field is exactly where this
 // suggestion would land, still owner-editable after.
 //
-// NOT wired to an API call — same status as the other four prompts here.
+// Wired through POST /api/generate/sentiment-analysis. The owner UI calls it
+// from the placement editor and keeps the result editable before save.
 
 import { PLAIN_PROSE_RULES } from "./outputFormat.js";
 

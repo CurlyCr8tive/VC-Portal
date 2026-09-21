@@ -123,7 +123,7 @@ export function renderSentimentChart(container, sentimentBreakdown) {
       )
       .join("") +
     (notSet
-      ? `<p class="hint" style="margin-top:8px;">"Not set" is a real category, not a gap to fill by guessing — no sentiment-analysis agent exists yet, so tone is only recorded when a person confirms it (see schema.js).</p>`
+      ? `<p class="hint" style="margin-top:8px;">"Not set" is a real category, not a gap to fill by guessing. Use the Sentiment Agent in Press Placements to suggest tone, then confirm or edit before it becomes part of the reporting data.</p>`
       : "");
 }
 

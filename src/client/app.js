@@ -14,7 +14,7 @@ import {
   postClientApiOpportunity,
   updateClientApiHomework,
 } from "../clientApiDataSource.js?v=20260919-report-builder";
-import { renderSidebar } from "./components/ClientSidebar.js";
+import { renderSidebar } from "./components/ClientSidebar.js?v=20260920-pr-messages-files-3";
 import { renderHeader } from "./components/DashboardHeader.js";
 import { renderMetricsGrid } from "./components/MetricCard.js?v=20260919-live-ui";
 import { renderPlacementsTable } from "./components/PressPlacementTable.js?v=20260919-live-ui";
@@ -26,10 +26,10 @@ import { renderLoadingState } from "./components/LoadingState.js";
 import { renderErrorState } from "./components/ErrorState.js";
 import { renderCampaignDetail } from "./components/CampaignDetailView.js?v=20260919-live-ui";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
-import { renderCoachingProgramView } from "./components/CoachingProgramView.js?v=20260919-live-ui";
+import { renderCoachingProgramView } from "./components/CoachingProgramView.js?v=20260921-pr-clickflow";
 import { loadPhasesForClient } from "../coachingPhaseStorage.js";
 import { loadResourcesForClient } from "../coachingResourceStorage.js";
-import { loadOpportunitiesForClient } from "../opportunityStorage.js";
+import { isRehearsalPlaceholderOpportunity, loadOpportunitiesForClient } from "../opportunityStorage.js?v=20260921-pr-clickflow";
 import { seedGreyzBistroCoachingData } from "../owner/seedGreyzBistroCoachingData.js?v=20260917-client-demo-1";
 import { averageScore, EVALUATION_CRITERIA } from "../opportunitySchema.js";
 import { calculateCoachingProgress, OPPORTUNITY_STATUS_LABELS } from "../coachingProgress.js";
@@ -327,7 +327,9 @@ function clientCoachingContext() {
   const snapshot = apiSnapshot();
   const phases = snapshot?.coaching?.phases || (clientName ? loadPhasesForClient(clientName) : []);
   const resources = snapshot?.coaching?.resources || (clientName ? loadResourcesForClient(clientName) : []);
-  const opportunities = snapshot?.coaching?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : []);
+  const opportunities = (snapshot?.coaching?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : [])).filter(
+    (opportunity) => !isRehearsalPlaceholderOpportunity(opportunity)
+  );
   const progress = calculateCoachingProgress({ phases, resources, opportunities });
   const actionableHomework = phases
     .flatMap((phase) => (phase.homework || []).map((homework) => ({ ...homework, phase })))
@@ -361,6 +363,14 @@ function clientCoachingContext() {
 
 function statusBadge(label, className = "") {
   return `<span class="client-status-badge ${escapeHtml(className)}">${escapeHtml(label)}</span>`;
+}
+
+function formatClientCurrency(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: Number(value) >= 1000 ? 0 : 2,
+  }).format(Number(value) || 0);
 }
 
 function priorityLabel(homework, index) {
@@ -850,12 +860,142 @@ function renderReportsView() {
 }
 
 function renderAnalyticsView() {
-  document.getElementById("analytics-content").innerHTML = `
-    <div class="section-heading"><h2>Analytics</h2></div>
-    <div class="card">
-      <p>Deeper analytics are coming soon. For now, the Performance chart on your Dashboard shows value and placement trends over time.</p>
+  const target = document.getElementById("analytics-content");
+  if (renderApiGate(target)) return;
+  if (state.demoState === "loading") return renderLoadingState(target);
+  if (state.demoState === "error") {
+    return renderErrorState(target, { onRetry: () => setDemoState("normal") });
+  }
+
+  const metrics = getMetrics(state.clientId);
+  const placements = filterPlacements(getPlacements(state.clientId), state.searchTerm);
+  const campaigns = getCampaigns(state.clientId);
+  const chartSeries = getChartSeries(state.clientId, state.chartRange);
+  const totalAve = chartSeries.reduce((sum, point) => sum + (Number(point.ave) || 0), 0) || placements.reduce((sum, placement) => sum + (Number(placement.aveValue) || 0), 0);
+  const placementCount = chartSeries.reduce((sum, point) => sum + (Number(point.placements) || 0), 0) || placements.length;
+  const leadTimes = placements.map((placement) => Number(placement.leadTimeDays)).filter((value) => Number.isFinite(value) && value > 0);
+  const avgLeadTime = leadTimes.length ? Math.round(leadTimes.reduce((sum, value) => sum + value, 0) / leadTimes.length) : metrics.avgLeadTime;
+  const visiblePlacementRecords = placements.length;
+  const analyticsMetrics = {
+    ...metrics,
+    totalAVE: totalAve || metrics.totalAVE,
+    totalPlacements: placementCount || metrics.totalPlacements,
+    avgLeadTime,
+    activeCampaigns: campaigns.filter((campaign) => (campaign.status || "").toLowerCase() === "active").length || campaigns.length,
+  };
+  const topPlacements = [...placements].sort((a, b) => (Number(b.aveValue) || 0) - (Number(a.aveValue) || 0)).slice(0, 4);
+  const campaignRows = campaigns.map((campaign) => {
+    const campaignPlacements = placements.filter((placement) => (placement.campaign || "") === campaign.name);
+    const campaignValue = campaignPlacements.reduce((sum, placement) => sum + (Number(placement.aveValue) || 0), 0);
+    return {
+      campaign,
+      placementCount: campaignPlacements.length,
+      value: campaignValue,
+    };
+  });
+  const maxCampaignValue = Math.max(1, ...campaignRows.map((row) => row.value));
+  const story = placementCount
+    ? `${placementCount} press placement${placementCount === 1 ? "" : "s"} created ${formatClientCurrency(totalAve)} in visible publicity value${visiblePlacementRecords && visiblePlacementRecords !== placementCount ? `, represented here through ${visiblePlacementRecords} bundled source record${visiblePlacementRecords === 1 ? "" : "s"}` : ""}${avgLeadTime ? ` with an average ${avgLeadTime}-day path from outreach to published coverage` : ""}.`
+    : "No placement analytics are available yet.";
+
+  target.innerHTML = `
+    <div class="section-heading">
+      <div>
+        <h2>Analytics</h2>
+        <p>Explore what created the value, which wins carried the story, and where to click for the source details.</p>
+      </div>
+      <button class="link-btn" data-goto="placements">Inspect placement sources</button>
     </div>
+
+    <section class="section">
+      <div class="card live-card analytics-story-card" tabindex="0" data-live-tip="${escapeHtml(story)}">
+        <p class="eyebrow">What this means</p>
+        <h3>${escapeHtml(story)}</h3>
+        <p>These numbers come from the placements and campaign records visible in this portal. Hover the cards, chart points, or rows to see the story behind each number.</p>
+        <div class="live-tip-panel" role="tooltip">
+          <strong>Client value story</strong>
+          <p>${escapeHtml(story)}</p>
+          <span>Open placements or reports to see the source records behind this summary.</span>
+        </div>
+      </div>
+      <div class="metrics-grid" id="analytics-metrics"></div>
+    </section>
+
+    <section class="section card" id="analytics-client-chart"></section>
+
+    <section class="analytics-grid">
+      <article class="card">
+        <div class="section-heading compact">
+          <h3>Campaign Value</h3>
+          <button class="link-btn" data-goto="campaigns">Open campaigns</button>
+        </div>
+        <div class="analytics-breakdown-list">
+          ${
+            campaignRows.length
+              ? campaignRows
+                  .map((row) => {
+                    const pct = Math.max(4, Math.round((row.value / maxCampaignValue) * 100));
+                    return `
+                    <button class="analytics-row live-card" data-campaign-detail="${escapeHtml(row.campaign.id)}" data-live-tip="${escapeHtml(`${row.campaign.name}: ${formatClientCurrency(row.value)} across ${row.placementCount} placement${row.placementCount === 1 ? "" : "s"}.`)}">
+                      <span>
+                        <strong>${escapeHtml(row.campaign.name)}</strong>
+                        <small>${row.placementCount} placement${row.placementCount === 1 ? "" : "s"} · ${escapeHtml(row.campaign.status || "Tracked")}</small>
+                      </span>
+                      <span class="analytics-bar-track" aria-hidden="true"><span style="width:${pct}%"></span></span>
+                      <em>${formatClientCurrency(row.value)}</em>
+                      <span class="live-tip-panel" role="tooltip"><strong>${escapeHtml(row.campaign.name)}</strong><p>${formatClientCurrency(row.value)} across ${row.placementCount} placement${row.placementCount === 1 ? "" : "s"}.</p><span>Click to open the campaign detail.</span></span>
+                    </button>`;
+                  })
+                  .join("")
+              : `<div class="state-panel compact"><h3>No campaigns tracked yet</h3><p>Campaign analytics will appear once Tenyse adds campaign records.</p></div>`
+          }
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="section-heading compact">
+          <h3>Highest Value Wins</h3>
+          <button class="link-btn" data-goto="reports">Open report</button>
+        </div>
+        <div class="analytics-breakdown-list">
+          ${
+            topPlacements.length
+              ? topPlacements
+                  .map(
+                    (placement) => `
+                    <a class="analytics-row live-card" href="${escapeHtml(placement.articleUrl || "#")}" target="${placement.articleUrl ? "_blank" : ""}" rel="noreferrer" data-live-tip="${escapeHtml(`${placement.publication}: ${placement.headline}`)}">
+                      <span>
+                        <strong>${escapeHtml(placement.publication || "Placement")}</strong>
+                        <small>${escapeHtml(placement.headline || "Coverage tracked")}</small>
+                      </span>
+                      <em>${formatClientCurrency(Number(placement.aveValue) || 0)}</em>
+                      <span class="live-tip-panel" role="tooltip"><strong>${escapeHtml(placement.publication || "Placement")}</strong><p>${escapeHtml(placement.headline || "Coverage tracked")}</p><span>${placement.articleUrl ? "Click to view the source article." : "No source link saved yet."}</span></span>
+                    </a>`
+                  )
+                  .join("")
+              : `<div class="state-panel compact"><h3>No value wins yet</h3><p>Top placements will appear once AVE values are saved.</p></div>`
+          }
+        </div>
+      </article>
+    </section>
   `;
+
+  renderMetricsGrid(document.getElementById("analytics-metrics"), analyticsMetrics);
+  renderPerformanceChart(document.getElementById("analytics-client-chart"), {
+    series: chartSeries,
+    range: state.chartRange,
+    onRangeChange: (range) => {
+      state.chartRange = range;
+      renderAnalyticsView();
+    },
+  });
+
+  target.querySelectorAll("[data-goto]").forEach((btn) => {
+    btn.addEventListener("click", () => navigate(btn.dataset.goto));
+  });
+  target.querySelectorAll("[data-campaign-detail]").forEach((btn) => {
+    btn.addEventListener("click", () => showCampaignDetail(btn.dataset.campaignDetail));
+  });
 }
 
 function renderResourcesView() {
@@ -887,8 +1027,14 @@ function renderResourcesView() {
 function renderCoachingView() {
   if (renderApiGate(document.getElementById("coaching-content"))) return;
   const snapshot = apiSnapshot();
+  const coachingData = snapshot?.coaching
+    ? {
+        ...snapshot.coaching,
+        opportunities: (snapshot.coaching.opportunities || []).filter((opportunity) => !isRehearsalPlaceholderOpportunity(opportunity)),
+      }
+    : null;
   renderCoachingProgramView(document.getElementById("coaching-content"), clientName, {
-    data: snapshot?.coaching || null,
+    data: coachingData,
     onNavigate: navigate,
     onHomeworkPatch: shouldUseClientApi()
       ? async (homeworkId, patch) => {
@@ -909,7 +1055,9 @@ function renderCoachingView() {
 
 function renderOpportunitiesView() {
   const snapshot = apiSnapshot();
-  const opportunities = snapshot?.coaching?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : []);
+  const opportunities = (snapshot?.coaching?.opportunities || (clientName ? loadOpportunitiesForClient(clientName) : [])).filter(
+    (opportunity) => !isRehearsalPlaceholderOpportunity(opportunity)
+  );
   document.getElementById("opportunities-content").innerHTML = `
     <div class="section-heading"><h2>Opportunities</h2></div>
     ${

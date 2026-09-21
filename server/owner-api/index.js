@@ -22,8 +22,8 @@ import { searchNews, isNewsSearchConfigured } from "./lib/newsSearch.js";
 import { searchWebForMentions, isWebSearchDiscoveryConfigured } from "./lib/webSearchDiscovery.js";
 import { listSearchUsage } from "./lib/searchUsageLog.js";
 import { buildSearchQuery, scoreArticleMatch } from "./lib/discoveryScoring.js";
-import { researchOutletRate } from "./lib/perplexityResearch.js";
-import { generateText } from "./lib/aiClient.js";
+import { researchOutletRate, isPerplexityResearchConfigured } from "./lib/perplexityResearch.js";
+import { generateText, isAiClientConfigured } from "./lib/aiClient.js";
 import { buildExecutiveSummaryPrompt } from "./lib/prompts/executiveSummaryPrompt.js";
 import { buildCampaignActivitySummaryPrompt } from "./lib/prompts/campaignActivitySummaryPrompt.js";
 import { buildReportNarrativePrompt } from "./lib/prompts/reportNarrativePrompt.js";
@@ -148,6 +148,66 @@ function ownerOrLocalDemoAiRoute(handler) {
     }
   };
 }
+
+app.get(
+  "/api/agent-status",
+  ownerOrLocalDemoAiRoute(async (req, res) => {
+    res.json({
+      ok: true,
+      mode: req.profile?.id === "local-demo-ai" ? "local-demo" : "owner",
+      agents: {
+        discovery: {
+          label: "Discovery Agent",
+          configured: isSupabaseConfigured && isNewsSearchConfigured,
+          demoSafe: true,
+          canRunLive: isSupabaseConfigured && isNewsSearchConfigured,
+          requiredEnv: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "CURRENTS_API_KEY or NEWSDATA_API_KEY"],
+          optionalEnv: ["ANTHROPIC_API_KEY or OPENAI_API_KEY for broader web search"],
+          note: isNewsSearchConfigured
+            ? "Structured search is configured. Candidate mentions still land in Review Queue for human approval."
+            : "Add Currents or NewsData to run fresh external discovery.",
+        },
+        aveResearch: {
+          label: "AVE Research Agent",
+          configured: isPerplexityResearchConfigured,
+          demoSafe: true,
+          canRunLive: isPerplexityResearchConfigured,
+          requiredEnv: ["PERPLEXITY_API_KEY"],
+          note: isPerplexityResearchConfigured
+            ? "Perplexity-backed outlet-rate research is available. Results are suggestions, never auto-saved."
+            : "Add Perplexity to research missing outlet rates live; local AVE formulas still work without it.",
+        },
+        writing: {
+          label: "Writing Agent",
+          configured: isAiClientConfigured,
+          demoSafe: true,
+          canRunLive: isAiClientConfigured,
+          requiredEnv: ["ANTHROPIC_API_KEY or OPENAI_API_KEY"],
+          note: isAiClientConfigured
+            ? "AI drafting is available for summaries, narratives, pitch language, and sentiment suggestions."
+            : "Add Claude or OpenAI to generate live copy; saved demo drafts remain available.",
+        },
+        sentiment: {
+          label: "Sentiment Agent",
+          configured: isAiClientConfigured,
+          demoSafe: true,
+          canRunLive: isAiClientConfigured,
+          requiredEnv: ["ANTHROPIC_API_KEY or OPENAI_API_KEY"],
+          note: "Runs from the placement editor. It suggests positive, neutral, or negative with reasoning; the owner can edit before saving.",
+        },
+        canvaBulkCreate: {
+          label: "Canva Bulk Create Agent",
+          configured: true,
+          demoSafe: true,
+          canRunLive: true,
+          requiredEnv: [],
+          note:
+            "Local export agent. It packages confirmed placements plus the approved Writing Agent summary into a Canva-ready CSV. Canva upload remains manual because the Teams plan uses Bulk Create, not the Enterprise Autofill API.",
+        },
+      },
+    });
+  })
+);
 
 function profileIdForDb(req) {
   const id = String(req.profile?.id || "");

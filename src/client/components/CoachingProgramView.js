@@ -2,15 +2,14 @@ import { escapeHtml } from "../utils.js";
 import { loadPhasesForClient, updatePhase } from "../../coachingPhaseStorage.js";
 import { updateHomeworkStatus, respondToReflection } from "../../coachingPhaseSchema.js";
 import { loadResourcesForClient } from "../../coachingResourceStorage.js";
-import { createOpportunity } from "../../opportunitySchema.js";
-import { addOpportunity, loadOpportunitiesForClient } from "../../opportunityStorage.js";
+import { loadOpportunitiesForClient } from "../../opportunityStorage.js";
 import { calculateCoachingProgress } from "../../coachingProgress.js";
 
 const STATUS_LABEL = { not_started: "Not Started", in_progress: "In Progress", complete: "Complete" };
 const HOMEWORK_TYPE_LABEL = { action: "Homework", reflection: "Reflection", standing: "Standing Rule" };
 
 export function renderCoachingProgramView(container, clientName, opts = {}) {
-  const { data = null, onNavigate = null, onHomeworkPatch = null, onOpportunitySubmit = null } = opts;
+  const { data = null, onNavigate = null, onHomeworkPatch = null } = opts;
   let activeData = data;
   let confirmation = "";
 
@@ -345,22 +344,13 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
   }
 
   function wireProgramActions() {
-    container.querySelector('[data-cp-action="opportunity"]')?.addEventListener("click", async () => {
-      const title = "New opportunity submitted from client portal";
-      const description = "Client asked Tenyse to review a new opportunity from the Coaching Program page.";
-      try {
-        if (onOpportunitySubmit) {
-          const nextData = await onOpportunitySubmit({ title, description });
-          if (nextData) activeData = nextData;
-        } else {
-          addOpportunity(createOpportunity({ client: clientName, title, description }));
-        }
-        confirmation = "Opportunity sent to Tenyse for review.";
-        render();
-      } catch (err) {
-        confirmation = err.message;
-        render();
+    container.querySelector('[data-cp-action="opportunity"]')?.addEventListener("click", () => {
+      if (onNavigate) {
+        onNavigate("opportunities");
+        return;
       }
+      const target = container.querySelector("#cp-opportunities");
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
     container.querySelector('[data-cp-action="resources"]')?.addEventListener("click", () => {

@@ -4,6 +4,11 @@
 import { logError } from "./errorLog.js";
 
 const STORAGE_KEY = "vc_opportunities_v1";
+const REHEARSAL_PLACEHOLDER_TITLE = "New opportunity submitted from client portal";
+
+export function isRehearsalPlaceholderOpportunity(opportunity) {
+  return opportunity?.title === REHEARSAL_PLACEHOLDER_TITLE;
+}
 
 export function loadOpportunities() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -44,6 +49,6 @@ export function deleteOpportunity(id) {
 
 export function loadOpportunitiesForClient(clientName) {
   return loadOpportunities()
-    .filter((o) => o.client === clientName)
+    .filter((o) => o.client === clientName && !isRehearsalPlaceholderOpportunity(o))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }

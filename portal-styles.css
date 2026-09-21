@@ -473,6 +473,83 @@ button {
   padding: 10px;
 }
 
+.sentiment-agent-box {
+  padding: 12px;
+  border: 1px solid rgba(77, 188, 184, 0.24);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(77, 188, 184, 0.08), rgba(255, 255, 255, 0.9));
+}
+
+.sentiment-agent-box label {
+  color: var(--color-navy);
+}
+
+.agent-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-status-card {
+  min-height: 156px;
+  padding: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: #fffdf9;
+}
+
+.agent-status-card span {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agent-status-card.ready span {
+  background: rgba(77, 188, 184, 0.16);
+  color: #217873;
+}
+
+.agent-status-card.needs-config span {
+  background: rgba(232, 111, 87, 0.14);
+  color: var(--color-coral-dark);
+}
+
+.agent-status-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.agent-status-card p {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.42;
+}
+
+.agent-status-card small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 1100px) {
+  .agent-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .agent-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .live-card {
   position: relative;
   overflow: visible;
@@ -981,8 +1058,10 @@ button {
 
 .owner-metric-card.is-interactive:hover .metric-hover-panel,
 .owner-metric-card.is-interactive:focus-visible .metric-hover-panel,
-.owner-metric-card.is-interactive:focus-within .metric-hover-panel {
+.owner-metric-card.is-interactive:focus-within .metric-hover-panel,
+.owner-metric-card.is-interactive.show-hover-panel .metric-hover-panel {
   opacity: 1;
+  pointer-events: auto;
   transform: translateY(6px);
 }
 
@@ -1002,12 +1081,26 @@ button {
   line-height: 1.38;
 }
 
-.metric-hover-panel span {
+.metric-hover-panel span,
+.metric-hover-action {
   display: inline-flex;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
   margin-top: 8px;
   color: var(--color-coral-dark);
   font-size: 0.78rem;
   font-weight: 800;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.metric-hover-action:hover,
+.metric-hover-action:focus-visible {
+  text-decoration: underline;
+  outline: none;
 }
 
 .owner-metric-card.is-interactive:hover .metric-value,
@@ -3899,6 +3992,64 @@ table.placements-table {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
+}
+
+.analytics-story-card {
+  margin-bottom: 16px;
+}
+
+.analytics-breakdown-list {
+  display: grid;
+  gap: 12px;
+}
+
+.analytics-row {
+  width: 100%;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: #fffdf9;
+  color: inherit;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(110px, 0.8fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.analytics-row strong {
+  display: block;
+  color: var(--color-navy);
+}
+
+.analytics-row small {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.25;
+}
+
+.analytics-row em {
+  color: var(--color-navy);
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.analytics-row .analytics-bar-track span {
+  display: block;
+  min-width: 5px;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-teal), var(--color-coral));
+}
+
+@media (max-width: 760px) {
+  .analytics-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .interactive-report-chart {
