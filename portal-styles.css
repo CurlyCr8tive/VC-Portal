@@ -2902,6 +2902,370 @@ table.placements-table {
   flex-wrap: wrap;
 }
 
+.owner-coaching-prototype {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+  gap: 16px;
+  align-items: start;
+  margin: 0 0 18px;
+}
+
+.owner-coaching-main,
+.owner-coaching-side {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.owner-coaching-progress-card,
+.owner-phase-focus-card,
+.owner-coaching-side-card,
+.owner-action-card {
+  position: relative;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  min-width: 0;
+}
+
+.owner-coaching-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.owner-coaching-card-head h3,
+.owner-phase-focus-card h3,
+.owner-coaching-side-card h3,
+.owner-action-card h3 {
+  margin: 0 0 5px;
+  color: var(--color-navy);
+}
+
+.owner-coaching-card-head p,
+.owner-coaching-side-card p,
+.owner-action-card p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.owner-coaching-card-head span {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.owner-coaching-progress-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #eee8e2;
+  overflow: hidden;
+  margin: 12px 0 18px;
+}
+
+.owner-coaching-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-green), var(--color-teal));
+}
+
+.owner-coaching-roadmap {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.owner-roadmap-step {
+  position: relative;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.owner-roadmap-step span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: 0 auto 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: #f7f4ef;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.owner-roadmap-step.complete span {
+  border-color: var(--color-green);
+  background: var(--color-green);
+  color: #fff;
+}
+
+.owner-roadmap-step.in_progress span {
+  border-color: var(--color-coral);
+  background: #fff7f4;
+  color: var(--color-coral);
+}
+
+.owner-roadmap-step strong {
+  display: block;
+  color: var(--color-green);
+  font-size: 0.78rem;
+}
+
+.owner-roadmap-step p {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.owner-phase-header,
+.owner-phase-content,
+.owner-coach-row,
+.owner-homework-row,
+.owner-coaching-stats-card dl {
+  display: grid;
+  gap: 12px;
+}
+
+.owner-phase-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.owner-phase-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 15px;
+  border-radius: 7px;
+  background: var(--color-coral);
+  color: #fff;
+  font-weight: 800;
+  margin-right: 10px;
+}
+
+.owner-phase-weeks,
+.owner-phase-status {
+  color: var(--color-navy);
+  font-weight: 800;
+}
+
+.owner-phase-status {
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 8px 13px;
+  background: #fffaf7;
+  font-size: 0.82rem;
+}
+
+.owner-phase-content {
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+}
+
+.owner-phase-focus-card p,
+.owner-featured-resource p {
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.owner-phase-list {
+  border-top: 1px solid var(--border-light);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.owner-phase-list h4,
+.owner-featured-resource h4,
+.owner-featured-resource h5 {
+  margin: 0 0 8px;
+  color: var(--color-navy);
+}
+
+.owner-phase-list ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.owner-deliverable-list {
+  list-style: none;
+  padding-left: 0 !important;
+}
+
+.owner-deliverable-list li::before {
+  content: "□";
+  color: var(--color-teal);
+  margin-right: 8px;
+}
+
+.owner-featured-resource {
+  border-radius: var(--radius-md);
+  background: #fbf5f1;
+  padding: 14px;
+}
+
+.owner-video-card {
+  min-height: 150px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #9e918f, #51494d);
+  display: grid;
+  align-content: end;
+  gap: 42px;
+  padding: 20px 14px 12px;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.owner-video-card > span {
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.owner-video-card div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.owner-video-card b {
+  display: block;
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-green) 34%, rgba(255, 255, 255, 0.35) 34%);
+}
+
+.owner-video-card em {
+  font-style: normal;
+  font-size: 0.78rem;
+}
+
+.owner-coaching-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.owner-action-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.owner-coach-row,
+.owner-homework-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.owner-coach-avatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 2px solid var(--color-coral);
+  background: #ffe8df;
+  color: var(--color-navy);
+  font-weight: 900;
+}
+
+.owner-coach-row span,
+.owner-homework-row small,
+.owner-homework-row em,
+.owner-coaching-stats-card dt {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.owner-homework-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.owner-homework-row {
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.owner-homework-row > span {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border: 1px solid #b7c2c0;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 0.7rem;
+}
+
+.owner-homework-row.complete > span {
+  background: var(--color-green);
+  border-color: var(--color-green);
+}
+
+.owner-homework-row strong {
+  color: var(--color-navy);
+  line-height: 1.25;
+}
+
+.owner-homework-row.complete strong {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.owner-reflection-prompt {
+  color: var(--color-navy) !important;
+  font-weight: 800;
+}
+
+.owner-reflection-box {
+  min-height: 92px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text-secondary);
+  background: #fff;
+  margin: 10px 0;
+}
+
+.owner-coaching-stats-card {
+  background: #fff2ea;
+  text-align: center;
+}
+
+.owner-coaching-stats-card strong {
+  display: block;
+  color: var(--color-coral);
+  margin: 8px 0 12px;
+}
+
+.owner-coaching-stats-card dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.owner-coaching-stats-card dd {
+  margin: 2px 0 0;
+  color: var(--color-navy);
+  font-weight: 900;
+}
+
 .cp-action-card {
   display: grid;
   align-content: start;
@@ -3745,12 +4109,19 @@ table.placements-table {
   .cp-phase-content,
   .owner-coaching-switcher,
   .owner-coaching-hero,
+  .owner-coaching-prototype,
+  .owner-phase-content,
   .owner-coaching-detail-grid {
     grid-template-columns: 1fr;
   }
 
-  .cp-action-grid {
+  .cp-action-grid,
+  .owner-coaching-action-grid {
     grid-template-columns: 1fr;
+  }
+
+  .owner-coaching-roadmap {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .client-message-layout {

@@ -43,7 +43,7 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js?v=20260919-report-builder";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260919-live-ui";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
-import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260920-owner-coaching-workspace";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260921-rich-greyz-owner";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js?v=20260919-report-builder";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-live-ui";
@@ -67,7 +67,7 @@ import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260919-live-ui";
 import { seedSamplePlacements } from "./seedSampleData.js";
 import { seedRealCaseStudyData, backfillAveDataQuality, inventDemoDayGapsForPreview, applyOutletRatesToPreviewPlacements } from "./seedRealCaseStudyData.js";
-import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260916-polish-2";
+import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260921-rich-greyz-owner";
 
 // ---------------------------------------------------------------------------
 // The owner side. Every getter below reads across ALL clients in mockData —
@@ -3181,8 +3181,10 @@ function renderCurrentView() {
 
 function renderCoachingView() {
   syncOwnerCoachingFromSupabase();
-  const greyzProfile = findClientByName("Greyz Bistro");
-  if (state.dataSource === "real" && greyzProfile && loadPhasesForClient("Greyz Bistro").length === 0) {
+  if (!findClientByName("Greyz Bistro")) {
+    seedRealCaseStudyData();
+  }
+  if (findClientByName("Greyz Bistro")) {
     seedGreyzBistroCoachingData();
   }
   const coachingClients =
