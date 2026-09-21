@@ -1,5 +1,6 @@
 import { escapeHtml } from "../utils.js";
 import { renderEmptyState } from "./EmptyState.js";
+import { formatCurrency } from "../../calculations.js?v=20260919-report-builder";
 
 /**
  * Renders campaign cards. If a campaign object carries a `clientName`
@@ -46,13 +47,37 @@ export function renderCampaignsGrid(container, campaigns, { onViewCampaign } = {
       return `
     <div class="card campaign-card live-card" tabindex="0" data-live-tip="${escapeHtml(tip)}">
       ${c.clientName ? `<span class="campaign-client-tag">${escapeHtml(c.clientName)}</span>` : ""}
-      <h3>${escapeHtml(c.name)}</h3>
+      <div class="campaign-card-heading">
+        <h3>${escapeHtml(c.name)}</h3>
+        <span class="campaign-status-pill">${escapeHtml(c.status)}</span>
+      </div>
+      ${
+        c.visibleCoverageWindow
+          ? `<p class="campaign-card-summary">Coverage window: <strong>${escapeHtml(c.visibleCoverageWindow)}</strong>. Strongest proof point: <strong>${escapeHtml(c.visibleProofPoint || "Pending")}</strong>.</p>`
+          : ""
+      }
       ${progressMarkup}
+      ${
+        c.visiblePlacements != null
+          ? `
+          <div class="campaign-proof-grid" aria-label="${escapeHtml(c.name)} campaign proof">
+            <div><span>Publicity value</span><strong>${formatCurrency(c.visibleValue || 0)}</strong></div>
+            <div><span>Visible placements</span><strong>${c.visiblePlacements}</strong></div>
+            <div><span>Outlets</span><strong>${c.visibleOutlets?.length || 0}</strong></div>
+          </div>
+          ${
+            c.visibleOutlets?.length
+              ? `<p class="campaign-outlet-line"><strong>Outlets:</strong> ${escapeHtml(c.visibleOutlets.slice(0, 4).join(", "))}${c.visibleOutlets.length > 4 ? ` + ${c.visibleOutlets.length - 4} more` : ""}</p>`
+              : `<p class="campaign-outlet-line"><strong>Outlets:</strong> Add or confirm placements to populate this campaign story.</p>`
+          }
+        `
+          : ""
+      }
       <div class="campaign-meta">
         <span>Started ${c.startDate ? escapeHtml(c.startDate) : "—"}</span>
         <span>${c.completedPlacements} of ${c.totalPlacements} placements completed</span>
         <span>Avg. lead time: ${c.avgLeadTime != null ? `${c.avgLeadTime} days` : "—"}</span>
-        <span>Status: ${escapeHtml(c.status)}</span>
+        ${c.visibleDatedCount != null ? `<span>Dated placements in current view: ${c.visibleDatedCount}</span>` : `<span>Status: ${escapeHtml(c.status)}</span>`}
         ${c.milestones && c.milestones.length ? `<span>${c.milestones.filter((m) => m.done).length} of ${c.milestones.length} milestones done</span>` : ""}
       </div>
       <button class="view-btn" data-campaign="${escapeHtml(c.id)}">View campaign details</button>

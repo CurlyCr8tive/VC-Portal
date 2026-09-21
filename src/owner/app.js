@@ -135,6 +135,7 @@ const state = {
   // 'the data' right now," not five separately-filtered pieces that could
   // drift out of sync with each other.
   dashboardClientFilter: "",
+  dashboardCampaignFilter: "",
   dashboardDateFrom: "",
   dashboardDateTo: "",
   editingPlacementId: null,
@@ -312,7 +313,7 @@ function filterPlacements(placements, term) {
 // ---------------------------------------------------------------------------
 
 function isDashboardFilterActive() {
-  return Boolean(state.dashboardClientFilter || state.dashboardDateFrom || state.dashboardDateTo);
+  return Boolean(state.dashboardClientFilter || state.dashboardCampaignFilter || state.dashboardDateFrom || state.dashboardDateTo);
 }
 
 function withinDashboardDateRange(dateStr) {
@@ -328,8 +329,62 @@ function withinDashboardDateRange(dateStr) {
 function getDashboardPlacements() {
   return getAllPlacements().filter((p) => {
     if (state.dashboardClientFilter && p.clientName !== state.dashboardClientFilter) return false;
-    return withinDashboardDateRange(p.publicationDate);
+    if (state.dashboardCampaignFilter && p.campaign !== state.dashboardCampaignFilter) return false;
+    return withinDashboardDateRange(p.publicationDate || p.landedDate);
   });
+}
+
+function dashboardCampaignOptions() {
+  return [...new Set(getAllCampaigns()
+    .filter((c) => !state.dashboardClientFilter || c.clientName === state.dashboardClientFilter)
+    .map((c) => c.name)
+    .filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function dashboardCoverageWindow(placements) {
+  const dates = placements.map((p) => p.publicationDate || p.landedDate).filter(Boolean).sort();
+  if (!dates.length) return "No dated coverage yet";
+  const start = dates[0];
+  const end = dates[dates.length - 1];
+  return start === end ? start : `${start} to ${end}`;
+}
+
+function placementsForDashboardCampaign(campaign, placements) {
+  return placements.filter((p) => p.clientName === campaign.clientName && p.campaign === campaign.name);
+}
+
+function enrichDashboardCampaigns(campaigns, placements) {
+  return campaigns.map((campaign) => {
+    const rows = placementsForDashboardCampaign(campaign, placements);
+    const value = rows.reduce((sum, p) => sum + (Number(p.aveValue) || 0), 0);
+    const datedRows = rows.filter((p) => p.publicationDate || p.landedDate);
+    const outlets = [...new Set(rows.map((p) => p.publication).filter(Boolean))];
+    const strongest = [...rows].sort((a, b) => (Number(b.aveValue) || 0) - (Number(a.aveValue) || 0))[0];
+    return {
+      ...campaign,
+      visiblePlacements: rows.length,
+      visibleValue: value,
+      visibleOutlets: outlets,
+      visibleCoverageWindow: dashboardCoverageWindow(rows),
+      visibleDatedCount: datedRows.length,
+      visibleProofPoint: strongest?.publication
+        ? `${strongest.publication}${strongest.aveValue != null ? ` (${formatCurrency(strongest.aveValue)})` : ""}`
+        : outlets[0] || "Proof point pending",
+    };
+  });
+}
+
+function getDashboardCampaignsForCurrentFilter(placements) {
+  const campaigns = getAllCampaigns().filter((c) => {
+    if (state.dashboardClientFilter && c.clientName !== state.dashboardClientFilter) return false;
+    if (state.dashboardCampaignFilter && c.name !== state.dashboardCampaignFilter) return false;
+    if (state.dashboardDateFrom || state.dashboardDateTo) {
+      return placements.some((p) => p.clientName === c.clientName && p.campaign === c.name);
+    }
+    return true;
+  });
+  return enrichDashboardCampaigns(campaigns, placements);
 }
 
 /**
@@ -373,8 +428,9 @@ function computeFilteredMetrics(placements) {
 function groupPlacementsByMonth(placements) {
   const byMonth = new Map();
   for (const p of placements) {
-    if (!p.publicationDate) continue;
-    const label = p.publicationDate.slice(0, 7); // YYYY-MM
+    const date = p.publicationDate || p.landedDate;
+    if (!date) continue;
+    const label = date.slice(0, 7); // YYYY-MM
     if (!byMonth.has(label)) byMonth.set(label, { label, ave: 0, placements: 0 });
     const bucket = byMonth.get(label);
     bucket.ave += p.landedDate ? p.aveValue || 0 : 0;
@@ -420,6 +476,7 @@ function dashboardSkeletonHTML() {
             ${sectionInfoButton({ title: "Campaign Progress", body: "Every real campaign across all visible clients, most recent first. Status is one of the three this app tracks (active, paused, completed) — see the full Campaigns page for filtering, search, and per-campaign publicity value." })}
             <button class="link-btn" data-goto="campaigns">View All</button>
           </div>
+          <div id="dashboard-campaign-controls"></div>
           <div class="campaigns-grid dashboard-campaigns-grid" id="dashboard-campaigns"></div>
         </div>
       </section>
@@ -892,6 +949,8 @@ function renderCoachingBanner(container) {
  * worse bet than one cheap full re-render.
  */
 function renderDashboardFilterBar(container) {
+  const clients = getOwnerClients();
+  const campaignOptions = dashboardCampaignOptions();
   container.innerHTML = `
     <div class="owner-control-block">
       <span class="control-label">View Mode</span>
@@ -899,6 +958,20 @@ function renderDashboardFilterBar(container) {
         <button type="button" class="${state.dashboardMode === "pr" ? "active" : ""}" data-dashboard-mode="pr">PR Reporting</button>
         <button type="button" class="${state.dashboardMode === "coaching" ? "active" : ""}" data-dashboard-mode="coaching">Coaching Program</button>
       </div>
+    </div>
+    <div class="owner-control-block">
+      <label class="control-label" for="dashboard-filter-client">Client</label>
+      <select id="dashboard-filter-client" class="owner-filter-select" aria-label="Filter dashboard by client">
+        <option value="">All clients</option>
+        ${clients.map((client) => `<option value="${escapeHtml(client.name)}" ${state.dashboardClientFilter === client.name ? "selected" : ""}>${escapeHtml(client.name)}</option>`).join("")}
+      </select>
+    </div>
+    <div class="owner-control-block">
+      <label class="control-label" for="dashboard-filter-campaign">Campaign</label>
+      <select id="dashboard-filter-campaign" class="owner-filter-select" aria-label="Filter dashboard by campaign">
+        <option value="">All campaigns</option>
+        ${campaignOptions.map((name) => `<option value="${escapeHtml(name)}" ${state.dashboardCampaignFilter === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+      </select>
     </div>
     <div class="owner-control-block">
       <span class="control-label">Time Range</span>
@@ -927,6 +1000,15 @@ function renderDashboardFilterBar(container) {
       renderDashboard();
     });
   });
+  container.querySelector("#dashboard-filter-client").addEventListener("change", (e) => {
+    state.dashboardClientFilter = e.target.value;
+    state.dashboardCampaignFilter = "";
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-filter-campaign").addEventListener("change", (e) => {
+    state.dashboardCampaignFilter = e.target.value;
+    renderDashboard();
+  });
   container.querySelector("#dashboard-filter-from").addEventListener("change", (e) => {
     state.dashboardDateFrom = e.target.value;
     renderDashboard();
@@ -944,6 +1026,72 @@ function renderDashboardFilterBar(container) {
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
       state.dashboardClientFilter = "";
+      state.dashboardCampaignFilter = "";
+      state.dashboardDateFrom = "";
+      state.dashboardDateTo = "";
+      renderDashboard();
+    });
+  }
+}
+
+function renderDashboardCampaignControls(container, placements, campaigns) {
+  const clients = getOwnerClients();
+  const campaignOptions = dashboardCampaignOptions();
+  container.innerHTML = `
+    <div class="dashboard-campaign-control-row">
+      <div>
+        <p class="eyebrow">Campaign intelligence</p>
+        <strong>${campaigns.length} campaign${campaigns.length === 1 ? "" : "s"} shown</strong>
+        <span>${placements.length} placement${placements.length === 1 ? "" : "s"} · ${dashboardCoverageWindow(placements)}</span>
+      </div>
+      <label>
+        <span>Client</span>
+        <select id="dashboard-campaign-client">
+          <option value="">All clients</option>
+          ${clients.map((client) => `<option value="${escapeHtml(client.name)}" ${state.dashboardClientFilter === client.name ? "selected" : ""}>${escapeHtml(client.name)}</option>`).join("")}
+        </select>
+      </label>
+      <label>
+        <span>Campaign</span>
+        <select id="dashboard-campaign-campaign">
+          <option value="">All campaigns</option>
+          ${campaignOptions.map((name) => `<option value="${escapeHtml(name)}" ${state.dashboardCampaignFilter === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
+        </select>
+      </label>
+      <label>
+        <span>From</span>
+        <input type="date" id="dashboard-campaign-from" value="${escapeHtml(state.dashboardDateFrom)}" />
+      </label>
+      <label>
+        <span>To</span>
+        <input type="date" id="dashboard-campaign-to" value="${escapeHtml(state.dashboardDateTo)}" />
+      </label>
+      ${isDashboardFilterActive() ? `<button type="button" class="btn-secondary" id="dashboard-campaign-clear">Clear</button>` : ""}
+    </div>
+  `;
+
+  container.querySelector("#dashboard-campaign-client").addEventListener("change", (e) => {
+    state.dashboardClientFilter = e.target.value;
+    state.dashboardCampaignFilter = "";
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-campaign-campaign").addEventListener("change", (e) => {
+    state.dashboardCampaignFilter = e.target.value;
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-campaign-from").addEventListener("change", (e) => {
+    state.dashboardDateFrom = e.target.value;
+    renderDashboard();
+  });
+  container.querySelector("#dashboard-campaign-to").addEventListener("change", (e) => {
+    state.dashboardDateTo = e.target.value;
+    renderDashboard();
+  });
+  const clearBtn = container.querySelector("#dashboard-campaign-clear");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      state.dashboardClientFilter = "";
+      state.dashboardCampaignFilter = "";
       state.dashboardDateFrom = "";
       state.dashboardDateTo = "";
       renderDashboard();
@@ -974,12 +1122,17 @@ function renderDashboard() {
   renderOwnerMetrics(document.getElementById("dashboard-metrics"), metrics);
 
   const filterSummaryEl = document.getElementById("dashboard-filter-summary");
+  const activeFilterParts = [
+    state.dashboardClientFilter || "all clients",
+    state.dashboardCampaignFilter || "all campaigns",
+    state.dashboardDateFrom || state.dashboardDateTo ? `${state.dashboardDateFrom || "any date"} to ${state.dashboardDateTo || "any date"}` : "",
+  ].filter(Boolean);
   const coachingRows = getDashboardCoachingRows();
   filterSummaryEl.textContent =
     state.dashboardMode === "coaching"
       ? `Showing ${state.dashboardClientFilter || "all coaching clients"}${state.dashboardDateFrom || state.dashboardDateTo ? " — date range does not apply to coaching program setup yet" : ""} — ${coachingRows.length} coaching program${coachingRows.length === 1 ? "" : "s"} match.`
       : filterActive
-        ? `Showing ${state.dashboardClientFilter || "all clients"}${state.dashboardDateFrom || state.dashboardDateTo ? `, ${state.dashboardDateFrom || "any date"} to ${state.dashboardDateTo || "any date"}` : ""} — ${filteredPlacements.length} placement${filteredPlacements.length === 1 ? "" : "s"} match.`
+        ? `Showing ${activeFilterParts.join(" · ")} — ${filteredPlacements.length} placement${filteredPlacements.length === 1 ? "" : "s"} match.`
         : "";
 
   const basePlacements = filterActive ? filteredPlacements : getAllPlacements();
@@ -1003,11 +1156,13 @@ function renderDashboard() {
   renderCoachingOverview(document.getElementById("dashboard-coaching-overview"));
   renderDashboardRollup(document.getElementById("dashboard-rollup-strip"), metrics);
 
-  const filteredCampaigns = state.dashboardClientFilter
-    ? getAllCampaigns().filter((c) => c.clientName === state.dashboardClientFilter)
-    : getAllCampaigns();
+  const filteredCampaigns = getDashboardCampaignsForCurrentFilter(filteredPlacements);
+  renderDashboardCampaignControls(document.getElementById("dashboard-campaign-controls"), filteredPlacements, filteredCampaigns);
   renderCampaignsGrid(document.getElementById("dashboard-campaigns"), filteredCampaigns, {
-    onViewCampaign: () => navigate("campaigns"),
+    onViewCampaign: (campaignId) => {
+      state.selectedCampaignId = campaignId;
+      navigate("campaign-detail");
+    },
   });
 
   // A client/date filter replaces the 30d/90d/1y preset chart entirely
@@ -1016,11 +1171,16 @@ function renderDashboard() {
   // meaningful reading once the underlying data is a client- or
   // date-bounded subset.
   if (filterActive) {
+    const chartContext = [
+      state.dashboardClientFilter || "All clients",
+      state.dashboardCampaignFilter || "All campaigns",
+      "by month",
+    ].join(" · ");
     renderPerformanceChart(document.getElementById("dashboard-chart"), {
       series: groupPlacementsByMonth(filteredPlacements).length ? groupPlacementsByMonth(filteredPlacements) : [{ label: "No dates in range", ave: 0, placements: 0 }],
       range: null,
       onRangeChange: () => {},
-      rangeLabel: "By month (filtered)",
+      rangeLabel: chartContext,
     });
   } else {
     renderPerformanceChart(document.getElementById("dashboard-chart"), {
