@@ -49,6 +49,7 @@ a {
 button {
   font-family: var(--font-sans);
   cursor: pointer;
+  line-height: 1.15;
 }
 
 :focus-visible {
@@ -513,6 +514,10 @@ button {
 }
 
 .link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: none;
   border: none;
   color: var(--color-coral-dark);
@@ -1171,8 +1176,10 @@ button {
 .metric-hover-panel {
   position: absolute;
   top: calc(100% - 6px);
-  left: 14px;
-  right: 14px;
+  left: 50%;
+  right: auto;
+  width: min(286px, calc(100vw - 32px));
+  max-width: 286px;
   z-index: 40;
   padding: 12px 14px;
   border: 1px solid rgba(232, 111, 87, 0.28);
@@ -1182,17 +1189,19 @@ button {
   box-shadow: 0 16px 38px rgba(31, 42, 82, 0.16);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-4px);
+  transform: translate(-50%, -4px);
   transition:
     opacity 140ms ease,
     transform 140ms ease;
+  text-align: left;
+  overflow-wrap: break-word;
 }
 
 .metric-hover-panel::before {
   content: "";
   position: absolute;
   top: -7px;
-  left: 22px;
+  left: calc(50% - 6px);
   width: 12px;
   height: 12px;
   border-top: 1px solid rgba(232, 111, 87, 0.28);
@@ -1219,19 +1228,29 @@ button {
 .reports-kpi-card.show-hover-panel .metric-hover-panel {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(6px);
+  transform: translate(-50%, 6px);
 }
 
-.metric-hover-panel strong {
+.metric-hover-panel strong,
+.owner-prototype-kpi .metric-hover-panel strong,
+.owner-metric-card .metric-hover-panel strong,
+.metric-card .metric-hover-panel strong,
+.reports-kpi-card .metric-hover-panel strong {
   display: block;
   margin-bottom: 4px;
   color: var(--color-navy);
+  font-family: var(--font-sans);
   font-size: 0.8rem;
+  line-height: 1.2;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.metric-hover-panel p {
+.metric-hover-panel p,
+.owner-prototype-kpi .metric-hover-panel p,
+.owner-metric-card .metric-hover-panel p,
+.metric-card .metric-hover-panel p,
+.reports-kpi-card .metric-hover-panel p {
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.82rem;
@@ -1241,6 +1260,8 @@ button {
 .metric-hover-panel span,
 .metric-hover-action {
   display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
   appearance: none;
   border: 0;
   background: transparent;
@@ -1252,6 +1273,7 @@ button {
   cursor: pointer;
   text-align: left;
   font-family: inherit;
+  line-height: 1.2;
 }
 
 .metric-hover-action:hover,
@@ -3078,6 +3100,8 @@ body:has(#owner-header) .avatar {
 }
 
 .icon-only-btn {
+  display: inline-grid;
+  place-items: center;
   width: 30px;
   height: 30px;
   border: 0;
@@ -3485,7 +3509,12 @@ body:has(#owner-header) .avatar {
 }
 
 .reports-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   height: 36px;
+  padding: 0 18px;
   border: 0;
   border-radius: 6px;
   background: var(--color-navy);
@@ -3744,6 +3773,10 @@ body:has(#owner-header) .avatar {
 
 .reports-action-button,
 .mini-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 30px;
   padding: 0 14px;
   border: 1px solid #d9e0ee;
@@ -3751,6 +3784,9 @@ body:has(#owner-header) .avatar {
   background: #fff;
   color: var(--color-navy);
   font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .reports-action-button.secondary {
@@ -3922,8 +3958,13 @@ body:has(#owner-header) .avatar {
 }
 
 .reports-quick-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
   width: 100%;
   min-height: 30px;
+  padding: 6px 10px;
   border: 1px solid #e5edf7;
   border-radius: 5px;
   background: #fff;
@@ -3931,10 +3972,13 @@ body:has(#owner-header) .avatar {
   text-align: left;
   font-size: 0.74rem;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .reports-quick-actions span {
-  float: right;
+  display: inline-grid;
+  place-items: center;
+  margin-left: auto;
   min-width: 20px;
   min-height: 20px;
   border-radius: 999px;
@@ -4066,11 +4110,17 @@ body:has(#owner-header) .avatar {
 
 .btn-primary,
 .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border-radius: var(--radius-sm);
   padding: 9px 16px;
   font-size: 0.85rem;
   font-weight: 600;
   border: none;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .btn-primary {
@@ -4095,6 +4145,31 @@ body:has(#owner-header) .avatar {
 .btn-secondary:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+
+.owner-campaign-progress-card button,
+.campaign-metric-button,
+.program-toggle button,
+.owner-segmented-control button,
+.report-window-button,
+.report-date-presets .btn-secondary,
+.clients-pagination button,
+.sidebar-footer button,
+.sidebar-support-card button,
+.cp-tabs button,
+.coaching-subnav button,
+.coaching-activity-tabs button,
+.coaching-tool-card button,
+.coaching-quick-actions button,
+.cp-action-card .btn-secondary,
+.auth-form button,
+.demo-accounts button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1.15;
+  text-align: center;
 }
 
 /* ---------- Empty / loading / error states ---------- */
