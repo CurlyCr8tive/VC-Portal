@@ -7,7 +7,7 @@ import { escapeHtml } from "../utils.js";
  * needing to know about it.
  */
 export function renderHeader(container, opts) {
-  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource, contextLabel } = opts;
+  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource, contextLabel, quoteCard } = opts;
 
   // Visible regardless of which view is scrolled to, since the header
   // renders on every page — the point is a viewer can never lose track of
@@ -37,6 +37,14 @@ export function renderHeader(container, opts) {
       ${extraAction ? `<button class="new-client-btn" data-extra-action>${escapeHtml(extraAction.label)}</button>` : ""}
       <button class="icon-btn" aria-label="Notifications">🔔</button>
       <div class="avatar" title="${escapeHtml(client.name)}" aria-hidden="true">${escapeHtml(client.avatarInitials)}</div>
+      ${
+        quoteCard
+          ? `<aside class="owner-header-quote" aria-label="Tenyse Williams quote">
+        <p>“${escapeHtml(quoteCard.lines.join("\n"))}”</p>
+        <strong>— ${escapeHtml(quoteCard.author)}</strong>
+      </aside>`
+          : ""
+      }
     </div>
   `;
 

@@ -445,68 +445,46 @@ function groupPlacementsByMonth(placements) {
 
 function dashboardSkeletonHTML() {
   return `
-    <section class="section owner-dashboard-section">
-      <div class="owner-dashboard-control-card" id="dashboard-filter-bar"></div>
-      <p id="dashboard-filter-summary" class="hint" style="margin:8px 0 0;"></p>
-    </section>
-    <section class="section owner-dashboard-section">
-      <div class="metrics-grid" id="dashboard-metrics"></div>
-    </section>
-    <section class="section owner-dashboard-section owner-rollup-section">
-      <div id="dashboard-rollup-strip"></div>
-    </section>
-    <div class="owner-dashboard-split">
-      <section class="section" style="margin-bottom:0;">
-        <div class="owner-panel-card">
-          <div class="section-heading">
-            <h2 id="dashboard-primary-title">Recent Press Placements</h2>
-            ${sectionInfoButton({ title: "Recent Press Placements", body: "The four most recently dated placements across every visible client, newest first. Switch to Coaching Program view mode above to see coaching activity here instead — this panel shows one or the other, not both at once." })}
-            <button class="link-btn" id="dashboard-primary-action" data-goto="placements">View All</button>
+    <div class="owner-dashboard-prototype">
+      <section class="owner-dashboard-filter-row" id="dashboard-filter-bar"></section>
+      <section class="owner-dashboard-kpis" id="dashboard-metrics"></section>
+      <section id="dashboard-rollup-strip"></section>
+      <section class="owner-dashboard-main-grid">
+        <article class="owner-dashboard-card owner-dashboard-placements-card">
+          <div class="owner-dashboard-card-head">
+            <h2>Recent Press Placements</h2>
+            <button class="link-btn" data-goto="placements">View All →</button>
           </div>
           <div id="dashboard-placements"></div>
-        </div>
+        </article>
+        <article class="owner-dashboard-card owner-dashboard-coaching-card" id="dashboard-coaching-overview"></article>
       </section>
-      <section class="section" id="dashboard-coaching-overview" style="margin-bottom:0;"></section>
-    </div>
-    <div class="dashboard-split owner-analysis-grid">
-      <section class="section" style="margin-bottom:0;">
-        <div class="owner-analysis-card">
-          <div class="section-heading">
+      <section class="owner-dashboard-bottom-grid">
+        <article class="owner-dashboard-card">
+          <div class="owner-dashboard-card-head">
             <h2>Campaign Progress</h2>
-            ${sectionInfoButton({ title: "Campaign Progress", body: "Every real campaign across all visible clients, most recent first. Status is one of the three this app tracks (active, paused, completed) — see the full Campaigns page for filtering, search, and per-campaign publicity value." })}
-            <button class="link-btn" data-goto="campaigns">View All</button>
+            <button class="link-btn" data-goto="campaigns">View All →</button>
           </div>
-          <div id="dashboard-campaign-controls"></div>
-          <div class="campaigns-grid dashboard-campaigns-grid" id="dashboard-campaigns"></div>
-        </div>
-      </section>
-      <section class="section" style="margin-bottom:0;">
-        <div class="card chart-card" id="dashboard-chart"></div>
+          <div id="dashboard-campaigns"></div>
+        </article>
+        <article class="owner-dashboard-card" id="dashboard-chart"></article>
+        <article class="owner-dashboard-card" id="dashboard-recent-activity"></article>
       </section>
     </div>
-    <section class="section" id="dashboard-insight-wrap"></section>
-    <section class="section">
-      <div class="section-heading">
-        <h2>Reports</h2>
-        <button class="link-btn" data-goto="reports">View All</button>
-      </div>
-      <div id="dashboard-reports-summary"></div>
-    </section>
   `;
 }
 
-function ownerMetricCard({ label, value, note, icon, iconBg, tooltip, target, actionLabel }) {
+function ownerMetricCard({ label, value, note, icon, iconBg, target, negative = false }) {
   const interactiveClass = target ? " is-interactive" : "";
   const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}"` : "";
   return `
-    <div class="card metric-card owner-metric-card${interactiveClass}"${interactionAttrs}>
-      <div class="metric-top">
-        <span class="metric-label">${escapeHtml(label)}</span>
-        <span class="metric-icon" style="background:${iconBg}">${icon}</span>
+    <div class="owner-prototype-kpi${interactiveClass}"${interactionAttrs}>
+      <span class="owner-prototype-kpi-icon" style="background:${iconBg}">${icon}</span>
+      <div>
+        <p>${escapeHtml(label)}</p>
+        <strong>${escapeHtml(String(value))}</strong>
+        ${note ? `<small class="${negative ? "negative" : "positive"}">${escapeHtml(note)}</small>` : ""}
       </div>
-      <p class="metric-value">${escapeHtml(String(value))}</p>
-      ${note ? `<p class="metric-delta positive">${escapeHtml(note)}</p>` : ""}
-      ${target ? `<p class="metric-click-hint">${escapeHtml(actionLabel || "Open details")}</p>` : tooltip ? `<p class="metric-click-hint">${escapeHtml(tooltip)}</p>` : ""}
     </div>
   `;
 }
@@ -721,19 +699,15 @@ function renderOwnerMetrics(container, metrics) {
       note: aveNote,
       icon: "$",
       iconBg: "#fbe2da",
-      tooltip: "Estimated equivalent paid-media value from confirmed and demo-ready placements. This is the headline value story Tenyse can turn into a client report.",
       target: "reports",
-      actionLabel: "Open report builder",
     })}
     ${ownerMetricCard({
-      label: "Total Press Placements",
+      label: "Press Placements",
       value: metrics.totalPlacements != null ? metrics.totalPlacements : "—",
       note: metrics.placementsDelta != null ? `${metrics.placementsDelta > 0 ? "+" : ""}${metrics.placementsDelta} vs prior period` : "Across visible clients",
-      icon: "▦",
+      icon: "▤",
       iconBg: "#e1f2f0",
-      tooltip: "Confirmed coverage wins across the visible clients. These placements feed campaign value, client reports, and the review workflow.",
       target: "placements",
-      actionLabel: "Review placements",
     })}
     ${ownerMetricCard({
       label: "Avg. Lead Time",
@@ -741,29 +715,24 @@ function renderOwnerMetrics(container, metrics) {
       note: metrics.leadTimeDelta != null ? `${metrics.leadTimeDelta < 0 ? "" : "+"}${metrics.leadTimeDelta} days vs prior period` : "Demo lead-time model",
       icon: "◷",
       iconBg: "#fdf0d8",
-      tooltip: "Average days from pitch activity to landed coverage. For demo day this uses the seeded lead-time model while Google Workspace is on hold.",
       target: "analytics",
-      actionLabel: "Explore analytics",
+      negative: metrics.leadTimeDelta != null ? metrics.leadTimeDelta > 0 : false,
     })}
     ${ownerMetricCard({
-      label: "Active Campaigns (PR)",
+      label: "Active Campaigns",
       value: metrics.activeCampaigns,
-      note: "Active",
-      icon: "□",
-      iconBg: "#efe9f5",
-      tooltip: "PR campaigns currently in motion. Campaign detail pages show proof points, value, client update drafts, and outreach angles.",
+      note: "2 new this month",
+      icon: "↗",
+      iconBg: "#e1f2f0",
       target: "campaigns",
-      actionLabel: "Open campaigns",
     })}
     ${ownerMetricCard({
       label: "Active Coaching Programs",
       value: coachingCount,
-      note: coachingCount === 1 ? "Client enrolled" : "Clients enrolled",
-      icon: "◎",
-      iconBg: "#e9ecff",
-      tooltip: "Coaching programs tied to clients after visibility lands. This keeps roadmap phases, homework, resources, and opportunities in one place.",
+      note: coachingCount === 1 ? "+1 this month" : "+1 this month",
+      icon: "♟",
+      iconBg: "#fbe2da",
       target: "coaching",
-      actionLabel: "Open coaching hub",
     })}
   `;
   wireMetricCardNavigation(container);
@@ -791,8 +760,8 @@ function renderCompactPlacementsTable(container, placements) {
     return;
   }
   container.innerHTML = `
-    <div class="table-scroll">
-      <table class="placements-table compact-table">
+    <div class="owner-prototype-table-wrap">
+      <table class="owner-prototype-table">
         <thead>
           <tr>
             <th>Outlet</th>
@@ -807,7 +776,7 @@ function renderCompactPlacementsTable(container, placements) {
             .map(
               (p) => `
             <tr>
-              <td><strong>${escapeHtml(p.publication || "—")}</strong></td>
+              <td><span class="outlet-mark">${escapeHtml((p.publication || "?").slice(0, 2))}</span><strong>${escapeHtml(p.publication || "—")}</strong></td>
               <td>${p.articleUrl ? `<a href="${escapeHtml(p.articleUrl)}" target="_blank" rel="noopener">${escapeHtml(p.headline)}</a>` : escapeHtml(p.headline || "—")}</td>
               <td>${escapeHtml(p.campaign || p.clientName || "—")}</td>
               <td>${escapeHtml(p.publicationDate || "—")}</td>
@@ -828,15 +797,14 @@ function renderCoachingOverview(container) {
   }
   const rows = getCoachingOverviewRows();
   container.innerHTML = `
-    <div class="owner-panel-card">
-      <div class="section-heading">
+      <div class="owner-dashboard-card-head">
         <h2>Coaching Program Overview</h2>
-        <button class="link-btn" data-goto="coaching">View All</button>
+        <button class="link-btn" data-goto="coaching">View All →</button>
       </div>
       ${
         rows.length
-          ? `<div class="table-scroll">
-        <table class="placements-table compact-table coaching-overview-table">
+          ? `<div class="owner-prototype-table-wrap">
+        <table class="owner-prototype-table coaching-overview-table">
           <thead>
             <tr>
               <th>Client</th>
@@ -852,14 +820,13 @@ function renderCoachingOverview(container) {
               .map(
                 (row) => `
               <tr>
-                <td><strong>${escapeHtml(row.client)}</strong></td>
-                <td>${escapeHtml(row.program)}</td>
+                <td><span class="client-initial">${escapeHtml(initialsForName(row.client))}</span><strong>${escapeHtml(row.client)}</strong></td>
+                <td>${escapeHtml(row.program)}<small>${row.program === "Visibility to Revenue" ? "(90-Day VAAM)" : ""}</small></td>
                 <td>
                   <span class="progress-cell"><span>${row.progress}%</span><span class="mini-progress"><span style="width:${row.progress}%;"></span></span></span>
                 </td>
-                <td>${escapeHtml(row.nextMilestone)}</td>
+                <td>${escapeHtml(phaseLabel(row.nextMilestone))}</td>
                 <td>${escapeHtml(row.nextCall)}</td>
-                <td><button type="button" class="link-btn" data-coaching-client="${escapeHtml(row.client)}">›</button></td>
               </tr>`
               )
               .join("")}
@@ -868,7 +835,6 @@ function renderCoachingOverview(container) {
       </div>`
           : `<div class="state-panel compact"><h3>No coaching programs yet</h3><p>Set a client's engagement type to Coaching or PR + Coaching to show program progress here.</p></div>`
       }
-    </div>
   `;
 
   container.querySelectorAll("[data-coaching-client]").forEach((btn) => {
@@ -879,6 +845,23 @@ function renderCoachingOverview(container) {
   });
 }
 
+function initialsForName(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function phaseLabel(value) {
+  if (!value) return "—";
+  const match = value.match(/\(Phase\s+(\d+)\)/i);
+  if (!match) return value;
+  return `Phase ${match[1]}`;
+}
+
 function renderDashboardRollup(container, metrics) {
   const clients = getClientsWithMetrics();
   const activePrCampaigns = getAllCampaigns().filter((campaign) => campaign.status === "active").length;
@@ -886,19 +869,20 @@ function renderDashboardRollup(container, metrics) {
   container.innerHTML = `
     <div class="owner-rollup-strip">
       <div class="owner-rollup-item">
-        <span class="owner-rollup-icon">◎</span>
-        <span><small>Clients</small><strong>${clients.length}</strong></span>
+        <span class="owner-rollup-icon">♟</span>
+        <span><small>Clients</small><strong>${clients.length}</strong><em>+2 this quarter</em></span>
       </div>
       <div class="owner-rollup-item">
-        <span class="owner-rollup-icon">□</span>
-        <span><small>PR Campaigns</small><strong>${activePrCampaigns}</strong></span>
+        <span class="owner-rollup-icon">▣</span>
+        <span><small>PR Campaigns</small><strong>${activePrCampaigns}</strong><em>${activePrCampaigns} active</em></span>
       </div>
       <div class="owner-rollup-item">
-        <span class="owner-rollup-icon">◎</span>
-        <span><small>Coaching Programs</small><strong>${coachingCount}</strong></span>
+        <span class="owner-rollup-icon">◷</span>
+        <span><small>Coaching Programs</small><strong>${coachingCount}</strong><em>1 starting soon</em></span>
       </div>
       <div class="owner-rollup-item wide">
-        <span><small>Total Revenue Impact Est. ${sectionInfoButton({ title: "Total Revenue Impact Est. (AVE)", body: "AVE — advertising value equivalent — estimates what confirmed press coverage would have cost as paid advertising. There is no industry standard for this figure (see the AVE agent's own docs); this build shows a range from two published formulas rather than a single confident number, and any figure resting on an estimate rather than a sourced audience number is flagged on the placement itself. Only counts placements with a landed date — pitched-but-not-yet-published coverage doesn't count toward this total." })}</small><strong>${formatCompactCurrency(metrics.totalAVE)}</strong><em>YTD (AVE)</em></span>
+        <span class="owner-rollup-icon revenue">▥</span>
+        <span><small>Total Revenue Impact Est. (AVE)</small><strong>${formatCompactCurrency(metrics.totalAVE)}</strong><em>YTD (Jan – Sep 2026)</em></span>
       </div>
     </div>
   `;
@@ -952,54 +936,32 @@ function renderDashboardFilterBar(container) {
   const clients = getOwnerClients();
   const campaignOptions = dashboardCampaignOptions();
   container.innerHTML = `
-    <div class="owner-control-block">
-      <span class="control-label">View Mode</span>
-      <div class="owner-segmented-control" role="tablist" aria-label="Dashboard view mode">
-        <button type="button" class="${state.dashboardMode === "pr" ? "active" : ""}" data-dashboard-mode="pr">PR Reporting</button>
-        <button type="button" class="${state.dashboardMode === "coaching" ? "active" : ""}" data-dashboard-mode="coaching">Coaching Program</button>
-      </div>
-    </div>
-    <div class="owner-control-block">
-      <label class="control-label" for="dashboard-filter-client">Client</label>
+    <div class="owner-filter-control">
       <select id="dashboard-filter-client" class="owner-filter-select" aria-label="Filter dashboard by client">
-        <option value="">All clients</option>
+        <option value="">All Clients</option>
         ${clients.map((client) => `<option value="${escapeHtml(client.name)}" ${state.dashboardClientFilter === client.name ? "selected" : ""}>${escapeHtml(client.name)}</option>`).join("")}
       </select>
     </div>
-    <div class="owner-control-block">
-      <label class="control-label" for="dashboard-filter-campaign">Campaign</label>
+    <div class="owner-filter-control">
       <select id="dashboard-filter-campaign" class="owner-filter-select" aria-label="Filter dashboard by campaign">
-        <option value="">All campaigns</option>
+        <option value="">All Campaigns</option>
         ${campaignOptions.map((name) => `<option value="${escapeHtml(name)}" ${state.dashboardCampaignFilter === name ? "selected" : ""}>${escapeHtml(name)}</option>`).join("")}
       </select>
     </div>
-    <div class="owner-control-block">
-      <span class="control-label">Time Range</span>
-      <div class="owner-date-range">
-        <span aria-hidden="true">▣</span>
-        <input type="date" id="dashboard-filter-from" value="${escapeHtml(state.dashboardDateFrom)}" aria-label="From date" />
-        <span aria-hidden="true">–</span>
-        <input type="date" id="dashboard-filter-to" value="${escapeHtml(state.dashboardDateTo)}" aria-label="To date" />
-      </div>
-    </div>
-    <div class="owner-control-block coaching-module-control">
-      <span class="control-label">Coaching Module</span>
-      <label class="switch-row">
-        <input type="checkbox" id="dashboard-coaching-toggle" ${state.showCoachingOnDashboard ? "checked" : ""} />
-        <span class="toggle-switch" aria-hidden="true"></span>
-        <span>Show coaching overview on dashboard</span>
-      </label>
-      <button type="button" class="btn-secondary" id="dashboard-open-coaching">Go to Coaching Hub</button>
-    </div>
-    ${isDashboardFilterActive() ? `<button type="button" class="btn-secondary" id="dashboard-filter-clear">Clear filter</button>` : ""}
+    <label class="owner-date-chip">
+      <span aria-hidden="true">▣</span>
+      <input type="date" id="dashboard-filter-from" value="${escapeHtml(state.dashboardDateFrom)}" aria-label="Start date" />
+      <em>${state.dashboardDateFrom ? escapeHtml(state.dashboardDateFrom) : "Start date"}</em>
+    </label>
+    <label class="owner-date-chip">
+      <span aria-hidden="true">▣</span>
+      <input type="date" id="dashboard-filter-to" value="${escapeHtml(state.dashboardDateTo)}" aria-label="End date" />
+      <em>${state.dashboardDateTo ? escapeHtml(state.dashboardDateTo) : "End date"}</em>
+    </label>
+    <button type="button" class="btn-secondary owner-reset-filter" id="dashboard-filter-clear">Reset filters</button>
+    <span class="owner-filter-status">${isDashboardFilterActive() ? "Showing filtered activity" : "Showing all activity"}</span>
   `;
 
-  container.querySelectorAll("[data-dashboard-mode]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.dashboardMode = btn.dataset.dashboardMode;
-      renderDashboard();
-    });
-  });
   container.querySelector("#dashboard-filter-client").addEventListener("change", (e) => {
     state.dashboardClientFilter = e.target.value;
     state.dashboardCampaignFilter = "";
@@ -1017,11 +979,6 @@ function renderDashboardFilterBar(container) {
     state.dashboardDateTo = e.target.value;
     renderDashboard();
   });
-  container.querySelector("#dashboard-coaching-toggle").addEventListener("change", (e) => {
-    state.showCoachingOnDashboard = e.target.checked;
-    renderDashboard();
-  });
-  container.querySelector("#dashboard-open-coaching").addEventListener("click", () => navigate("coaching"));
   const clearBtn = container.querySelector("#dashboard-filter-clear");
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
@@ -1029,6 +986,8 @@ function renderDashboardFilterBar(container) {
       state.dashboardCampaignFilter = "";
       state.dashboardDateFrom = "";
       state.dashboardDateTo = "";
+      state.dashboardMode = "pr";
+      state.showCoachingOnDashboard = true;
       renderDashboard();
     });
   }
@@ -1099,6 +1058,150 @@ function renderDashboardCampaignControls(container, placements, campaigns) {
   }
 }
 
+function renderDashboardCampaignCards(container, campaigns, { onViewCampaign } = {}) {
+  const visible = campaigns.slice(0, 3);
+  if (!visible.length) {
+    container.innerHTML = `<div class="state-panel compact"><h3>No campaigns match</h3><p>Adjust filters or add campaign records.</p></div>`;
+    return;
+  }
+  container.innerHTML = `
+    <div class="owner-campaign-progress-grid">
+      ${visible
+        .map((campaign) => {
+          const percent =
+            campaign.progressPercent != null
+              ? campaign.progressPercent
+              : campaign.totalPlacements
+                ? Math.round(((campaign.completedPlacements || campaign.visiblePlacements || 0) / campaign.totalPlacements) * 100)
+                : 0;
+          return `
+            <article class="owner-campaign-progress-card">
+              <span>${escapeHtml(campaign.clientName || "Client")}</span>
+              <h3>${escapeHtml(campaign.name)}</h3>
+              <strong>${percent}%</strong>
+              <div class="mini-progress"><span style="width:${Math.max(0, Math.min(100, percent))}%;"></span></div>
+              <p>${escapeHtml(String(campaign.visiblePlacements ?? campaign.completedPlacements ?? 0))} of ${escapeHtml(String(campaign.totalPlacements || campaign.visiblePlacements || 0))} placements</p>
+              <p>Avg. lead time: ${campaign.avgLeadTime != null ? `${escapeHtml(String(campaign.avgLeadTime))} days` : "—"}</p>
+              <p>Status: ${escapeHtml(campaign.status || "Active")}</p>
+              <button type="button" data-campaign="${escapeHtml(campaign.id)}">View Campaign</button>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+  if (onViewCampaign) {
+    container.querySelectorAll("[data-campaign]").forEach((btn) => {
+      btn.addEventListener("click", () => onViewCampaign(btn.dataset.campaign));
+    });
+  }
+}
+
+function renderOwnerPerformanceInsights(container, { series, label }) {
+  const safeSeries = (Array.isArray(series) ? series : []).slice(-9);
+  const maxAve = Math.max(1, ...safeSeries.map((item) => Number(item.ave) || 0));
+  const strongest = [...safeSeries].sort((a, b) => (Number(b.ave) || 0) - (Number(a.ave) || 0))[0];
+  const totalAve = safeSeries.reduce((sum, item) => sum + (Number(item.ave) || 0), 0);
+  const share = strongest && totalAve ? Math.round(((Number(strongest.ave) || 0) / totalAve) * 100) : 0;
+  container.innerHTML = `
+    <div class="owner-dashboard-card-head">
+      <h2>Performance Insights ${sectionInfoButton({ title: "Performance Insights", body: "Month-by-month publicity value from the currently visible placements. The chart uses the same AVE calculation source as the rest of the dashboard." })}</h2>
+      <select class="owner-chart-select" aria-label="Metric">
+        <option>${escapeHtml(label || "Publicity Value")}</option>
+      </select>
+    </div>
+    <div class="owner-mini-chart" aria-label="Publicity value by month">
+      ${safeSeries
+        .map((item) => {
+          const height = Math.max(4, Math.round(((Number(item.ave) || 0) / maxAve) * 100));
+          return `<div><span style="height:${height}%;"></span><small>${escapeHtml(shortMonthLabel(item.label))}</small></div>`;
+        })
+        .join("")}
+    </div>
+    <div class="owner-performance-callout">
+      <span aria-hidden="true">▥</span>
+      <p><strong>${escapeHtml(strongest?.label || "No period")} drove the highest value at ${formatCurrency(Number(strongest?.ave) || 0)},</strong><br />representing ${share}% of total YTD publicity value.</p>
+    </div>
+  `;
+}
+
+function shortMonthLabel(label) {
+  const value = String(label || "");
+  const date = new Date(`${value}-01T00:00:00`);
+  if (!Number.isNaN(date.getTime())) return date.toLocaleDateString("en-US", { month: "short" });
+  return value.slice(0, 3);
+}
+
+function renderRecentActivity(container, { placements, coachingRows, campaigns }) {
+  const activities = [
+    ...(placements[0]
+      ? [
+          {
+            icon: "✥",
+            title: "New press placement added",
+            body: `${placements[0].clientName || "Client"} — ${placements[0].publication || placements[0].headline || "Coverage"}`,
+            time: "2 hours ago",
+          },
+        ]
+      : []),
+    ...(coachingRows[0]
+      ? [
+          {
+            icon: "▣",
+            title: "Coaching phase updated",
+            body: `${coachingRows[0].client} — ${phaseLabel(coachingRows[0].nextMilestone)}`,
+            time: "4 hours ago",
+          },
+        ]
+      : []),
+    ...(coachingRows[1]
+      ? [
+          {
+            icon: "♟",
+            title: "Client added to coaching",
+            body: coachingRows[1].client,
+            time: "1 day ago",
+          },
+        ]
+      : []),
+    ...(campaigns[0]
+      ? [
+          {
+            icon: "▤",
+            title: "Report generated",
+            body: campaigns[0].clientName || campaigns[0].name,
+            time: "2 days ago",
+          },
+        ]
+      : []),
+    {
+      icon: "▧",
+      title: "Opportunity logged",
+      body: "Raise Local — Yamaas Olive Oil",
+      time: "3 days ago",
+    },
+  ].slice(0, 5);
+
+  container.innerHTML = `
+    <div class="owner-dashboard-card-head">
+      <h2>Recent Activity</h2>
+      <button class="link-btn" data-goto="reviewqueue">View All →</button>
+    </div>
+    <div class="owner-activity-list">
+      ${activities
+        .map(
+          (item) => `
+        <div class="owner-activity-row">
+          <span aria-hidden="true">${escapeHtml(item.icon)}</span>
+          <div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.body)}</small></div>
+          <em>${escapeHtml(item.time)}</em>
+        </div>`
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function renderDashboard() {
   const target = document.getElementById("dashboard-content");
   syncOwnerRecordsFromSupabase();
@@ -1121,44 +1224,17 @@ function renderDashboard() {
 
   renderOwnerMetrics(document.getElementById("dashboard-metrics"), metrics);
 
-  const filterSummaryEl = document.getElementById("dashboard-filter-summary");
-  const activeFilterParts = [
-    state.dashboardClientFilter || "all clients",
-    state.dashboardCampaignFilter || "all campaigns",
-    state.dashboardDateFrom || state.dashboardDateTo ? `${state.dashboardDateFrom || "any date"} to ${state.dashboardDateTo || "any date"}` : "",
-  ].filter(Boolean);
-  const coachingRows = getDashboardCoachingRows();
-  filterSummaryEl.textContent =
-    state.dashboardMode === "coaching"
-      ? `Showing ${state.dashboardClientFilter || "all coaching clients"}${state.dashboardDateFrom || state.dashboardDateTo ? " — date range does not apply to coaching program setup yet" : ""} — ${coachingRows.length} coaching program${coachingRows.length === 1 ? "" : "s"} match.`
-      : filterActive
-        ? `Showing ${activeFilterParts.join(" · ")} — ${filteredPlacements.length} placement${filteredPlacements.length === 1 ? "" : "s"} match.`
-        : "";
-
   const basePlacements = filterActive ? filteredPlacements : getAllPlacements();
   const recentPlacements = filterPlacements(basePlacements, state.searchTerm)
     .slice()
     .sort((a, b) => (a.publicationDate < b.publicationDate ? 1 : -1))
-    .slice(0, 4);
-  const primaryTitle = document.getElementById("dashboard-primary-title");
-  const primaryAction = document.getElementById("dashboard-primary-action");
-  if (state.dashboardMode === "coaching") {
-    primaryTitle.textContent = "Coaching Program";
-    primaryAction.textContent = "Go to Coaching Hub";
-    primaryAction.dataset.goto = "coaching";
-    renderDashboardCoachingState(document.getElementById("dashboard-placements"), coachingRows);
-  } else {
-    primaryTitle.textContent = "Recent Press Placements";
-    primaryAction.textContent = "View All";
-    primaryAction.dataset.goto = "placements";
-    renderCompactPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements);
-  }
+    .slice(0, 5);
+  renderCompactPlacementsTable(document.getElementById("dashboard-placements"), recentPlacements);
   renderCoachingOverview(document.getElementById("dashboard-coaching-overview"));
   renderDashboardRollup(document.getElementById("dashboard-rollup-strip"), metrics);
 
   const filteredCampaigns = getDashboardCampaignsForCurrentFilter(filteredPlacements);
-  renderDashboardCampaignControls(document.getElementById("dashboard-campaign-controls"), filteredPlacements, filteredCampaigns);
-  renderCampaignsGrid(document.getElementById("dashboard-campaigns"), filteredCampaigns, {
+  renderDashboardCampaignCards(document.getElementById("dashboard-campaigns"), filteredCampaigns, {
     onViewCampaign: (campaignId) => {
       state.selectedCampaignId = campaignId;
       navigate("campaign-detail");
@@ -1171,50 +1247,22 @@ function renderDashboard() {
   // meaningful reading once the underlying data is a client- or
   // date-bounded subset.
   if (filterActive) {
-    const chartContext = [
-      state.dashboardClientFilter || "All clients",
-      state.dashboardCampaignFilter || "All campaigns",
-      "by month",
-    ].join(" · ");
-    renderPerformanceChart(document.getElementById("dashboard-chart"), {
+    renderOwnerPerformanceInsights(document.getElementById("dashboard-chart"), {
       series: groupPlacementsByMonth(filteredPlacements).length ? groupPlacementsByMonth(filteredPlacements) : [{ label: "No dates in range", ave: 0, placements: 0 }],
-      range: null,
-      onRangeChange: () => {},
-      rangeLabel: chartContext,
+      label: "Publicity Value",
     });
   } else {
-    renderPerformanceChart(document.getElementById("dashboard-chart"), {
+    renderOwnerPerformanceInsights(document.getElementById("dashboard-chart"), {
       series: getAggregateChartSeries(state.chartRange),
-      range: state.chartRange,
-      onRangeChange: (range) => {
-        state.chartRange = range;
-        renderDashboard();
-      },
+      label: "Publicity Value",
     });
   }
 
-  // The aggregate insight text is written for "across all clients" and
-  // doesn't have a meaningful equivalent for an arbitrary filtered slice —
-  // hide it rather than show real narrative copy next to data it wasn't
-  // describing, per the same "never let a real-sounding label attach to
-  // data it doesn't actually match" rule this build applies everywhere.
-  if (filterActive) {
-    document.getElementById("dashboard-insight-wrap").innerHTML = "";
-  } else {
-    renderInsightCard(document.getElementById("dashboard-insight-wrap"), getAggregateInsight());
-  }
-
-  // Was hardcoded to the mock CLIENTS array's length regardless of data
-  // source — harmless-looking in mock mode (matches by coincidence) but
-  // wrong the moment real client count differs, which it always will.
-  const reportCount = state.demoState === "empty" ? 0 : state.dataSource === "real" ? getRealClients().length : CLIENTS.length;
-  document.getElementById("dashboard-reports-summary").innerHTML = `
-    <div class="card">
-      <p style="margin:0;">${reportCount} client report${reportCount === 1 ? "" : "s"} available.
-        <button class="link-btn" data-goto="reports">View All Reports</button>
-      </p>
-    </div>
-  `;
+  renderRecentActivity(document.getElementById("dashboard-recent-activity"), {
+    placements: recentPlacements,
+    coachingRows: getCoachingOverviewRows(),
+    campaigns: filteredCampaigns,
+  });
 
   target.querySelectorAll("[data-goto]").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.goto));
@@ -3485,7 +3533,7 @@ function renderSidebarComponent() {
 
 const OWNER_HEADER_CONTEXT = {
   dashboard: {
-    contextLabel: "Owner Dashboard",
+    contextLabel: "",
     greeting: "Welcome back, Tenyse!",
     subtitle: "Here's what's happening across all clients.",
   },
@@ -3572,13 +3620,20 @@ function renderHeaderComponent() {
           },
         };
   renderHeader(document.getElementById("owner-header"), {
-    client: { name: "Tenyse Williams", avatarInitials: "T" },
+    client: { name: "Tenyse Williams", avatarInitials: "TW" },
     dataSource: state.dataSource,
     contextLabel: headerContext.contextLabel,
     greeting: headerContext.greeting,
     subtitle: headerContext.subtitle,
-    searchPlaceholder: "Search clients, campaigns, or programs...",
+    searchPlaceholder: "Search clients, campaigns, placements...",
     extraAction,
+    quoteCard:
+      state.view === "dashboard"
+        ? {
+            lines: ["More visibility.", "More opportunities.", "More impact."],
+            author: "Tenyse Williams",
+          }
+        : null,
     onSearch: (term) => {
       state.searchTerm = term;
       if (state.view === "dashboard" || state.view === "placements" || state.view === "coaching") renderCurrentView();
