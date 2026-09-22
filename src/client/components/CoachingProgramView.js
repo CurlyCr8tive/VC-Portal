@@ -253,7 +253,7 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
         <p><span aria-hidden="true">“</span>${escapeHtml(reflection?.text || "What's one partnership opportunity that excites you right now, and what would make it a good fit for your brand?")}</p>
         <textarea id="cp-reflection-response" rows="4" placeholder="Write your response here...">${escapeHtml(reflection?.response || "")}</textarea>
         <div class="cp-reflection-actions">
-          <button type="button" class="new-client-btn" id="cp-save-reflection" ${reflection ? "" : "disabled"}>Save Response</button>
+          <button type="button" class="new-client-btn" id="cp-save-reflection">Save Response</button>
           <small>${reflection?.status === "complete" ? "Saved" : "Last saved: Sep 10, 2026"}</small>
         </div>
         <div class="live-tip-panel" role="tooltip"><strong>Reflection Prompt</strong><p>This captures client context and gives Tenyse better coaching notes before the next call.</p><span>Save a response for Tenyse to review.</span></div>
@@ -325,10 +325,19 @@ export function renderCoachingProgramView(container, clientName, opts = {}) {
 
   function wireReflection(reflection) {
     const saveBtn = container.querySelector("#cp-save-reflection");
-    if (!saveBtn || !reflection) return;
+    if (!saveBtn) return;
     saveBtn.addEventListener("click", async () => {
       const response = container.querySelector("#cp-reflection-response").value;
-      if (!response.trim()) return;
+      if (!reflection) {
+        confirmation = "Tenyse has not assigned a reflection prompt yet.";
+        render();
+        return;
+      }
+      if (!response.trim()) {
+        confirmation = "Write a response before saving it for Tenyse.";
+        render();
+        return;
+      }
       const { phases } = getData();
       const phase = phases.find((item) => (item.homework || []).some((homework) => homework.id === reflection.id));
       if (!phase) return;

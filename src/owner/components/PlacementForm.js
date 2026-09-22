@@ -185,8 +185,8 @@ export function renderPlacementForm(
       </details>
 
       <div class="form-actions" style="display:flex; gap:10px;">
-        <button type="submit" class="btn-primary" ${submitDisabledReason ? "disabled" : ""} title="${escapeHtml(submitDisabledReason)}">
-          ${submitDisabledReason ? "Sign in to Save Placement" : isEdit ? "Save Changes" : "Add Placement"}
+        <button type="submit" class="btn-primary" title="${escapeHtml(submitDisabledReason)}">
+          ${submitDisabledReason ? "Preview Save Placement" : isEdit ? "Save Changes" : "Add Placement"}
         </button>
         ${isEdit ? `<button type="button" class="btn-secondary" id="op-cancel">Cancel</button>` : ""}
       </div>
@@ -428,6 +428,15 @@ export function renderPlacementForm(
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (submitDisabledReason) {
+      const message = container.querySelector("#op-submit-message") || document.createElement("p");
+      message.id = "op-submit-message";
+      message.className = "hint";
+      message.style.margin = "8px 0 0";
+      message.textContent = submitDisabledReason;
+      form.appendChild(message);
+      return;
+    }
     const raw = Object.fromEntries(new FormData(form).entries());
     const succeeded = await onSubmit(raw);
     if (succeeded) {

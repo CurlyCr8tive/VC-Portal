@@ -49,8 +49,8 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
           </div>
         </div>
         <div class="form-actions report-export-actions">
-          <button type="button" class="btn-secondary" id="canva-export-review-summary" ${clients.length === 0 ? "disabled" : ""}>Review + approve summary</button>
-          <button type="button" class="btn-primary" id="canva-export-generate" ${clients.length === 0 ? "disabled" : ""}>Download Canva CSV</button>
+          <button type="button" class="btn-secondary" id="canva-export-review-summary">Review + approve summary</button>
+          <button type="button" class="btn-primary" id="canva-export-generate">Download Canva CSV</button>
         </div>
       </div>
 
@@ -161,6 +161,15 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
   });
 
   container.querySelector("#canva-export-review-summary").addEventListener("click", () => {
+    if (!clients.length || !clientSelect.value) {
+      resultEl.innerHTML = `
+        <div class="report-action-feedback warn">
+          <strong>No report package is available yet.</strong>
+          Add or import a client with confirmed placements, then return here to approve the summary.
+        </div>
+      `;
+      return;
+    }
     const selected = clientSelect.selectedOptions[0];
     const targetId = selected?.dataset.reportTarget;
     const target = targetId ? document.getElementById(`summary-form-${targetId}`) : null;
@@ -186,6 +195,15 @@ export function renderCanvaExportPanel(container, { clients, onGenerate, getSumm
 
   container.querySelector("#canva-export-generate").addEventListener("click", () => {
     const clientName = clientSelect.value;
+    if (!clients.length || !clientName) {
+      resultEl.innerHTML = `
+        <div class="report-action-feedback warn">
+          <strong>No Canva export is ready yet.</strong>
+          Add a client and confirmed placement rows first; the CSV export will use that data plus an approved summary when available.
+        </div>
+      `;
+      return;
+    }
     const startDate = container.querySelector("#canva-export-start").value;
     const endDate = container.querySelector("#canva-export-end").value;
     const result = onGenerate({ clientName, startDate, endDate });

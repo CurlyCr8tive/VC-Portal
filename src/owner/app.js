@@ -3210,7 +3210,7 @@ function reviewDiscoveryCtaHtml() {
           <span>Client</span>
           <select id="review-discovery-client">${options || `<option value="">No clients yet</option>`}</select>
         </label>
-        <button type="button" class="primary-button" id="review-discovery-run" ${options ? "" : "disabled"}>Discover Mentions</button>
+        <button type="button" class="primary-button" id="review-discovery-run">Discover Mentions</button>
       </div>
       <p class="review-discovery-status" id="review-discovery-status" aria-live="polite"></p>
     </section>
@@ -3224,7 +3224,10 @@ function wireReviewDiscoveryCta() {
   if (!button || !select || !status) return;
   button.addEventListener("click", async () => {
     const clientName = select.value;
-    if (!clientName) return;
+    if (!clientName) {
+      status.textContent = "Add or import a client first, then run Discover Mentions.";
+      return;
+    }
     button.disabled = true;
     status.textContent = `Scanning for ${clientName} mentions…`;
     try {
@@ -3483,7 +3486,7 @@ function renderSummaryForm(container, clientName) {
       </div>
       <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-primary" id="summary-save-${cssId(clientName)}">Save Draft</button>
-        <button type="button" class="btn-secondary" id="summary-approve-${cssId(clientName)}" ${!existing ? "disabled" : ""} title="${!existing ? "Save a draft first" : "Approves the saved draft above — not unsaved edits in the box"}">Approve</button>
+        <button type="button" class="btn-secondary" id="summary-approve-${cssId(clientName)}">Approve</button>
         <button type="button" class="btn-secondary" id="summary-generate-${cssId(clientName)}">Generate with AI</button>
         <span id="summary-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
@@ -3498,14 +3501,24 @@ function renderSummaryForm(container, clientName) {
   });
 
   const approveBtn = container.querySelector(`#summary-approve-${cssId(clientName)}`);
-  if (approveBtn && !approveBtn.disabled) {
-    approveBtn.addEventListener("click", () => {
-      const summary = loadSummary(clientName);
-      approveSummary(clientName);
-      if (summary?.text) approveClientReport({ clientName, executiveSummary: summary.text });
-      renderReportsView();
-    });
-  }
+  approveBtn?.addEventListener("click", () => {
+    const textarea = container.querySelector(`#summary-text-${cssId(clientName)}`);
+    const draftText = textarea?.value.trim() || "";
+    if (!draftText) {
+      const generateStatus = container.querySelector(`#summary-generate-status-${cssId(clientName)}`);
+      if (generateStatus) generateStatus.textContent = "Add or generate summary text first, then Save Draft and Approve.";
+      textarea?.focus();
+      return;
+    }
+    if (!loadSummary(clientName)) {
+      saveSummary(clientName, draftText);
+      saveClientReportDraft({ clientName, executiveSummary: draftText });
+    }
+    const summary = loadSummary(clientName);
+    approveSummary(clientName);
+    if (summary?.text || draftText) approveClientReport({ clientName, executiveSummary: summary?.text || draftText });
+    renderReportsView();
+  });
 
   const generateBtn = container.querySelector(`#summary-generate-${cssId(clientName)}`);
   const generateStatus = container.querySelector(`#summary-generate-status-${cssId(clientName)}`);
@@ -3554,7 +3567,7 @@ function renderReportNarrativeForm(container, clientName) {
       </div>
       <div class="form-actions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button type="button" class="btn-secondary" id="narrative-generate-${cssId(clientName)}">Generate</button>
-        <button type="button" class="btn-secondary" id="narrative-copy-${cssId(clientName)}" disabled>Copy Narrative</button>
+        <button type="button" class="btn-secondary" id="narrative-copy-${cssId(clientName)}">Copy Narrative</button>
         <span id="narrative-generate-status-${cssId(clientName)}" style="font-size:0.8rem; color:var(--text-secondary);"></span>
       </div>
     </div>
@@ -3582,7 +3595,6 @@ function renderReportNarrativeForm(container, clientName) {
     const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
     if (result.ok) {
       textarea.value = result.text;
-      copyBtn.disabled = false;
       statusEl.textContent = "Draft ready — review, then copy into the final report.";
     } else {
       statusEl.textContent = result.message;
@@ -3591,7 +3603,11 @@ function renderReportNarrativeForm(container, clientName) {
 
   copyBtn?.addEventListener("click", async () => {
     const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
-    if (!textarea.value.trim()) return;
+    if (!textarea.value.trim()) {
+      statusEl.textContent = "Generate the narrative first, then copy it.";
+      generateBtn.focus();
+      return;
+    }
     try {
       await navigator.clipboard.writeText(textarea.value);
       statusEl.textContent = "Narrative copied.";
