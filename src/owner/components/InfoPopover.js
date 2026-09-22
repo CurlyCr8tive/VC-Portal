@@ -19,27 +19,12 @@
 // is called exactly once, at app startup.
 
 let popoverEl = null;
-let closeTimer = null;
-
-function cancelPopoverClose() {
-  if (!closeTimer) return;
-  window.clearTimeout(closeTimer);
-  closeTimer = null;
-}
-
-function schedulePopoverClose() {
-  cancelPopoverClose();
-  closeTimer = window.setTimeout(closePopover, 140);
-}
-
 function ensurePopoverEl() {
   if (popoverEl) return popoverEl;
   popoverEl = document.createElement("div");
   popoverEl.className = "info-popover";
   popoverEl.hidden = true;
   popoverEl.setAttribute("role", "dialog");
-  popoverEl.addEventListener("pointerenter", cancelPopoverClose);
-  popoverEl.addEventListener("pointerleave", schedulePopoverClose);
   document.body.appendChild(popoverEl);
   return popoverEl;
 }
@@ -54,12 +39,10 @@ function escapePopoverText(value) {
 }
 
 function closePopover() {
-  cancelPopoverClose();
   if (popoverEl) popoverEl.hidden = true;
 }
 
 function openPopoverFor(button) {
-  cancelPopoverClose();
   const el = ensurePopoverEl();
   const title = button.dataset.infoTitle || "";
   const body = button.dataset.infoBody || "";
@@ -117,32 +100,8 @@ export function installInfoPopoverDelegate() {
     true
   );
 
-  document.addEventListener("pointerover", (e) => {
-    const trigger = e.target.closest(".info-popover-trigger");
-    if (!trigger) return;
-    openPopoverFor(trigger);
-  });
-
-  document.addEventListener("pointerout", (e) => {
-    const trigger = e.target.closest(".info-popover-trigger");
-    if (!trigger) return;
-    if (trigger.contains(e.relatedTarget)) return;
-    schedulePopoverClose();
-  });
-
-  document.addEventListener("focusin", (e) => {
-    const trigger = e.target.closest(".info-popover-trigger");
-    if (!trigger) return;
-    openPopoverFor(trigger);
-  });
-
-  document.addEventListener("focusout", (e) => {
-    const trigger = e.target.closest(".info-popover-trigger");
-    if (!trigger) return;
-    schedulePopoverClose();
-  });
-
   document.addEventListener("click", (e) => {
+    if (e.target.closest(".info-popover-trigger")) return;
     if (popoverEl && !popoverEl.hidden && !popoverEl.contains(e.target)) closePopover();
   });
   document.addEventListener("keydown", (e) => {

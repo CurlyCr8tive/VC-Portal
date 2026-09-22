@@ -34,7 +34,7 @@ import { renderReportCard } from "../client/components/LatestReportCard.js?v=202
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260922-populated-pages";
-import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260922-popover-capture";
+import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260922-popover-click-only";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-analytics-clicks";
 import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-live-ui";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-live-ui";
@@ -2387,7 +2387,7 @@ function renderClientsView() {
                   <td>${clientRowAve(client)}</td>
                   <td>
                     <div class="clients-row-actions">
-                      <button type="button" class="reports-action-button" data-client-view="${escapeHtml(client.name)}">View</button>
+                      <button type="button" class="reports-action-button" data-client-view="${escapeHtml(client.name)}" aria-label="View ${escapeHtml(client.name)} dashboard">View</button>
                       <details class="clients-row-menu">
                         <summary aria-label="More actions for ${escapeHtml(client.name)}">⋮</summary>
                         <div class="clients-row-menu-list">
@@ -2539,6 +2539,7 @@ function wireClientsTableActions({ allClients, filteredClients, canManageClients
       state.dashboardDateFrom = "";
       state.dashboardDateTo = "";
       navigate("dashboard");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
   document.querySelectorAll("[data-client-edit]").forEach((btn) => {
