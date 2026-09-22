@@ -65,6 +65,7 @@ import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260919-live-ui";
+import { downloadReportPdf } from "../reportPdf.js";
 import { seedSamplePlacements } from "./seedSampleData.js";
 import { seedRealCaseStudyData, backfillAveDataQuality, inventDemoDayGapsForPreview, applyOutletRatesToPreviewPlacements } from "./seedRealCaseStudyData.js";
 import { seedGreyzBistroCoachingData } from "./seedGreyzBistroCoachingData.js?v=20260921-rich-greyz-owner";
@@ -171,6 +172,7 @@ const state = {
   clientsSearch: "",
   clientCommsPanel: null,
   clientsActionPanel: null,
+  selectedClientDetail: "",
   clientCommsStatus: "idle",
   clientCommsData: null,
   realClientsSync: "idle", // idle | loading | loaded | error
@@ -2305,10 +2307,11 @@ function renderClientsView() {
   syncRealClientsFromSupabase();
 
   const canManageClients = shouldUseOwnerApi();
-  const isEditing = canManageClients && state.editingClient;
+  const isEditing = Boolean(state.editingClient);
   const editingRecord = isEditing && state.editingClient !== true ? findClientByName(state.editingClient) : null;
   const allClients = getClientsWithMetrics();
   const filteredClients = applyClientsFilters(allClients);
+  const selectedClientDetail = state.selectedClientDetail ? clientByIdOrName(allClients, state.selectedClientDetail) : null;
   const summary = buildClientsSummary(allClients);
   const { industries, programs } = clientsFilterOptions(allClients);
   const insights = buildClientsInsights(allClients);
@@ -2318,6 +2321,7 @@ function renderClientsView() {
     <div class="clients-dashboard">
     ${ownerApiAuthHint()}
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
+    ${selectedClientDetail ? renderClientDetailDrawer(selectedClientDetail) : ""}
     ${
       state.dataSource === "real" && state.realClientsSync === "error"
         ? `<p class="hint" style="margin-bottom:12px;">Using demo-ready client data for this walkthrough.</p>`
@@ -2388,7 +2392,7 @@ function renderClientsView() {
                   <td>${clientRowAve(client)}</td>
                   <td>
                     <div class="clients-row-actions">
-                      <button type="button" class="reports-action-button" data-client-view="${escapeHtml(client.name)}" aria-label="View ${escapeHtml(client.name)} dashboard">View</button>
+                      <button type="button" class="reports-action-button" data-client-view="${escapeHtml(client.name)}" aria-label="View ${escapeHtml(client.name)} client details">View</button>
                       <details class="clients-row-menu">
                         <summary aria-label="More actions for ${escapeHtml(client.name)}">⋮</summary>
                         <div class="clients-row-menu-list">
@@ -2427,7 +2431,7 @@ function renderClientsView() {
         <section class="reports-panel reports-quick-actions clients-quick-actions">
           <h2>Quick Actions</h2>
           <button type="button" id="clients-quick-add">＋ Add New Client</button>
-          <button type="button" id="clients-quick-import">⇩ Import Clients (CSV)</button>
+          <button type="button" id="clients-quick-import">⇩ Import Workflow Preview (CSV)</button>
           <button type="button" id="clients-quick-export">⇧ Export Client Data (CSV)</button>
           <button type="button" id="clients-quick-programs">▣ Manage Programs</button>
           <button type="button" id="clients-quick-reports">▤ View Client Reports</button>
@@ -2483,14 +2487,19 @@ function renderClientsView() {
       initialData: editingRecord || (state.editingClient !== true ? { name: state.editingClient } : null),
       onSubmit: async (raw) => {
         try {
-          if (editingRecord) {
+          if (canManageClients && editingRecord) {
             const saved = await saveRealClient({ raw, existingRecord: editingRecord });
             updateClient(applyClientEdit(editingRecord, saved));
-          } else {
+          } else if (canManageClients) {
             const saved = await saveRealClient({ raw });
             addClient(createClient(saved));
+          } else if (editingRecord) {
+            updateClient(applyClientEdit(editingRecord, raw));
+          } else {
+            addClient(createClient(raw));
           }
           state.editingClient = null;
+          state.selectedClientDetail = raw.name;
           renderClientsView();
         } catch (err) {
           alert(err.message);
@@ -2510,6 +2519,73 @@ function clientByIdOrName(clients, value) {
   return clients.find((client) => client.id === value || client.name === value);
 }
 
+function renderClientDetailDrawer(client) {
+  const campaigns = getAllCampaigns().filter((campaign) => campaign.clientName === client.name || campaign.client === client.name);
+  const placements = getAllPlacements().filter((placement) => (placement.clientName || placement.client) === client.name);
+  const profile = client.profile || {};
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === "active");
+  const latestPlacement = placements
+    .slice()
+    .sort((a, b) => String(b.publicationDate || b.landedDate || "").localeCompare(String(a.publicationDate || a.landedDate || "")))[0];
+  return `
+    <section class="reports-panel client-detail-drawer" id="client-detail-drawer" aria-label="${escapeHtml(client.name)} client details">
+      <div class="client-detail-drawer-head">
+        <div>
+          <p class="eyebrow">Client Detail</p>
+          <h2>${escapeHtml(client.name)}</h2>
+          <p>${escapeHtml(clientSecondaryLine(client))}</p>
+        </div>
+        <button type="button" class="link-btn" id="client-detail-close">Close</button>
+      </div>
+      <div class="client-detail-grid">
+        <article>
+          <span>Status</span>
+          <strong>${escapeHtml(clientStatusLabel(profile.status))}</strong>
+          <small>${escapeHtml(profile.engagementType ? `Engagement: ${profile.engagementType.replace(/_/g, " + ")}` : "Engagement not specified")}</small>
+        </article>
+        <article>
+          <span>Placements</span>
+          <strong>${escapeHtml(String(client.metrics?.totalPlacements ?? placements.length))}</strong>
+          <small>${latestPlacement ? `${escapeHtml(latestPlacement.publication || latestPlacement.outlet || "Latest outlet")} · ${escapeHtml(latestPlacement.publicationDate || latestPlacement.landedDate || "")}` : "No placement rows yet"}</small>
+        </article>
+        <article>
+          <span>AVE</span>
+          <strong>${clientRowAve(client)}</strong>
+          <small>${escapeHtml(formatCompactNumber(client.metrics?.avgReach || placements.reduce((sum, item) => sum + Number(item.audienceReach || item.estimatedReach || 0), 0)))} estimated reach</small>
+        </article>
+        <article>
+          <span>Campaigns</span>
+          <strong>${escapeHtml(String(campaigns.length))}</strong>
+          <small>${activeCampaigns.length ? `${activeCampaigns.length} active` : "No active campaign marked"}</small>
+        </article>
+      </div>
+      <div class="client-detail-two-col">
+        <div>
+          <h3>Profile</h3>
+          <p><strong>Industry:</strong> ${escapeHtml(clientIndustryDisplay(client))}</p>
+          <p><strong>Contact:</strong> ${escapeHtml(profile.contactEmail || "No contact email on file")}</p>
+          <p><strong>Notes:</strong> ${escapeHtml(profile.notes || "No owner notes yet.")}</p>
+        </div>
+        <div>
+          <h3>Next Useful Actions</h3>
+          <ul>
+            <li>${placements.length ? "Review report-ready placements and AVE." : "Add a confirmed placement before reporting."}</li>
+            <li>${campaigns.length ? "Open the campaign workspace for deeper context." : "Create or attach a campaign when work begins."}</li>
+            <li>${profile.contactEmail ? "Invite or message the client from the row menu." : "Add a contact email before inviting to portal."}</li>
+          </ul>
+        </div>
+      </div>
+      <div class="client-detail-actions">
+        <button type="button" class="btn-secondary" id="client-detail-open-dashboard">Open Filtered Dashboard</button>
+        <button type="button" class="btn-secondary" id="client-detail-open-reports">Open Reports</button>
+        <button type="button" class="btn-secondary" id="client-detail-scan">Scan for Mentions</button>
+        ${["coaching", "pr_and_coaching"].includes(profile.engagementType || "") ? `<button type="button" class="btn-secondary" id="client-detail-open-coaching">Open Coaching</button>` : ""}
+      </div>
+      <p class="clients-row-status" id="client-detail-status" aria-live="polite"></p>
+    </section>
+  `;
+}
+
 function renderClientsActionPanel(allClients) {
   const panel = state.clientsActionPanel;
   if (!panel) return "";
@@ -2519,10 +2595,11 @@ function renderClientsActionPanel(allClients) {
   const panelCopy = {
     import: {
       eyebrow: "Import workflow",
-      title: "CSV import preview",
-      body: "Use this when Tenyse wants to bring in a batch of prospects or legacy clients. The live save is gated to the owner account, but the demo path shows the required fields and what gets created.",
+      title: "CSV import workflow preview",
+      body: "This is a preview workflow, not a silent importer. Use it to verify a CSV before adding clients; the live database save still requires the owner account.",
       bullets: ["Required: Client name, contact email, industry, status", "Optional: program enrollment, campaign count, notes, next outreach date", "After import: review unconfirmed clients, invite to portal, then attach campaigns or coaching"],
       actions: [
+        { label: "Choose CSV to Preview", id: "clients-panel-choose-csv" },
         { label: "Open Add Client Form", id: "clients-panel-add" },
         { label: "Export Current Template", id: "clients-panel-export" },
       ],
@@ -2581,6 +2658,7 @@ function renderClientsActionPanel(allClients) {
       <div class="clients-action-panel-buttons">
         ${panelCopy.actions.map((action) => `<button type="button" class="btn-secondary" id="${escapeHtml(action.id)}">${escapeHtml(action.label)}</button>`).join("")}
       </div>
+      ${panel.type === "import" ? `<input type="file" id="clients-import-file" accept=".csv,text/csv" hidden /><p class="clients-import-feedback" id="clients-import-feedback" aria-live="polite">Choose a CSV to preview row count and headers before importing.</p>` : ""}
     </section>
   `;
 }
@@ -2595,6 +2673,46 @@ function openClientsActionPanel(type, clientName = "") {
   setTimeout(() => document.getElementById("clients-action-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
 }
 
+function previewClientCsvFile(file) {
+  const feedback = document.getElementById("clients-import-feedback");
+  if (!file || !feedback) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result || "");
+    const rows = text
+      .split(/\r?\n/)
+      .map((row) => row.trim())
+      .filter(Boolean);
+    const headers = rows[0]?.split(",").map((value) => value.trim()).filter(Boolean) || [];
+    const missing = ["name", "contactEmail", "industry", "status"].filter((field) => !headers.some((header) => header.toLowerCase() === field.toLowerCase()));
+    feedback.innerHTML = `
+      <strong>${escapeHtml(file.name)}</strong>: ${Math.max(rows.length - 1, 0)} data row${rows.length === 2 ? "" : "s"} detected.
+      Headers: ${headers.length ? escapeHtml(headers.join(", ")) : "none found"}.
+      ${missing.length ? `<span>Missing suggested columns: ${escapeHtml(missing.join(", "))}.</span>` : "<span>Looks ready for a live import review.</span>"}
+    `;
+  };
+  reader.onerror = () => {
+    feedback.textContent = "Could not read this CSV. Try exporting a fresh template and uploading again.";
+  };
+  reader.readAsText(file);
+}
+
+async function runClientDiscoveryFromDetail(client) {
+  const statusEl = document.getElementById("client-detail-status");
+  if (!client) return;
+  if (statusEl) statusEl.textContent = `Scanning ${client.name} mentions...`;
+  try {
+    const result = await discoveryScanClient({ clientName: client.name });
+    if (statusEl) {
+      statusEl.textContent = result.ok
+        ? `${result.demoPreview ? "Demo-safe scan: " : ""}${result.matched ?? 0} matched, ${result.inserted ?? 0} added to Review Queue.`
+        : result.message || "Scan could not complete.";
+    }
+  } catch (err) {
+    if (statusEl) statusEl.textContent = "Scan could not complete.";
+  }
+}
+
 function wireClientsTableActions({ allClients, filteredClients, canManageClients }) {
   document.getElementById("clients-export-csv")?.addEventListener("click", () => downloadClientsCsv(filteredClients));
   document.getElementById("clients-quick-export")?.addEventListener("click", () => downloadClientsCsv(allClients));
@@ -2607,22 +2725,20 @@ function wireClientsTableActions({ allClients, filteredClients, canManageClients
     renderClientsView();
   });
   document.getElementById("clients-panel-add")?.addEventListener("click", () => {
-    if (!canManageClients) {
-      openClientsActionPanel("import");
-      return;
-    }
     state.editingClient = true;
+    state.clientsActionPanel = null;
     renderClientsView();
   });
+  document.getElementById("clients-panel-choose-csv")?.addEventListener("click", () => document.getElementById("clients-import-file")?.click());
+  document.getElementById("clients-import-file")?.addEventListener("change", (event) => previewClientCsvFile(event.target.files?.[0]));
   document.getElementById("clients-panel-export")?.addEventListener("click", () => downloadClientsCsv(allClients));
   document.getElementById("clients-panel-export-visible")?.addEventListener("click", () => downloadClientsCsv(filteredClients));
   document.getElementById("clients-panel-view")?.addEventListener("click", () => {
     const client = allClients.find((item) => item.name === state.clientsActionPanel?.clientName) || allClients.find((item) => item.name === "Greyz Bistro") || allClients[0];
     if (!client) return;
-    state.dashboardClientFilter = client.name;
-    state.dashboardDateFrom = "";
-    state.dashboardDateTo = "";
-    navigate("dashboard");
+    state.selectedClientDetail = client.name;
+    state.clientsActionPanel = null;
+    renderClientsView();
   });
   document.getElementById("clients-panel-reports")?.addEventListener("click", () => navigate("reports"));
   document.getElementById("clients-panel-review")?.addEventListener("click", () => navigate("reviewqueue"));
@@ -2639,11 +2755,8 @@ function wireClientsTableActions({ allClients, filteredClients, canManageClients
     renderClientsView();
   });
   document.getElementById("clients-quick-add")?.addEventListener("click", () => {
-    if (!canManageClients) {
-      openClientsActionPanel("import");
-      return;
-    }
     state.editingClient = true;
+    state.clientsActionPanel = null;
     renderClientsView();
   });
   document.getElementById("clients-quick-programs")?.addEventListener("click", () => navigate("coaching"));
@@ -2658,12 +2771,35 @@ function wireClientsTableActions({ allClients, filteredClients, canManageClients
 
   document.querySelectorAll("[data-client-view]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.dashboardClientFilter = btn.dataset.clientView;
-      state.dashboardDateFrom = "";
-      state.dashboardDateTo = "";
-      navigate("dashboard");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      state.selectedClientDetail = btn.dataset.clientView;
+      state.clientsActionPanel = null;
+      renderClientsView();
+      window.setTimeout(() => document.getElementById("client-detail-drawer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     });
+  });
+  document.getElementById("client-detail-close")?.addEventListener("click", () => {
+    state.selectedClientDetail = "";
+    renderClientsView();
+  });
+  document.getElementById("client-detail-open-dashboard")?.addEventListener("click", () => {
+    const client = clientByIdOrName(allClients, state.selectedClientDetail);
+    if (!client) return;
+    state.dashboardClientFilter = client.name;
+    state.dashboardDateFrom = "";
+    state.dashboardDateTo = "";
+    navigate("dashboard");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.getElementById("client-detail-open-reports")?.addEventListener("click", () => navigate("reports"));
+  document.getElementById("client-detail-open-coaching")?.addEventListener("click", () => {
+    const client = clientByIdOrName(allClients, state.selectedClientDetail);
+    if (!client) return;
+    state.coachingSelectedClient = client.name;
+    navigate("coaching");
+  });
+  document.getElementById("client-detail-scan")?.addEventListener("click", () => {
+    const client = clientByIdOrName(allClients, state.selectedClientDetail);
+    runClientDiscoveryFromDetail(client);
   });
   document.querySelectorAll("[data-client-edit]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -3876,9 +4012,9 @@ function renderReportsOverview(container) {
       </article>
       <aside class="reports-panel reports-quick-actions">
         <h2>Quick Actions</h2>
-        <button type="button" data-report-builder-action>▧ Generate Custom Report</button>
-        <button type="button" data-report-builder-action>▣ Bulk Create Reports</button>
-        <button type="button" data-report-builder-action>▤ Export Client Data (CSV)</button>
+        <button type="button" data-report-builder-action="custom">▧ Generate Custom Report</button>
+        <button type="button" data-report-builder-action="bulk">▣ Bulk Create Reports</button>
+        <button type="button" data-report-builder-action="export">▤ Export Client Data (CSV)</button>
         <button type="button" data-goto="analytics">▥ View AVE Benchmarks</button>
         <button type="button" data-goto="reviewqueue">▱ Review Press Queue <span>3</span></button>
         <button type="button" data-goto="campaigns">▱ Manage Campaigns</button>
@@ -3889,12 +4025,12 @@ function renderReportsOverview(container) {
 
     <section class="reports-bottom-grid">
       <article class="reports-panel reports-recent">
-        <div class="reports-panel-head"><h2>Recent Reports</h2><button class="link-btn" data-report-builder-action>View All</button></div>
+        <div class="reports-panel-head"><h2>Recent Reports</h2><button class="link-btn" data-report-builder-action="custom">View All</button></div>
         <table class="reports-table">
           <thead><tr><th>Report Name</th><th>Client</th><th>Date Range</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>${recentReports
             .map(
-              (report) => `<tr><td>▤ ${escapeHtml(report.name)}</td><td>${escapeHtml(report.client)}</td><td>${escapeHtml(report.dateRange)}</td><td>${escapeHtml(report.created)}</td><td><button type="button" class="mini-action" data-view-report="${escapeHtml(report.client)}">◉ View</button><button type="button" class="mini-action" data-view-report="${escapeHtml(report.client)}">↧ Download</button></td></tr>`
+              (report) => `<tr><td>▤ ${escapeHtml(report.name)}</td><td>${escapeHtml(report.client)}</td><td>${escapeHtml(report.dateRange)}</td><td>${escapeHtml(report.created)}</td><td><button type="button" class="mini-action" data-view-report="${escapeHtml(report.client)}">◉ View</button><button type="button" class="mini-action" data-download-report="${escapeHtml(report.client)}">↧ Download</button></td></tr>`
             )
             .join("")}</tbody>
         </table>
@@ -3909,6 +4045,7 @@ function renderReportsOverview(container) {
         </ul>
       </aside>
     </section>
+    <div id="reports-overview-feedback" aria-live="polite"></div>
     </div>
   `;
   wireMetricCardNavigation(container);
@@ -3926,6 +4063,23 @@ function renderReportsOverview(container) {
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
+  container.querySelectorAll("[data-download-report]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const clientName = btn.dataset.downloadReport || "";
+      const client = getRealClients().find((item) => item.name === clientName);
+      const report = getRealReport(clientName);
+      if (report?.executiveSummary) {
+        downloadReportPdf(report);
+        return;
+      }
+      const el = client?.id ? document.getElementById(`report-${client.id}`) : null;
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      const feedback = document.getElementById("reports-overview-feedback");
+      if (feedback) {
+        feedback.innerHTML = `<div class="report-action-feedback warn"><strong>PDF preview not generated yet for ${escapeHtml(clientName)}.</strong> Save and approve an executive summary first, then Download PDF will create the report file.</div>`;
+      }
+    });
+  });
   container.querySelectorAll("[data-ave-client]").forEach((btn) => {
     btn.addEventListener("click", () => {
       renderAveCalculationPanel(document.getElementById("reports-ave-calculation-panel"), {
@@ -3934,7 +4088,29 @@ function renderReportsOverview(container) {
     });
   });
   container.querySelectorAll("[data-report-builder-action]").forEach((btn) => {
-    btn.addEventListener("click", () => document.getElementById("report-builder-start")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.reportBuilderAction || "custom";
+      if (action === "bulk") {
+        document.getElementById("canva-export-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        const result = document.getElementById("canva-export-result");
+        if (result) {
+          result.innerHTML = `
+            <div class="report-action-feedback success">
+              <strong>Canva Bulk Create workflow opened.</strong>
+              Choose a report package, confirm the reporting window, then download the Canva-ready CSV for template upload.
+            </div>
+          `;
+        }
+        document.querySelector(".report-export-card")?.classList.add("report-work-card-highlight");
+        window.setTimeout(() => document.querySelector(".report-export-card")?.classList.remove("report-work-card-highlight"), 1600);
+        return;
+      }
+      document.getElementById("report-builder-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const feedback = document.getElementById("reports-overview-feedback");
+      if (feedback && action === "export") {
+        feedback.innerHTML = `<div class="report-action-feedback success"><strong>Export area opened.</strong> Use the client-level Export CSV buttons or the Canva Bulk Create CSV panel below.</div>`;
+      }
+    });
   });
   container.querySelectorAll("[data-copy-report-link]").forEach((btn) => {
     btn.addEventListener("click", async () => {
