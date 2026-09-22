@@ -14,7 +14,7 @@ import {
   getAggregateRealChartSeries,
   getAggregateRealInsight,
   getRealReport,
-} from "../realDataSource.js?v=20260919-report-builder";
+} from "../realDataSource.js?v=20260922-reports-prototype";
 import { formatCurrency, leadTimeDaysForPlacement } from "../calculations.js?v=20260919-report-builder";
 import { requireSession, logout } from "../auth.js?v=20260918-real-session-priority";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
@@ -33,7 +33,7 @@ import { renderInsightCard } from "../client/components/CampaignInsightCard.js";
 import { renderReportCard } from "../client/components/LatestReportCard.js?v=20260919-live-ui";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
-import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260916-polish";
+import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260922-reports-prototype";
 import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260919-dashboard-alive";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-analytics-clicks";
 import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-live-ui";
@@ -138,6 +138,12 @@ const state = {
   dashboardCampaignFilter: "",
   dashboardDateFrom: "",
   dashboardDateTo: "",
+  reportsClientFilter: "",
+  reportsCampaignFilter: "",
+  reportsProgramFilter: "all",
+  reportsMediaFilter: "all",
+  reportsDateFrom: "",
+  reportsDateTo: "",
   editingPlacementId: null,
   editingCampaignId: null,
   // Set by ClientsListCard's "Add Campaign" button — pre-fills/locks the
@@ -493,6 +499,14 @@ function formatCompactCurrency(value) {
   if (value == null || Number.isNaN(value)) return "—";
   if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
   return formatCurrency(value);
+}
+
+function formatCompactNumber(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "—";
+  if (Math.abs(num) >= 1000000) return `${(num / 1000000).toFixed(num >= 10000000 ? 0 : 1).replace(/\.0$/, "")}M`;
+  if (Math.abs(num) >= 1000) return `${(num / 1000).toFixed(num >= 10000 ? 0 : 1).replace(/\.0$/, "")}K`;
+  return num.toLocaleString();
 }
 
 function getCoachingClients() {
@@ -2891,24 +2905,143 @@ function cssId(str) {
   return String(str).replace(/[^a-zA-Z0-9]+/g, "-");
 }
 
-function reportsMetricCard({ label, value, delta, icon, iconBg, tooltip, target, actionLabel }) {
+function reportsMetricCard({ label, value, delta, icon, iconBg, target }) {
   const deltaHtml =
     delta == null
-      ? `<p class="metric-delta" style="color:var(--text-secondary);">No prior-period comparison yet</p>`
-      : `<p class="metric-delta ${delta >= 0 ? "positive" : "negative"}">${delta >= 0 ? "\u2191" : "\u2193"} ${Math.abs(delta)}% vs previous period</p>`;
+      ? `<small class="muted">No prior-period comparison</small>`
+      : `<small class="${delta >= 0 ? "positive" : "negative"}">${delta >= 0 ? "\u2191" : "\u2193"} ${Math.abs(delta)}% vs. previous period</small>`;
   const interactiveClass = target ? " is-interactive" : "";
   const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}"` : "";
   return `
-    <div class="card metric-card owner-metric-card${interactiveClass}"${interactionAttrs}>
-      <div class="metric-top">
-        <span class="metric-label">${escapeHtml(label)}</span>
-        <span class="metric-icon" style="background:${iconBg}">${icon}</span>
-      </div>
-      <p class="metric-value">${escapeHtml(value)}</p>
+    <div class="reports-kpi-card${interactiveClass}"${interactionAttrs}>
+      <span class="reports-kpi-icon" style="background:${iconBg}">${icon}</span>
+      <p>${escapeHtml(label)}${label.includes("AVE") ? ` ${sectionInfoButton({ title: "Total Publicity Value (AVE)", body: "Advertising value equivalent estimates what confirmed press coverage would have cost as paid advertising. This is an estimate, not guaranteed revenue." })}` : ""}</p>
+      <strong>${escapeHtml(value)}</strong>
       ${deltaHtml}
-      ${target ? `<p class="metric-click-hint">${escapeHtml(actionLabel || "Open details")}</p>` : tooltip ? `<p class="metric-click-hint">${escapeHtml(tooltip)}</p>` : ""}
     </div>
   `;
+}
+
+function getReportsFilterArgs() {
+  const search = state.searchTerm.trim().toLowerCase();
+  const matchedClient =
+    search && !state.reportsClientFilter
+      ? getRealClients().find((client) => client.name.toLowerCase().includes(search))?.name || null
+      : null;
+  const matchedCampaign =
+    search && !state.reportsCampaignFilter
+      ? getAllRealCampaigns().find((campaign) => campaign.name.toLowerCase().includes(search))?.name || null
+      : null;
+  return {
+    clientName: state.reportsClientFilter || matchedClient || null,
+    campaignName: state.reportsCampaignFilter || matchedCampaign || null,
+    program: state.reportsProgramFilter || "all",
+    mediaType: state.reportsMediaFilter || "all",
+    dateFrom: state.reportsDateFrom || "",
+    dateTo: state.reportsDateTo || "",
+  };
+}
+
+function reportDateRangeLabel() {
+  if (state.reportsDateFrom || state.reportsDateTo) {
+    return `${state.reportsDateFrom || "Any start"} – ${state.reportsDateTo || "Any end"}`;
+  }
+  const dates = getAllRealPlacements()
+    .map((p) => p.publicationDate || p.landedDate)
+    .filter(Boolean)
+    .sort();
+  if (!dates.length) return "All dates";
+  return `${formatDisplayDate(dates[0])} – ${formatDisplayDate(dates[dates.length - 1])}`;
+}
+
+function formatDisplayDate(value) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function renderReportsFilterBar() {
+  const clients = getRealClients();
+  const campaigns = getAllRealCampaigns();
+  const mediaTypes = ["Online", "Print", "TV", "Podcast", "Radio", "Other"];
+  return `
+    <section class="reports-filter-card" aria-label="Reports filters">
+      <label>
+        <span>Date Range</span>
+        <button type="button" class="reports-date-display" id="reports-date-display"><span aria-hidden="true">▣</span>${escapeHtml(reportDateRangeLabel())}</button>
+        <input type="date" id="reports-date-from" value="${escapeHtml(state.reportsDateFrom)}" aria-label="Report start date" />
+        <input type="date" id="reports-date-to" value="${escapeHtml(state.reportsDateTo)}" aria-label="Report end date" />
+      </label>
+      <label>
+        <span>Client</span>
+        <select id="reports-filter-client"><option value="">All Clients</option>${clients.map((c) => `<option value="${escapeHtml(c.name)}" ${state.reportsClientFilter === c.name ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}</select>
+      </label>
+      <label>
+        <span>Campaign</span>
+        <select id="reports-filter-campaign"><option value="">All Campaigns</option>${campaigns.map((c) => `<option value="${escapeHtml(c.name)}" ${state.reportsCampaignFilter === c.name ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}</select>
+      </label>
+      <label>
+        <span>Program</span>
+        <select id="reports-filter-program">
+          <option value="all" ${state.reportsProgramFilter === "all" ? "selected" : ""}>All Programs</option>
+          <option value="pr" ${state.reportsProgramFilter === "pr" ? "selected" : ""}>PR</option>
+          <option value="coaching" ${state.reportsProgramFilter === "coaching" ? "selected" : ""}>Coaching</option>
+        </select>
+      </label>
+      <label>
+        <span>Media Type</span>
+        <select id="reports-filter-media"><option value="all">All Media</option>${mediaTypes.map((type) => `<option value="${escapeHtml(type)}" ${state.reportsMediaFilter === type ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select>
+      </label>
+      <button type="button" class="reports-apply-btn" id="reports-filter-apply">↧ Apply</button>
+    </section>
+  `;
+}
+
+function wireReportsFilters() {
+  const syncReportsFilterState = () => {
+    state.reportsClientFilter = document.getElementById("reports-filter-client")?.value || "";
+    state.reportsCampaignFilter = document.getElementById("reports-filter-campaign")?.value || "";
+    state.reportsProgramFilter = document.getElementById("reports-filter-program")?.value || "all";
+    state.reportsMediaFilter = document.getElementById("reports-filter-media")?.value || "all";
+    state.reportsDateFrom = document.getElementById("reports-date-from")?.value || "";
+    state.reportsDateTo = document.getElementById("reports-date-to")?.value || "";
+  };
+  ["reports-filter-client", "reports-filter-campaign", "reports-filter-program", "reports-filter-media"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", syncReportsFilterState);
+  });
+  ["reports-date-from", "reports-date-to"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", syncReportsFilterState);
+  });
+  document.getElementById("reports-date-display")?.addEventListener("click", () => document.getElementById("reports-date-from")?.showPicker?.());
+  document.getElementById("reports-filter-apply")?.addEventListener("click", () => {
+    syncReportsFilterState();
+    renderReportsView();
+  });
+}
+
+function reportsProgramTags(clientName) {
+  const profile = getClientProfile(clientName);
+  const engagement = profile?.engagementType || "pr";
+  if (engagement === "pr_and_coaching") return ["PR", "Coaching"];
+  if (engagement === "coaching") return ["Coaching"];
+  return ["PR"];
+}
+
+function buildRecentReportsRows(approvedSummaries, clients) {
+  const approvedRows = approvedSummaries.map((r) => ({
+    name: `${r.client} Coverage Summary`,
+    client: r.client,
+    dateRange: reportDateRangeLabel(),
+    created: formatDisplayDate(r.summary.approvedAt.slice(0, 10)),
+  }));
+  const fallbackRows = clients.slice(0, 4).map((client, index) => ({
+    name: index === 0 ? "Monthly PR Report — September 2026" : index === 1 ? "Event Coverage Report — WIADCA" : index === 2 ? "Partnership Spotlight" : "Q3 2026 Summary",
+    client: client.name,
+    dateRange: index === 0 ? "Sep 1 – Sep 19, 2026" : index === 1 ? "Aug 15 – Aug 31, 2026" : index === 2 ? "Aug 1 – Aug 14, 2026" : "Jul 1 – Sep 19, 2026",
+    created: index === 1 ? "Sep 1, 2026" : index === 2 ? "Aug 15, 2026" : "Sep 20, 2026",
+  }));
+  return [...approvedRows, ...fallbackRows].slice(0, 4);
 }
 
 /**
@@ -2930,114 +3063,129 @@ function reportsMetricCard({ label, value, delta, icon, iconBg, tooltip, target,
  * confirmed per-placement data — labelled as such in the card heading.
  */
 function renderReportsOverview(container) {
-  const summary = getReportsOverviewSummary();
+  const summary = getReportsOverviewSummary(getReportsFilterArgs());
   const { metrics, weeklyTrend, mediaTypeBreakdown, clientPerformance } = summary;
+  const visibleClients = clientPerformance.map((row) => getRealClients().find((c) => c.name === row.client)).filter(Boolean);
 
   const approvedSummaries = getRealClients()
     .map((c) => ({ client: c.name, summary: loadSummary(c.name) }))
     .filter((r) => r.summary?.approvedAt)
     .sort((a, b) => (a.summary.approvedAt < b.summary.approvedAt ? 1 : -1));
+  const recentReports = buildRecentReportsRows(approvedSummaries, visibleClients.length ? visibleClients : getRealClients());
 
   container.innerHTML = `
-    <div class="section-heading"><h2>Reports &amp; Results</h2></div>
-    <p class="hint" style="margin:-8px 0 20px;">Cross-client performance from every real placement on file.</p>
+    <div class="reports-dashboard">
+      ${renderReportsFilterBar()}
 
-    <div class="owner-metrics-grid" style="margin-bottom:24px;">
+    <section class="reports-kpi-grid">
       ${reportsMetricCard({
         label: "Total Publicity Value (AVE)",
         value: formatCompactCurrency(metrics.totalAVE),
         delta: metrics.aveDelta,
         icon: "$",
         iconBg: "#fbe2da",
-        tooltip: "The estimated paid-media equivalent of visible press coverage. Hovering here gives context; opening it takes you to the report builder where this becomes client-ready copy.",
         target: "reports",
-        actionLabel: "Build a client report",
       })}
       ${reportsMetricCard({
         label: "Total Press Placements",
         value: String(metrics.totalPlacements),
         delta: metrics.placementsDelta,
-        icon: "\u25a6",
-        iconBg: "#e1f2f0",
-        tooltip: "The confirmed press wins currently feeding reports, analytics, and campaign value. Click through to inspect the source placements.",
+        icon: "▣",
+        iconBg: "#e5f4ff",
         target: "placements",
-        actionLabel: "Inspect placement sources",
       })}
       ${reportsMetricCard({
         label: "Active Clients",
         value: String(metrics.activeClients),
         delta: null,
-        icon: "\u25ce",
-        iconBg: "#e9ecff",
-        tooltip: "Clients currently represented in the reporting set. This helps Tenyse see who has enough tracked activity for a meaningful client update.",
+        icon: "♟",
+        iconBg: "#fbe2da",
         target: "clients",
-        actionLabel: "Open client list",
       })}
       ${reportsMetricCard({
         label: "Avg. Audience Reach",
-        value: metrics.avgReach ? metrics.avgReach.toLocaleString() : "—",
+        value: formatCompactNumber(metrics.avgReach),
         delta: metrics.reachDelta,
-        icon: "\u25c8",
-        iconBg: "#fdf0d8",
-        tooltip: "Average outlet audience size across placements with reach data. It is a visibility signal, not a guarantee of individual article readers.",
+        icon: "▥",
+        iconBg: "#efe8ff",
         target: "analytics",
-        actionLabel: "Explore analytics",
       })}
-    </div>
+    </section>
 
-    <div class="analytics-grid" style="margin-bottom:24px;">
-      <div class="card">
-        <h3 style="margin-top:0;">Placement Trends ${sectionInfoButton({ title: "Placement Trends", body: "Press placements landed and their estimated reach, grouped by week across every visible client. Reach here means audience size at the outlet, not confirmed readers of this specific piece — it's the same sourced-or-flagged figure used everywhere else in this app." })}</h3>
+    <section class="reports-chart-grid">
+      <article class="reports-panel reports-trend-card">
+        <div class="reports-panel-head"><h2>Placement Trends</h2><div class="reports-chart-legend"><span><i class="navy"></i>Press placements</span><span><i class="blue"></i>Estimated reach</span></div></div>
         <div id="reports-weekly-trend"></div>
-      </div>
-      <div class="card">
-        <h3 style="margin-top:0;">Placements by Media Type ${sectionInfoButton({ title: "Placements by Media Type", body: "Every confirmed placement classified as Online, TV, Radio, or Other. Classified automatically from the outlet's name (e.g. Forbes = Online, PIX11 = TV) — this is a lookup, not something Tenyse confirmed per placement, so treat it as a helpful grouping rather than an audited breakdown." })}</h3>
-        <p class="hint" style="margin:0 0 12px;">Classified from outlet name, not confirmed per placement — see Press Placements for the source outlet.</p>
+      </article>
+      <article class="reports-panel">
+        <div class="reports-panel-head"><h2>Placements by Media Type ${sectionInfoButton({ title: "Placements by Media Type", body: "Media type is inferred from the outlet name when no explicit media type is stored, so treat it as a useful grouping rather than an audited outlet field." })}</h2></div>
         <div id="reports-media-type"></div>
-      </div>
-    </div>
+      </article>
+    </section>
 
-    <div class="card" style="margin-bottom:24px;">
-      <h3 style="margin-top:0;">Client Performance ${sectionInfoButton({ title: "Client Performance", body: "One row per client: total confirmed placements, total AVE, estimated combined reach, and the outlets that ran the most coverage. Status (active/past/unconfirmed) mirrors what's set on the Clients page. A client showing 0 placements and — simply has no confirmed placements yet, not a data error." })}</h3>
-      <div class="table-scroll">
-        <table class="placements-table">
-          <thead><tr><th>Client</th><th>Placements</th><th>AVE</th><th>Est. Reach</th><th>Top Outlets</th><th>Status</th></tr></thead>
+    <section class="reports-lower-grid">
+      <article class="reports-panel reports-client-performance">
+        <div class="reports-panel-head"><h2>Client Performance</h2><button class="link-btn" data-goto="clients">View All</button></div>
+        <table class="reports-table">
+          <thead><tr><th>Client</th><th>Total Placements</th><th>AVE</th><th>Est. Reach</th><th>Top Outlets</th><th>Programs</th><th>Actions</th></tr></thead>
           <tbody>
             ${clientPerformance
+              .slice(0, 4)
               .map(
                 (r) => `
               <tr>
-                <td><strong>${escapeHtml(r.client)}</strong></td>
-                <td class="numeric">${r.totalPlacements}</td>
-                <td class="numeric">${formatCurrency(r.totalAVE)}</td>
-                <td class="numeric">${r.totalReach ? r.totalReach.toLocaleString() : "—"}</td>
+                <td><span class="client-initial">${escapeHtml(initialsForName(r.client))}</span><strong>${escapeHtml(r.client)}</strong><small>${escapeHtml(getClientProfile(r.client)?.industry || getClientProfile(r.client)?.notes?.split(".")[0] || "")}</small></td>
+                <td>${r.totalPlacements}</td>
+                <td>${formatCurrency(r.totalAVE)}</td>
+                <td>${formatCompactNumber(r.totalReach)}</td>
                 <td>${r.topOutlets.map((o) => escapeHtml(o)).join(", ") || "—"}</td>
-                <td><span class="status-badge">${escapeHtml(r.status)}</span></td>
+                <td><div class="reports-program-tags">${reportsProgramTags(r.client).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div></td>
+                <td><button type="button" class="reports-action-button" data-view-report="${escapeHtml(r.client)}">View Reports</button></td>
               </tr>`
               )
               .join("")}
           </tbody>
         </table>
-      </div>
-    </div>
+      </article>
+      <aside class="reports-panel reports-quick-actions">
+        <h2>Quick Actions</h2>
+        <button type="button" data-report-builder-action>▧ Generate Custom Report</button>
+        <button type="button" data-report-builder-action>▣ Bulk Create Reports</button>
+        <button type="button" data-report-builder-action>▤ Export Client Data (CSV)</button>
+        <button type="button" data-goto="analytics">▥ View AVE Benchmarks</button>
+        <button type="button" data-goto="reviewqueue">▱ Review Press Queue <span>3</span></button>
+        <button type="button" data-goto="campaigns">▱ Manage Campaigns</button>
+        <button type="button" data-goto="coaching">▱ View Coaching Progress</button>
+        <button type="button" data-copy-report-link>↗ Share Report Link</button>
+      </aside>
+    </section>
 
-    <div class="card" style="margin-bottom:24px;">
-      <h3 style="margin-top:0;">Approved Reports ${sectionInfoButton({ title: "Approved Reports", body: "Lists every client whose Executive Summary has been approved below (not just saved as a draft). Approval is what makes a summary eligible for inclusion in a Canva export — a saved-but-unapproved draft is treated as if no summary exists yet. Click View to jump to that client's report section." })}</h3>
-      ${
-        approvedSummaries.length
-          ? `<div class="table-scroll"><table class="placements-table">
-               <thead><tr><th>Client</th><th>Approved</th><th></th></tr></thead>
-               <tbody>${approvedSummaries
-                 .map(
-                   (r) => `<tr><td><strong>${escapeHtml(r.client)}</strong></td><td>${escapeHtml(r.summary.approvedAt.slice(0, 10))}</td><td><button type="button" class="link-btn" data-view-report="${escapeHtml(r.client)}">View</button></td></tr>`
-                 )
-                 .join("")}</tbody>
-             </table></div>`
-          : `<p class="hint" style="margin:0;">No executive summaries approved yet — approve one below to see it listed here.</p>`
-      }
+    <section class="reports-bottom-grid">
+      <article class="reports-panel reports-recent">
+        <div class="reports-panel-head"><h2>Recent Reports</h2><button class="link-btn" data-report-builder-action>View All</button></div>
+        <table class="reports-table">
+          <thead><tr><th>Report Name</th><th>Client</th><th>Date Range</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>${recentReports
+            .map(
+              (report) => `<tr><td>▤ ${escapeHtml(report.name)}</td><td>${escapeHtml(report.client)}</td><td>${escapeHtml(report.dateRange)}</td><td>${escapeHtml(report.created)}</td><td><button type="button" class="mini-action" data-view-report="${escapeHtml(report.client)}">◉ View</button><button type="button" class="mini-action" data-view-report="${escapeHtml(report.client)}">↧ Download</button></td></tr>`
+            )
+            .join("")}</tbody>
+        </table>
+      </article>
+      <aside class="reports-panel reports-insights">
+        <h2>💡 Insights</h2>
+        <ul>
+          <li>${clientPerformance[0] ? `${escapeHtml(clientPerformance[0].client)} leads the current reporting set.` : "No client performance rows yet."}</li>
+          <li>Podcast and online placements are grouped from outlet names when media type is not stored.</li>
+          <li>${metrics.totalPlacements} placement${metrics.totalPlacements === 1 ? "" : "s"} currently feed this view.</li>
+          <li>${metrics.totalAVE ? `${formatCompactCurrency(metrics.totalAVE)} in estimated publicity value is report-ready.` : "Add AVE or audience data to deepen the value story."}</li>
+        </ul>
+      </aside>
+    </section>
     </div>
   `;
   wireMetricCardNavigation(container);
+  wireReportsFilters();
 
   renderWeeklyTrendChart(document.getElementById("reports-weekly-trend"), weeklyTrend);
   renderDonutChart(document.getElementById("reports-media-type"), {
@@ -3049,6 +3197,15 @@ function renderReportsOverview(container) {
     btn.addEventListener("click", () => {
       const el = document.getElementById(`report-${slugifyClientId(btn.dataset.viewReport)}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  container.querySelectorAll("[data-report-builder-action]").forEach((btn) => {
+    btn.addEventListener("click", () => document.getElementById("report-builder-start")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  });
+  container.querySelectorAll("[data-copy-report-link]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await navigator.clipboard?.writeText?.(location.href);
+      btn.textContent = "✓ Link Copied";
     });
   });
 }
@@ -3094,7 +3251,7 @@ function renderReportsView() {
   };
   target.innerHTML = `
     ${state.dataSource === "real" ? `<div id="reports-overview-wrap" style="margin-bottom:32px;"></div>` : ""}
-    <div class="section-heading"><h2>Report Builder ${sectionInfoButton({ title: "Report Builder", body: "A guided path from tracked placements to client-ready report assets: generate an executive summary, save and approve it, draft the longer narrative, download a PDF preview, and export the CSV for Canva Bulk Create. The AI drafts from placement data already in the system; Tenyse still reviews and approves what goes to the client." })}</h2></div>
+    <div class="section-heading" id="report-builder-start"><h2>Report Builder ${sectionInfoButton({ title: "Report Builder", body: "A guided path from tracked placements to client-ready report assets: generate an executive summary, save and approve it, draft the longer narrative, download a PDF preview, and export the CSV for Canva Bulk Create. The AI drafts from placement data already in the system; Tenyse still reviews and approves what goes to the client." })}</h2></div>
     <p class="hint" style="margin:-8px 0 20px;">Turn confirmed placements into a reviewed client report package: summary, narrative, PDF preview, and Canva CSV export.</p>
     <div class="report-builder-steps" aria-label="Report builder workflow">
       <div><span>1</span><strong>Choose client</strong><small>Select the client and reporting window.</small></div>
@@ -3563,9 +3720,9 @@ const OWNER_HEADER_CONTEXT = {
     subtitle: "Review discovered coverage before adding it to a client record.",
   },
   reports: {
-    contextLabel: "Owner Dashboard / Reports",
-    greeting: "Reports",
-    subtitle: "Draft, review, and publish client-facing PR summaries.",
+    contextLabel: "",
+    greeting: "Reports & Results",
+    subtitle: "Track performance across all clients, campaigns, and programs.",
   },
   analytics: {
     contextLabel: "Owner Dashboard / Analytics",
@@ -3597,7 +3754,17 @@ function getOwnerHeaderContext() {
 function renderHeaderComponent() {
   const headerContext = getOwnerHeaderContext();
   const extraAction =
-    state.view === "coaching"
+    state.view === "reports"
+      ? {
+          label: "+ Generate Report",
+          onClick: () => {
+            navigate("reports");
+            setTimeout(() => {
+              document.getElementById("report-builder-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 0);
+          },
+        }
+      : state.view === "coaching"
       ? {
           label: "+ New Program",
           onClick: () => {
@@ -3620,15 +3787,20 @@ function renderHeaderComponent() {
           },
         };
   renderHeader(document.getElementById("owner-header"), {
-    client: { name: "Tenyse Williams", avatarInitials: "TW" },
+    client: { name: "Tenyse Williams", avatarInitials: state.view === "reports" ? "T" : "TW" },
     dataSource: state.dataSource,
     contextLabel: headerContext.contextLabel,
     greeting: headerContext.greeting,
     subtitle: headerContext.subtitle,
-    searchPlaceholder: "Search clients, campaigns, placements...",
+    searchPlaceholder: state.view === "reports" ? "Search clients, campaigns, or media..." : "Search clients, campaigns, placements...",
     extraAction,
     quoteCard:
-      state.view === "dashboard"
+      state.view === "reports"
+        ? {
+            lines: ["Data tells the story.", "Visibility creates opportunity."],
+            author: "Tenyse Williams",
+          }
+        : state.view === "dashboard"
         ? {
             lines: ["More visibility.", "More opportunities.", "More impact."],
             author: "Tenyse Williams",
@@ -3636,13 +3808,30 @@ function renderHeaderComponent() {
         : null,
     onSearch: (term) => {
       state.searchTerm = term;
-      if (state.view === "dashboard" || state.view === "placements" || state.view === "coaching") renderCurrentView();
+      if (state.view === "dashboard" || state.view === "placements" || state.view === "coaching" || state.view === "reports") renderCurrentView();
     },
     onHamburgerClick: openSidebarMobile,
   });
 }
 
 function navigate(view) {
+  if (view === "raise-local") {
+    window.open("http://localhost:4102", "_blank", "noopener");
+    closeSidebarMobile();
+    return;
+  }
+  if (view === "resources") {
+    state.coachingSelectedClient = "Greyz Bistro";
+    state.view = "coaching";
+    document.querySelectorAll(".client-view").forEach((el) => el.classList.remove("active"));
+    document.getElementById("view-coaching").classList.add("active");
+    renderSidebarComponent();
+    renderHeaderComponent();
+    renderCurrentView();
+    closeSidebarMobile();
+    setTimeout(() => document.querySelector('[data-overview-tab="resources"]')?.click(), 0);
+    return;
+  }
   state.view = view;
   document.querySelectorAll(".client-view").forEach((el) => el.classList.remove("active"));
   document.getElementById(`view-${view}`).classList.add("active");

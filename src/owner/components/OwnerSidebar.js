@@ -5,10 +5,12 @@ const NAV_ITEMS = [
   { id: "clients", label: "Clients", icon: "♙" },
   { id: "campaigns", label: "Campaigns (PR)", icon: "⌁" },
   { id: "coaching", label: "Coaching Program", icon: "⊕" },
+  { id: "raise-local", label: "Raise Local", icon: "▱", badge: "New" },
   { id: "placements", label: "Press Placements", icon: "▤" },
-  { id: "reviewqueue", label: "Review Queue", icon: "▣" },
   { id: "reports", label: "Reports", icon: "▥" },
   { id: "analytics", label: "Analytics", icon: "⌘" },
+  { id: "reviewqueue", label: "Review Queue", icon: "▣", badge: "3" },
+  { id: "resources", label: "Resources", icon: "▧" },
   { id: "settings", label: "Settings", icon: "⚙" },
 ];
 

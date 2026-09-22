@@ -439,9 +439,27 @@ function isoWeekLabel(dateStr) {
  * delta when there isn't a sound comparison to make (e.g., all
  * placements land on one side of the split).
  */
-export function getReportsOverviewSummary({ clientName = null } = {}) {
-  const allPlacements = getAllRealPlacements().filter((p) => !clientName || p.clientName === clientName);
-  const clients = getRealClients().filter((c) => !clientName || c.name === clientName);
+export function getReportsOverviewSummary({ clientName = null, campaignName = null, dateFrom = "", dateTo = "", mediaType = "", program = "" } = {}) {
+  const clientAllowsProgram = (client) => {
+    if (!program || program === "all") return true;
+    const engagement = client.profile?.engagementType || "";
+    if (program === "pr") return engagement === "pr" || engagement === "pr_and_coaching";
+    if (program === "coaching") return engagement === "coaching" || engagement === "pr_and_coaching";
+    return true;
+  };
+  const clients = getRealClients().filter((c) => (!clientName || c.name === clientName) && clientAllowsProgram(c));
+  const clientNames = new Set(clients.map((c) => c.name));
+  const allPlacements = getAllRealPlacements().filter((p) => {
+    const date = p.publicationDate || p.landedDate || "";
+    const classified = classifyMediaType(p.publication).type;
+    return (
+      clientNames.has(p.clientName || p.client) &&
+      (!campaignName || p.campaign === campaignName) &&
+      (!dateFrom || date >= dateFrom) &&
+      (!dateTo || date <= dateTo) &&
+      (!mediaType || mediaType === "all" || classified === mediaType)
+    );
+  });
   const dated = allPlacements.filter((p) => p.publicationDate || p.landedDate).map((p) => ({ ...p, _date: p.publicationDate || p.landedDate }));
   dated.sort((a, b) => (a._date < b._date ? -1 : 1));
 
@@ -502,7 +520,7 @@ export function getReportsOverviewSummary({ clientName = null } = {}) {
   // Per-client performance rows.
   const clientPerformance = clients
     .map((c) => {
-      const rows = allPlacements.filter((p) => p.clientName === c.name);
+      const rows = allPlacements.filter((p) => (p.clientName || p.client) === c.name);
       const outletCounts = {};
       for (const p of rows) outletCounts[p.publication] = (outletCounts[p.publication] || 0) + 1;
       const topOutlets = Object.entries(outletCounts)
