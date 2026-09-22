@@ -16,7 +16,7 @@ import {
   getRealReport,
 } from "../realDataSource.js?v=20260922-populated-pages";
 import { formatCurrency, leadTimeDaysForPlacement } from "../calculations.js?v=20260919-report-builder";
-import { requireSession, logout } from "../auth.js?v=20260918-real-session-priority";
+import { requireSession, logout } from "../auth.js?v=20260922-preview-switch";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
 import { createPlacement, applyPlacementEdit } from "../schema.js";
 import { addPlacement, updatePlacement, deletePlacement, upsertPlacement } from "../storage.js";

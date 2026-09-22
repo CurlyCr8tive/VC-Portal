@@ -1,4 +1,4 @@
-import { demoLandingPageFor, login, landingPageFor, setSession, MOCK_ACCOUNTS } from "./auth.js?v=20260918-real-session-priority";
+import { demoLandingPageFor, login, landingPageFor, setSession, MOCK_ACCOUNTS } from "./auth.js?v=20260922-preview-switch";
 import { isRealAuthConfigured, signInReal } from "./supabaseAuthClient.js";
 
 // Keep login.html stable even when a previous owner/client demo session exists.

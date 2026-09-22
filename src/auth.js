@@ -63,8 +63,7 @@ function safeRemoveSession() {
   }
 }
 
-function sessionFromDemoParams() {
-  const params = new URLSearchParams(window.location.search);
+function sessionFromDemoParams(params = new URLSearchParams(window.location.search)) {
   const demo = params.get("demo");
   if (!demo) return null;
   if (demo === "owner") return MOCK_ACCOUNTS.find((a) => a.role === "owner") || null;
@@ -73,10 +72,14 @@ function sessionFromDemoParams() {
   ) || null;
 }
 
+function demoPreviewSwitchRequested(params = new URLSearchParams(window.location.search)) {
+  return params.get("preview") === "1";
+}
+
 export function demoLandingPageFor(account) {
   if (!account) return "login.html";
-  if (account.role === "owner") return "owner.html?demo=owner";
-  if (account.role === "pr_client") return `client.html?demo=${encodeURIComponent(account.clientId || account.email)}`;
+  if (account.role === "owner") return "owner.html?demo=owner&preview=1";
+  if (account.role === "pr_client") return `client.html?demo=${encodeURIComponent(account.clientId || account.email)}&preview=1`;
   return "login.html";
 }
 
@@ -114,6 +117,13 @@ const VALID_ROLES = new Set(["owner", "pr_client"]);
  * fixes it at the source instead of chasing every downstream symptom.
  */
 export function getSession() {
+  const params = new URLSearchParams(window.location.search);
+  const demoSession = sessionFromDemoParams(params);
+  if (demoSession && demoPreviewSwitchRequested(params)) {
+    safeWriteSession(demoSession);
+    return demoSession;
+  }
+
   // A real, signed-in session must never be silently downgraded by a
   // `?demo=` param still sitting in the URL (an old bookmark, a link
   // clicked from a previous walkthrough, a page left open from before
@@ -132,7 +142,6 @@ export function getSession() {
     }
   }
 
-  const demoSession = sessionFromDemoParams();
   if (demoSession) {
     safeWriteSession(demoSession);
     return demoSession;
