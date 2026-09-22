@@ -1974,20 +1974,27 @@ body:has(#owner-header) .avatar {
   grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 8px;
   align-items: end;
-  padding: 22px 22px 8px;
+  padding: 14px 22px 8px;
   border-bottom: 1px solid #f2e8df;
+  overflow: visible;
 }
 
-.owner-mini-chart div {
+.owner-mini-chart-bar {
+  position: relative;
   height: 118px;
   display: grid;
   grid-template-rows: 1fr auto;
   align-items: end;
   gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
   text-align: center;
+  cursor: pointer;
 }
 
-.owner-mini-chart span {
+.owner-mini-chart-bar > span {
   display: block;
   width: 100%;
   max-width: 26px;
@@ -1996,9 +2003,69 @@ body:has(#owner-header) .avatar {
   background: linear-gradient(180deg, #ffaaa5, #f48a7a);
 }
 
-.owner-mini-chart small {
+.owner-mini-chart-bar > small {
   color: var(--text-secondary);
   font-size: 0.68rem;
+}
+
+.owner-trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 4px 18px 0;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.owner-trend-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.owner-trend-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.owner-trend-legend .coral {
+  background: #f48a7a;
+}
+
+.owner-trend-legend .navy {
+  background: var(--color-navy);
+}
+
+.owner-trend-legend .teal {
+  background: #4bb9b2;
+}
+
+.owner-mini-chart .owner-trend-tip {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  width: min(230px, 68vw);
+  text-align: left;
+  transform: translate(-50%, 8px);
+}
+
+.owner-mini-chart .owner-trend-tip::before {
+  top: auto;
+  bottom: -7px;
+  left: calc(50% - 6px);
+  border-top: 0;
+  border-left: 0;
+  border-right: 1px solid rgba(232, 111, 87, 0.28);
+  border-bottom: 1px solid rgba(232, 111, 87, 0.28);
+}
+
+.owner-mini-chart-bar:hover .owner-trend-tip,
+.owner-mini-chart-bar:focus-visible .owner-trend-tip,
+.owner-mini-chart-bar:focus-within .owner-trend-tip {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .owner-performance-callout {
