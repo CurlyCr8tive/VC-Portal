@@ -3032,22 +3032,20 @@ table.placements-table {
   grid-template-columns: minmax(0, 1fr) 230px;
   gap: 20px;
   align-items: start;
-  margin-bottom: 14px;
-}
-
-.coaching-dashboard-intro > p {
-  margin: 0;
-  color: var(--text-secondary);
-  max-width: 680px;
+  min-height: 0;
+  margin: -76px 0 8px;
+  pointer-events: none;
 }
 
 .coaching-quote-card {
   border: 1px solid #efd8d4;
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: linear-gradient(135deg, #fff, #fff4f2);
-  padding: 13px 16px;
+  padding: 14px 16px;
   color: var(--color-navy);
   box-shadow: var(--shadow-sm);
+  grid-column: 2;
+  pointer-events: auto;
 }
 
 .coaching-quote-card p {
@@ -3055,6 +3053,7 @@ table.placements-table {
   font-family: var(--font-serif);
   line-height: 1.35;
   margin: 0 0 6px;
+  font-size: 0.98rem;
 }
 
 .coaching-quote-card strong {
@@ -3085,6 +3084,22 @@ table.placements-table {
   white-space: nowrap;
 }
 
+.coaching-subnav svg,
+.coaching-kpi-card svg,
+.coaching-program-row svg,
+.coaching-program-create svg,
+.coaching-activity-row svg,
+.coaching-tool-card svg,
+.coaching-quick-actions-panel h3 svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .coaching-subnav button.active {
   border-color: var(--color-coral);
   color: var(--color-coral);
@@ -3104,7 +3119,7 @@ table.placements-table {
   align-items: center;
   min-height: 92px;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: #fff;
   box-shadow: var(--shadow-sm);
   padding: 14px;
@@ -3116,7 +3131,12 @@ table.placements-table {
   width: 46px;
   height: 46px;
   border-radius: 10px;
-  font-size: 1.25rem;
+}
+
+.coaching-kpi-card > span svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
 }
 
 .coaching-kpi-card.coral > span {
@@ -3179,7 +3199,7 @@ table.placements-table {
 
 .coaching-panel {
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: 8px;
   background: #fff;
   box-shadow: var(--shadow-sm);
   padding: 14px;
@@ -3254,6 +3274,7 @@ table.placements-table {
   background: #e9e8ff;
   color: var(--color-navy);
   font-weight: 800;
+  font-size: 0.75rem;
 }
 
 .coaching-progress-cell {
@@ -3293,12 +3314,6 @@ table.placements-table {
   font-weight: 700;
 }
 
-.coaching-table-action:disabled,
-.coaching-overflow:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 .coaching-overflow {
   border: 0;
   background: transparent;
@@ -3335,7 +3350,13 @@ table.placements-table {
   border-radius: 999px;
   background: #fff0ed;
   color: var(--color-coral);
-  font-size: 1.2rem;
+}
+
+.coaching-program-row > span svg,
+.coaching-program-create > span svg,
+.coaching-tool-card > span svg {
+  width: 22px;
+  height: 22px;
 }
 
 .coaching-program-row strong,
@@ -3399,6 +3420,7 @@ table.placements-table {
 .coaching-activity-tabs button.active {
   color: var(--color-coral);
   border-bottom: 2px solid var(--color-coral);
+  background: #fff;
 }
 
 .coaching-activity-row,
@@ -3421,6 +3443,8 @@ table.placements-table {
 
 .coaching-activity-row > span {
   color: var(--color-coral);
+  display: grid;
+  place-items: center;
 }
 
 .coaching-activity-row strong,
@@ -3530,7 +3554,6 @@ table.placements-table {
   border-radius: 8px;
   background: #f1ecff;
   color: #6650c8;
-  font-size: 1.2rem;
 }
 
 .coaching-tool-card strong {
@@ -3556,6 +3579,18 @@ table.placements-table {
 
 .coaching-quick-actions-panel {
   background: linear-gradient(135deg, #fff, #fff0ed);
+}
+
+.coaching-quick-actions-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coaching-quick-actions-panel h3 svg {
+  color: #f2a900;
+  width: 22px;
+  height: 22px;
 }
 
 .coaching-quick-actions {

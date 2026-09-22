@@ -30,6 +30,7 @@ export function renderCoachingAdminView(
     coachingDataForClient = null,
     syncStatus = "local",
     syncMessage = "",
+    searchTerm = "",
     onLoadTemplate = null,
     onSavePhase = null,
     onAddHomework = null,
@@ -114,17 +115,16 @@ export function renderCoachingAdminView(
 
   function coachingHeaderHtml() {
     const nav = [
-      ["overview", "♖", "Overview"],
-      ["programs", "⌘", "Programs"],
-      ["clients", "♚", "Clients"],
-      ["resources", "▣", "Resources"],
-      ["opportunities", "♡", "Opportunities"],
-      ["templates", "▤", "Templates"],
-      ["settings", "⚙", "Settings"],
+      ["overview", "megaphone", "Overview"],
+      ["programs", "blocks", "Programs"],
+      ["clients", "users", "Clients"],
+      ["resources", "clipboard", "Resources"],
+      ["opportunities", "shield", "Opportunities"],
+      ["templates", "document", "Templates"],
+      ["settings", "settings", "Settings"],
     ];
     return `
       <header class="coaching-dashboard-intro">
-        <p class="hint">A multi-client command center for the Visibility to Revenue coaching work: progress, calls, assignments, resources, opportunities, and templates.</p>
         <aside class="coaching-quote-card">
           <p>More visibility.<br />More opportunities.<br />More impact.</p>
           <strong>— Tenyse Williams</strong>
@@ -135,7 +135,7 @@ export function renderCoachingAdminView(
           .map(
             ([id, icon, label]) => `
               <button type="button" class="${activeOverviewTab === id ? "active" : ""}" data-overview-tab="${id}" aria-pressed="${activeOverviewTab === id ? "true" : "false"}">
-                <span aria-hidden="true">${icon}</span>${label}
+                <span aria-hidden="true">${coachingIcon(icon)}</span>${label}
               </button>
             `
           )
@@ -154,7 +154,7 @@ export function renderCoachingAdminView(
 
   function overviewDashboardHtml() {
     if (activeOverviewTab !== "overview") return overviewPanelHtml(activeOverviewTab);
-    const rows = coachingClientRows();
+    const rows = filteredCoachingRows();
     const activityItems = [
       { type: "calls", title: "Biweekly Strategy Call — Greyz Bistro", date: "Fri, Sep 9, 2026", time: "2:00 PM – 3:00 PM", label: "Call" },
       { type: "calls", title: "Program Kickoff — Cultural Intelligence", date: "Tue, Sep 22, 2026", time: "1:30 PM – 2:30 PM", label: "Call" },
@@ -168,10 +168,10 @@ export function renderCoachingAdminView(
       activeActivityFilter === "all" ? activityItems : activityItems.filter((item) => item.type === activeActivityFilter);
     return `
       <section class="coaching-kpi-grid">
-        ${coachingKpiCard("👥", "Coaching Clients", "3", "+1 this month", "coral")}
-        ${coachingKpiCard("▥", "Active Programs", "2", "1 cohort starting soon", "coral")}
-        ${coachingKpiCard("✓", "Avg. Client Progress", "68%", "+12% from last month", "green")}
-        ${coachingKpiCard("▣", "Upcoming Calls", "4", "Next: Sep 9, 2026", "purple")}
+        ${coachingKpiCard("users", "Coaching Clients", "3", "+1 this month", "coral")}
+        ${coachingKpiCard("bars", "Active Programs", "2", "1 cohort starting soon", "coral")}
+        ${coachingKpiCard("check", "Avg. Client Progress", "68%", "+12% from last month", "green")}
+        ${coachingKpiCard("calendar", "Upcoming Calls", "4", "Next: Sep 9, 2026", "purple")}
       </section>
 
       <section class="coaching-dashboard-grid">
@@ -195,8 +195,8 @@ export function renderCoachingAdminView(
             <h3>Program Overview</h3>
             <button type="button" class="link-btn" data-overview-tab="programs">View All</button>
           </div>
-          ${programOverviewRow("🎯", "Visibility to Revenue (90-Day VAAM)", "6 Phases • 12 Weeks", "Help founders grow their visibility, authority, partnerships, and revenue.", "2", "Clients enrolled")}
-          ${programOverviewRow("👥", "Cultural Intelligence (6-Week Track)", "6 Modules • 6 Weeks", "Help local businesses connect with nonprofit partners.", "0", "Clients enrolled")}
+          ${programOverviewRow("target", "Visibility to Revenue (90-Day VAAM)", "6 Phases • 12 Weeks", "Help founders grow their visibility, authority, partnerships, and revenue.", "2", "Clients enrolled")}
+          ${programOverviewRow("users", "Cultural Intelligence (6-Week Track)", "6 Modules • 6 Weeks", "Help local businesses connect with nonprofit partners.", "0", "Clients enrolled")}
           <button type="button" class="coaching-program-create" data-overview-tab="programs">
             <span>+</span>
             <div><strong>Create a New Program</strong><small>Build a custom program with your own phases, goals, and resources.</small></div>
@@ -247,14 +247,14 @@ export function renderCoachingAdminView(
         <article class="coaching-panel coaching-tools-panel">
           <h3>Tools &amp; Resources</h3>
           <div class="coaching-tools-grid">
-            ${toolCard("⚖", "Opportunity Evaluator", "Score and evaluate incoming opportunities.", "Open Tool", "opportunities")}
-            ${toolCard("▣", "Resource Library", "Guides, templates, and past call materials.", "Browse", "resources")}
-            ${toolCard("☷", "Missing Assets Checklist", "Track what each client still needs to provide.", "Open Checklist", "resources")}
-            ${toolCard("▤", "Templates", "Use or customize phase templates.", "View Templates", "templates")}
+            ${toolCard("scale", "Opportunity Evaluator", "Score and evaluate incoming opportunities.", "Open Tool", "opportunities")}
+            ${toolCard("folder", "Resource Library", "Guides, templates, and past call materials.", "Browse", "resources")}
+            ${toolCard("checklist", "Missing Assets Checklist", "Track what each client still needs to provide.", "Open Checklist", "resources")}
+            ${toolCard("document", "Templates", "Use or customize phase templates.", "View Templates", "templates")}
           </div>
         </article>
         <article class="coaching-panel coaching-quick-actions-panel">
-          <h3>💡 Quick Actions</h3>
+          <h3>${coachingIcon("lightbulb")} Quick Actions</h3>
           <div class="coaching-quick-actions">
             <button type="button" data-overview-tab="clients">Add a Client to Coaching</button>
             <button type="button" data-overview-tab="clients">Schedule a Call</button>
@@ -275,13 +275,6 @@ export function renderCoachingAdminView(
       });
     });
 
-    container.querySelector(".coaching-search input")?.addEventListener("input", (event) => {
-      const term = event.target.value.toLowerCase();
-      container.querySelectorAll("[data-coaching-row]").forEach((row) => {
-        row.hidden = term && !row.textContent.toLowerCase().includes(term);
-      });
-    });
-
     container.querySelectorAll("[data-activity-filter]").forEach((btn) => {
       btn.addEventListener("click", () => {
         activeActivityFilter = btn.dataset.activityFilter;
@@ -293,7 +286,7 @@ export function renderCoachingAdminView(
   function coachingKpiCard(icon, label, value, note, tone) {
     return `
       <article class="coaching-kpi-card ${tone}">
-        <span aria-hidden="true">${icon}</span>
+        <span aria-hidden="true">${coachingIcon(icon)}</span>
         <div><p>${escapeHtml(label)}</p><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>
       </article>
     `;
@@ -317,11 +310,23 @@ export function renderCoachingAdminView(
         action: "View",
         openClient: "Greyz Bistro",
       },
-      { initials: "RL", client: "Raise Local Cohort 1", sub: "(Coming Soon)", program: "Cultural Intelligence", programSub: "(6-Week Track)", progress: 0, phase: "Not Started", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Setup", disabled: true },
-      { initials: "UE", client: "Urban Eats Collective", sub: "", program: "Visibility to Revenue", programSub: "(90-Day VAAM)", progress: 25, phase: "Phase 2", phaseSub: "Founder Positioning", nextCall: "Wed, Sep 23", nextCallSub: "11:00 AM", action: "View", disabled: true },
-      { initials: "NB", client: "Nourish Brooklyn", sub: "(Interested)", program: "TBD", programSub: "", progress: null, phase: "—", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Invite", disabled: true },
+      { initials: "RL", client: "Raise Local Cohort 1", sub: "(Coming Soon)", program: "Cultural Intelligence", programSub: "(6-Week Track)", progress: 0, phase: "Not Started", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Setup", overviewTab: "programs" },
+      { initials: "UE", client: "Urban Eats Collective", sub: "", program: "Visibility to Revenue", programSub: "(90-Day VAAM)", progress: 25, phase: "Phase 2", phaseSub: "Founder Positioning", nextCall: "Wed, Sep 23", nextCallSub: "11:00 AM", action: "View", overviewTab: "clients" },
+      { initials: "NB", client: "Nourish Brooklyn", sub: "(Interested)", program: "TBD", programSub: "", progress: null, phase: "—", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Invite", overviewTab: "clients" },
     ];
     return rows;
+  }
+
+  function filteredCoachingRows() {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return coachingClientRows();
+    return coachingClientRows().filter((row) =>
+      [row.client, row.sub, row.program, row.programSub, row.phase, row.phaseSub, row.nextCall]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term)
+    );
   }
 
   function clientProgressRowHtml(row) {
@@ -334,7 +339,10 @@ export function renderCoachingAdminView(
         <td class="coaching-progress-cell" aria-label="${escapeHtml(progressText)}">${progressBar}</td>
         <td><strong>${escapeHtml(row.phase)}</strong><small>${escapeHtml(row.phaseSub)}</small></td>
         <td><strong>${escapeHtml(row.nextCall)}</strong><small>${escapeHtml(row.nextCallSub)}</small></td>
-        <td><button type="button" class="coaching-table-action" ${row.disabled ? "disabled" : `data-open-client="${escapeHtml(row.openClient)}"`}>${escapeHtml(row.action)}</button><button type="button" class="coaching-overflow" aria-label="More actions for ${escapeHtml(row.client)}" ${row.disabled ? "disabled" : ""}>⋮</button></td>
+        <td>
+          <button type="button" class="coaching-table-action" ${row.openClient ? `data-open-client="${escapeHtml(row.openClient)}"` : `data-overview-tab="${escapeHtml(row.overviewTab || "clients")}"`}>${escapeHtml(row.action)}</button>
+          <button type="button" class="coaching-overflow" aria-label="More actions for ${escapeHtml(row.client)}" data-overview-tab="${escapeHtml(row.overviewTab || "clients")}">⋮</button>
+        </td>
       </tr>
     `;
   }
@@ -342,7 +350,7 @@ export function renderCoachingAdminView(
   function programOverviewRow(icon, title, meta, body, count, label) {
     return `
       <button type="button" class="coaching-program-row" data-overview-tab="programs">
-        <span aria-hidden="true">${icon}</span>
+        <span aria-hidden="true">${coachingIcon(icon)}</span>
         <div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(meta)}</small><p>${escapeHtml(body)}</p></div>
         <em><b>${escapeHtml(count)}</b>${escapeHtml(label)}</em>
         <i aria-hidden="true">›</i>
@@ -355,7 +363,7 @@ export function renderCoachingAdminView(
   }
 
   function activityRow(item) {
-    return `<div class="coaching-activity-row"><span aria-hidden="true">▣</span><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.date)} &nbsp; ${escapeHtml(item.time)}</small></div><em>${escapeHtml(item.label)}</em></div>`;
+    return `<div class="coaching-activity-row"><span aria-hidden="true">${coachingIcon("calendar")}</span><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.date)} &nbsp; ${escapeHtml(item.time)}</small></div><em>${escapeHtml(item.label)}</em></div>`;
   }
 
   function phaseCompletionBar(num, label, percent) {
@@ -367,7 +375,7 @@ export function renderCoachingAdminView(
   }
 
   function toolCard(icon, title, body, button, tab) {
-    return `<article class="coaching-tool-card"><span aria-hidden="true">${icon}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(body)}</p></div><button type="button" data-overview-tab="${escapeHtml(tab)}">${escapeHtml(button)}</button></article>`;
+    return `<article class="coaching-tool-card"><span aria-hidden="true">${coachingIcon(icon)}</span><div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(body)}</p></div><button type="button" data-overview-tab="${escapeHtml(tab)}">${escapeHtml(button)}</button></article>`;
   }
 
   function overviewPanelHtml(tab) {
@@ -383,7 +391,7 @@ export function renderCoachingAdminView(
       return `
         <section class="coaching-panel coaching-tab-panel">
           <div class="coaching-panel-heading"><h3>Coaching Clients</h3><button type="button" class="link-btn" data-overview-tab="overview">Back to Overview</button></div>
-          <div class="coaching-client-table-wrap"><table class="coaching-client-table"><tbody>${coachingClientRows().map(clientProgressRowHtml).join("")}</tbody></table></div>
+          <div class="coaching-client-table-wrap"><table class="coaching-client-table"><tbody>${filteredCoachingRows().map(clientProgressRowHtml).join("")}</tbody></table></div>
         </section>
       `;
     }
@@ -401,11 +409,32 @@ export function renderCoachingAdminView(
         <div class="coaching-panel-heading"><h3>${escapeHtml(titles[tab] || "Coaching")}</h3><button type="button" class="link-btn" data-overview-tab="overview">Back to Overview</button></div>
         <p class="hint">${tab === "programs" ? "Program templates are represented here for the demo. Open a client workspace to edit phases, homework, and resources." : "This area is prepared for the live handoff; existing coaching work remains available in the client workspace."}</p>
         <div class="coaching-program-overview-panel">
-          ${programOverviewRow("🎯", "Visibility to Revenue (90-Day VAAM)", "6 Phases • 12 Weeks", "Help founders grow their visibility, authority, partnerships, and revenue.", "2", "Clients enrolled")}
-          ${programOverviewRow("👥", "Cultural Intelligence (6-Week Track)", "6 Modules • 6 Weeks", "Help local businesses connect with nonprofit partners.", "0", "Clients enrolled")}
+          ${programOverviewRow("target", "Visibility to Revenue (90-Day VAAM)", "6 Phases • 12 Weeks", "Help founders grow their visibility, authority, partnerships, and revenue.", "2", "Clients enrolled")}
+          ${programOverviewRow("users", "Cultural Intelligence (6-Week Track)", "6 Modules • 6 Weeks", "Help local businesses connect with nonprofit partners.", "0", "Clients enrolled")}
         </div>
       </section>
     `;
+  }
+
+  function coachingIcon(name) {
+    const icons = {
+      megaphone: `<svg viewBox="0 0 24 24"><path d="M4 13h3l8 4V7l-8 4H4z"/><path d="M7 13v5"/><path d="M18 9a4 4 0 0 1 0 6"/></svg>`,
+      blocks: `<svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="9" y="14" width="6" height="6" rx="1.5"/></svg>`,
+      users: `<svg viewBox="0 0 24 24"><path d="M16 19v-1.5c0-2-1.8-3.5-4-3.5s-4 1.5-4 3.5V19"/><circle cx="12" cy="8" r="3"/><path d="M20 18v-1.2c0-1.5-1.1-2.7-2.7-3.2"/><path d="M17 5.4a2.4 2.4 0 0 1 0 4.6"/><path d="M4 18v-1.2c0-1.5 1.1-2.7 2.7-3.2"/><path d="M7 5.4a2.4 2.4 0 0 0 0 4.6"/></svg>`,
+      clipboard: `<svg viewBox="0 0 24 24"><path d="M9 4h6l1 2h2v14H6V6h2z"/><path d="M9 10h6"/><path d="M9 14h6"/></svg>`,
+      shield: `<svg viewBox="0 0 24 24"><path d="M12 4 19 7v5c0 4.5-3 7-7 8-4-1-7-3.5-7-8V7z"/><path d="m9 12 2 2 4-5"/></svg>`,
+      document: `<svg viewBox="0 0 24 24"><path d="M7 4h7l3 3v13H7z"/><path d="M14 4v4h4"/><path d="M10 12h5"/><path d="M10 16h5"/></svg>`,
+      settings: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a7 7 0 0 0-1.8-1L14.4 3h-4.8l-.4 3a7 7 0 0 0-1.8 1L5 6.1l-2 3.4L5.1 11a7 7 0 0 0 0 2L3 14.5l2 3.4 2.4-1a7 7 0 0 0 1.8 1l.4 3h4.8l.4-3a7 7 0 0 0 1.8-1l2.4 1 2-3.4-2.1-1.5a7 7 0 0 0 .1-1z"/></svg>`,
+      bars: `<svg viewBox="0 0 24 24"><rect x="5" y="11" width="3" height="8" rx="1"/><rect x="11" y="7" width="3" height="12" rx="1"/><rect x="17" y="4" width="3" height="15" rx="1"/></svg>`,
+      check: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m8.5 12.5 2.4 2.4 4.9-5.8"/></svg>`,
+      calendar: `<svg viewBox="0 0 24 24"><rect x="5" y="6" width="14" height="14" rx="2"/><path d="M8 4v4"/><path d="M16 4v4"/><path d="M5 10h14"/></svg>`,
+      target: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><path d="m15 9 4-4"/><path d="M19 5h-4V1"/></svg>`,
+      lightbulb: `<svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M8 13a6 6 0 1 1 8 0c-.9.8-1.2 1.8-1.2 3H9.2c0-1.2-.3-2.2-1.2-3z"/></svg>`,
+      scale: `<svg viewBox="0 0 24 24"><path d="M12 4v16"/><path d="M5 7h14"/><path d="m6 7-3 6h6z"/><path d="m18 7-3 6h6z"/></svg>`,
+      folder: `<svg viewBox="0 0 24 24"><path d="M4 7h6l2 2h8v10H4z"/></svg>`,
+      checklist: `<svg viewBox="0 0 24 24"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="m4 6 1 1 2-2"/><path d="m4 12 1 1 2-2"/><path d="m4 18 1 1 2-2"/></svg>`,
+    };
+    return icons[name] || icons.document;
   }
 
   function ownerClientSwitcherHtml() {

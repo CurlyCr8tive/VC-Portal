@@ -3344,6 +3344,7 @@ function renderCoachingView() {
     coachingDataForClient: hasLiveCoachingRows ? coachingDataForClient : localCoachingDataForClient,
     syncStatus: hasLiveCoachingRows ? state.realCoachingSync : "local",
     syncMessage: state.realCoachingSyncMessage,
+    searchTerm: state.searchTerm,
     onLoadTemplate: hasLiveCoachingRows
       ? async (clientName, template) => {
           let nextData = null;
@@ -3580,7 +3581,7 @@ function renderHeaderComponent() {
     extraAction,
     onSearch: (term) => {
       state.searchTerm = term;
-      if (state.view === "dashboard" || state.view === "placements") renderCurrentView();
+      if (state.view === "dashboard" || state.view === "placements" || state.view === "coaching") renderCurrentView();
     },
     onHamburgerClick: openSidebarMobile,
   });
