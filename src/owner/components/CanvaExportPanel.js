@@ -281,11 +281,17 @@ function renderResult(resultEl, result) {
       <div class="review-queue-item" style="border-color:var(--color-teal);">
         <div class="rq-info">
           <p class="rq-headline">CSV downloaded — ${result.summaryOnly ? "approved summary included" : `${result.count} placement${result.count === 1 ? "" : "s"} included`}.</p>
+          <p class="rq-meta"><strong>File:</strong> ${escapeHtml(result.filename || "Canva CSV")}</p>
           <p class="rq-meta">${
             result.summaryOnly
               ? "No landed placements matched this range, so this file gives Canva the approved report summary only."
-              : "Next: upload it into Canva Bulk Create and review the generated report pages before sending."
+              : "Next: in Canva, open Tenyse's report template, choose Apps → Bulk Create, upload this CSV, connect each CSV field to the matching text/image areas, generate the report pages, then review before sending."
           }</p>
+          ${
+            result.warnings?.length
+              ? `<ul style="margin:8px 0 0; padding-left:18px; font-size:0.84rem; color:var(--text-secondary);">${result.warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}</ul>`
+              : ""
+          }
         </div>
       </div>
     `;

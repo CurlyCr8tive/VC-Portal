@@ -1199,7 +1199,11 @@ button {
 .owner-metric-card.is-interactive:hover .metric-hover-panel,
 .owner-metric-card.is-interactive:focus-visible .metric-hover-panel,
 .owner-metric-card.is-interactive:focus-within .metric-hover-panel,
-.owner-metric-card.is-interactive.show-hover-panel .metric-hover-panel {
+.owner-metric-card.is-interactive.show-hover-panel .metric-hover-panel,
+.owner-prototype-kpi.is-interactive:hover .metric-hover-panel,
+.owner-prototype-kpi.is-interactive:focus-visible .metric-hover-panel,
+.owner-prototype-kpi.is-interactive:focus-within .metric-hover-panel,
+.owner-prototype-kpi.is-interactive.show-hover-panel .metric-hover-panel {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(6px);
@@ -1716,6 +1720,7 @@ body:has(#owner-header) .avatar {
 }
 
 .owner-prototype-kpi {
+  position: relative;
   min-height: 100px;
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -1731,13 +1736,21 @@ body:has(#owner-header) .avatar {
 
 .owner-prototype-kpi.is-interactive {
   cursor: pointer;
+  overflow: visible;
 }
 
 .owner-prototype-kpi.is-interactive:hover,
-.owner-prototype-kpi.is-interactive:focus-visible {
+.owner-prototype-kpi.is-interactive:focus-visible,
+.owner-prototype-kpi.is-interactive:focus-within {
   transform: translateY(-2px);
   border-color: rgba(226, 115, 90, 0.48);
   box-shadow: 0 14px 28px rgba(31, 42, 82, 0.11);
+  z-index: 25;
+}
+
+.owner-prototype-kpi.is-interactive:focus-visible {
+  outline: 3px solid rgba(232, 111, 87, 0.24);
+  outline-offset: 3px;
 }
 
 .owner-prototype-kpi-icon {

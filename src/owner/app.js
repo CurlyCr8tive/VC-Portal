@@ -770,9 +770,9 @@ function dashboardSkeletonHTML() {
   `;
 }
 
-function ownerMetricCard({ label, value, note, icon, iconBg, target, negative = false }) {
+function ownerMetricCard({ label, value, note, icon, iconBg, target, negative = false, detail = "", actionLabel = "" }) {
   const interactiveClass = target ? " is-interactive" : "";
-  const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}"` : "";
+  const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}" aria-label="${escapeHtml(`${label}: ${value}. ${actionLabel || `Open ${target}.`}`)}"` : "";
   return `
     <div class="owner-prototype-kpi${interactiveClass}"${interactionAttrs}>
       <span class="owner-prototype-kpi-icon" style="background:${iconBg}">${icon}</span>
@@ -781,6 +781,15 @@ function ownerMetricCard({ label, value, note, icon, iconBg, target, negative = 
         <strong>${escapeHtml(String(value))}</strong>
         ${note ? `<small class="${negative ? "negative" : "positive"}">${escapeHtml(note)}</small>` : ""}
       </div>
+      ${
+        detail
+          ? `<div class="metric-hover-panel" role="tooltip">
+              <strong>${escapeHtml(label)}</strong>
+              <p>${escapeHtml(detail)}</p>
+              ${actionLabel ? `<span>${escapeHtml(actionLabel)}</span>` : ""}
+            </div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -1004,6 +1013,8 @@ function renderOwnerMetrics(container, metrics) {
       icon: "$",
       iconBg: "#fbe2da",
       target: "reports",
+      detail: "Estimated publicity value across confirmed placements in the current dashboard filter. AVE is directional reporting value, not guaranteed revenue.",
+      actionLabel: "Open Reports for AVE detail and report exports.",
     })}
     ${ownerMetricCard({
       label: "Press Placements",
@@ -1012,6 +1023,8 @@ function renderOwnerMetrics(container, metrics) {
       icon: "▤",
       iconBg: "#e1f2f0",
       target: "placements",
+      detail: "Confirmed press placement rows currently visible to the owner dashboard. These records feed the reports, charts, AVE totals, and Canva CSV export.",
+      actionLabel: "Open Press Placements to inspect source rows.",
     })}
     ${ownerMetricCard({
       label: "Avg. Lead Time",
@@ -1021,6 +1034,8 @@ function renderOwnerMetrics(container, metrics) {
       iconBg: "#fdf0d8",
       target: "analytics",
       negative: metrics.leadTimeDelta != null ? metrics.leadTimeDelta > 0 : false,
+      detail: "Average time from outreach/pitch activity to published placement where dates are available. Lower lead time means coverage is landing faster.",
+      actionLabel: "Open Analytics for trend context.",
     })}
     ${ownerMetricCard({
       label: "Active Campaigns",
@@ -1029,6 +1044,8 @@ function renderOwnerMetrics(container, metrics) {
       icon: "↗",
       iconBg: "#e1f2f0",
       target: "campaigns",
+      detail: "Campaigns currently marked active in the owner workspace. Campaigns organize placements, proof points, outreach angles, and report context.",
+      actionLabel: "Open Campaigns to manage active work.",
     })}
     ${ownerMetricCard({
       label: "Active Coaching Programs",
@@ -1037,6 +1054,8 @@ function renderOwnerMetrics(container, metrics) {
       icon: "♟",
       iconBg: "#fbe2da",
       target: "coaching",
+      detail: "Clients currently enrolled in coaching programs, including PR plus coaching relationships. Coaching progress feeds the shared roadmap and client view.",
+      actionLabel: "Open Coaching Program to view phases and homework.",
     })}
   `;
   wireMetricCardNavigation(container);
@@ -1642,6 +1661,14 @@ async function demoCapableJsonHeaders() {
   return headers;
 }
 
+async function demoAiJsonHeaders() {
+  if (shouldUseOwnerApi()) return authedJsonHeaders();
+  return {
+    "Content-Type": "application/json",
+    "X-VC-Demo-AI": "true",
+  };
+}
+
 /**
  * Every "real" client the owner UI knows about (getClientsWithMetrics(),
  * getRealClients()) is keyed by a slug generated from placement.client text
@@ -2098,20 +2125,18 @@ function demoDiscoveryPreviewResult(clientName, reason = "") {
  */
 async function generateAIText(type, data) {
   try {
-    const headers = await authedJsonHeaders();
-    if (!headers.Authorization) headers["X-VC-Demo-AI"] = "true";
     const res = await fetch(`${OWNER_API_BASE}/api/generate/${type}`, {
       method: "POST",
-      headers,
+      headers: await demoAiJsonHeaders(),
       body: JSON.stringify(data),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: "Use the saved Demo Day draft for this section." };
+      return { ok: false, message: body.message || "Live AI did not answer. Use the grounded demo draft for this section." };
     }
     return { ok: true, text: body.text, providerUsed: body.providerUsed };
   } catch (err) {
-    return { ok: false, message: "Use the saved Demo Day draft for this section." };
+    return { ok: false, message: "Owner API is not running. Start server/owner-api to use live AI; a grounded demo draft can still be generated locally." };
   }
 }
 
