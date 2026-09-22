@@ -1070,6 +1070,11 @@ button {
   overflow: visible;
 }
 
+.reports-kpi-card {
+  position: relative;
+  overflow: visible;
+}
+
 .owner-metric-card {
   min-height: 116px;
   padding: 18px;
@@ -1203,7 +1208,15 @@ button {
 .owner-prototype-kpi.is-interactive:hover .metric-hover-panel,
 .owner-prototype-kpi.is-interactive:focus-visible .metric-hover-panel,
 .owner-prototype-kpi.is-interactive:focus-within .metric-hover-panel,
-.owner-prototype-kpi.is-interactive.show-hover-panel .metric-hover-panel {
+.owner-prototype-kpi.is-interactive.show-hover-panel .metric-hover-panel,
+.metric-card:hover .metric-hover-panel,
+.metric-card:focus-visible .metric-hover-panel,
+.metric-card:focus-within .metric-hover-panel,
+.metric-card.show-hover-panel .metric-hover-panel,
+.reports-kpi-card:hover .metric-hover-panel,
+.reports-kpi-card:focus-visible .metric-hover-panel,
+.reports-kpi-card:focus-within .metric-hover-panel,
+.reports-kpi-card.show-hover-panel .metric-hover-panel {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(6px);
