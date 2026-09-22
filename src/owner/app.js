@@ -170,6 +170,7 @@ const state = {
   clientsIndustryFilter: "all",
   clientsSearch: "",
   clientCommsPanel: null,
+  clientsActionPanel: null,
   clientCommsStatus: "idle",
   clientCommsData: null,
   realClientsSync: "idle", // idle | loading | loaded | error
@@ -2362,7 +2363,7 @@ function renderClientsView() {
           <h2>Clients <span>(${filteredClients.length})</span> ${sectionInfoButton({ title: "Clients", body: "Every client profile on file with real status, industry, program enrollment, campaign count, placement count, and AVE. Use View for the primary dashboard path and the overflow menu for secondary workflows such as editing, inviting, scheduling, and mention discovery." })}</h2>
           <div class="clients-table-actions">
             <button type="button" class="link-btn" id="clients-export-csv">↧ Export CSV</button>
-            <button type="button" class="icon-only-btn" aria-label="More client table options">⋮</button>
+            <button type="button" class="icon-only-btn" id="clients-table-options" aria-label="More client table options">⋮</button>
           </div>
         </div>
         <div class="table-scroll">
@@ -2418,7 +2419,7 @@ function renderClientsView() {
         </div>
         <div class="clients-table-footer">
           <span>Showing ${filteredClients.length ? `1–${filteredClients.length}` : "0"} of ${allClients.length} clients</span>
-          <span class="clients-pagination"><button type="button" disabled>‹</button><strong>1</strong><button type="button" disabled>›</button></span>
+          <span class="clients-pagination-note">Page 1 of 1</span>
         </div>
       </section>
 
@@ -2426,14 +2427,15 @@ function renderClientsView() {
         <section class="reports-panel reports-quick-actions clients-quick-actions">
           <h2>Quick Actions</h2>
           <button type="button" id="clients-quick-add">＋ Add New Client</button>
-          <button type="button" disabled>⇩ Import Clients (CSV)</button>
+          <button type="button" id="clients-quick-import">⇩ Import Clients (CSV)</button>
           <button type="button" id="clients-quick-export">⇧ Export Client Data (CSV)</button>
           <button type="button" id="clients-quick-programs">▣ Manage Programs</button>
           <button type="button" id="clients-quick-reports">▤ View Client Reports</button>
-          <button type="button" disabled>♙ Invite to Portal</button>
-          <button type="button" disabled>▣ Schedule Outreach</button>
+          <button type="button" id="clients-quick-invite">♙ Invite to Portal</button>
+          <button type="button" id="clients-quick-schedule">▣ Schedule Outreach</button>
           <button type="button" id="clients-quick-inactive">◉ View Inactive Clients</button>
         </section>
+        ${renderClientsActionPanel(allClients)}
         <section class="reports-panel reports-insights clients-insights">
           <h2>💡 Insights</h2>
           <ul>${insights.map((insight) => `<li>${escapeHtml(insight)}</li>`).join("")}</ul>
@@ -2508,16 +2510,137 @@ function clientByIdOrName(clients, value) {
   return clients.find((client) => client.id === value || client.name === value);
 }
 
+function renderClientsActionPanel(allClients) {
+  const panel = state.clientsActionPanel;
+  if (!panel) return "";
+  const activeClients = allClients.filter((client) => client.profile?.status === "active");
+  const pendingClients = allClients.filter((client) => ["unconfirmed", "prospect", "coming_soon"].includes(client.profile?.status || ""));
+  const selectedClient = panel.clientName ? allClients.find((client) => client.name === panel.clientName) : activeClients[0] || allClients[0];
+  const panelCopy = {
+    import: {
+      eyebrow: "Import workflow",
+      title: "CSV import preview",
+      body: "Use this when Tenyse wants to bring in a batch of prospects or legacy clients. The live save is gated to the owner account, but the demo path shows the required fields and what gets created.",
+      bullets: ["Required: Client name, contact email, industry, status", "Optional: program enrollment, campaign count, notes, next outreach date", "After import: review unconfirmed clients, invite to portal, then attach campaigns or coaching"],
+      actions: [
+        { label: "Open Add Client Form", id: "clients-panel-add" },
+        { label: "Export Current Template", id: "clients-panel-export" },
+      ],
+    },
+    invite: {
+      eyebrow: "Portal access",
+      title: `Invite ${escapeHtml(selectedClient?.name || "a client")} to the portal`,
+      body: "This is the owner-facing invite flow. In a live owner session it sends the portal link; in preview it shows the message and keeps the action safe.",
+      bullets: [
+        `Recipient: ${selectedClient?.profile?.contactEmail || "client contact email on file"}`,
+        "Access: client dashboard, reports, placements, coaching program if enrolled",
+        "Suggested note: Your Verified Consulting workspace is ready for review. You can see coverage, value, homework, and resources in one place.",
+      ],
+      actions: [
+        { label: "View Client Dashboard", id: "clients-panel-view" },
+        { label: "Open Reports", id: "clients-panel-reports" },
+      ],
+    },
+    schedule: {
+      eyebrow: "Outreach workflow",
+      title: "Schedule client outreach",
+      body: "Use this to prep a touchpoint from client status, campaign activity, and missing assets instead of leaving Tenyse with a blank calendar action.",
+      bullets: [
+        `${activeClients.length} active clients are ready for routine check-ins.`,
+        `${pendingClients.length} clients still need confirmation, onboarding, or follow-up.`,
+        "Recommended next step: prioritize unconfirmed clients, then clients with active campaigns and no recent note.",
+      ],
+      actions: [
+        { label: "View Messages", id: "clients-panel-messages" },
+        { label: "Filter Pending Clients", id: "clients-panel-pending" },
+      ],
+    },
+    table: {
+      eyebrow: "Table actions",
+      title: "Client table options",
+      body: "These are the table-level actions that used to be hidden behind a dead menu.",
+      bullets: ["Export the current filtered client list", "Open Review Queue to scan for client mentions", "Open Reports for AVE and client performance"],
+      actions: [
+        { label: "Export Visible Rows", id: "clients-panel-export-visible" },
+        { label: "Open Review Queue", id: "clients-panel-review" },
+      ],
+    },
+  }[panel.type];
+
+  if (!panelCopy) return "";
+
+  return `
+    <section class="reports-panel clients-action-panel" id="clients-action-panel">
+      <div class="clients-action-panel-head">
+        <span>${escapeHtml(panelCopy.eyebrow)}</span>
+        <button type="button" class="link-btn" id="clients-action-close">Close</button>
+      </div>
+      <h2>${panelCopy.title}</h2>
+      <p>${escapeHtml(panelCopy.body)}</p>
+      <ul>${panelCopy.bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+      <div class="clients-action-panel-buttons">
+        ${panelCopy.actions.map((action) => `<button type="button" class="btn-secondary" id="${escapeHtml(action.id)}">${escapeHtml(action.label)}</button>`).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function rowStatusEl(clientId) {
   return document.querySelector(`[data-client-row-status="${CSS.escape(clientId)}"]`);
+}
+
+function openClientsActionPanel(type, clientName = "") {
+  state.clientsActionPanel = { type, clientName };
+  renderClientsView();
+  setTimeout(() => document.getElementById("clients-action-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
 }
 
 function wireClientsTableActions({ allClients, filteredClients, canManageClients }) {
   document.getElementById("clients-export-csv")?.addEventListener("click", () => downloadClientsCsv(filteredClients));
   document.getElementById("clients-quick-export")?.addEventListener("click", () => downloadClientsCsv(allClients));
+  document.getElementById("clients-table-options")?.addEventListener("click", () => openClientsActionPanel("table"));
+  document.getElementById("clients-quick-import")?.addEventListener("click", () => openClientsActionPanel("import"));
+  document.getElementById("clients-quick-invite")?.addEventListener("click", () => openClientsActionPanel("invite"));
+  document.getElementById("clients-quick-schedule")?.addEventListener("click", () => openClientsActionPanel("schedule"));
+  document.getElementById("clients-action-close")?.addEventListener("click", () => {
+    state.clientsActionPanel = null;
+    renderClientsView();
+  });
+  document.getElementById("clients-panel-add")?.addEventListener("click", () => {
+    if (!canManageClients) {
+      openClientsActionPanel("import");
+      return;
+    }
+    state.editingClient = true;
+    renderClientsView();
+  });
+  document.getElementById("clients-panel-export")?.addEventListener("click", () => downloadClientsCsv(allClients));
+  document.getElementById("clients-panel-export-visible")?.addEventListener("click", () => downloadClientsCsv(filteredClients));
+  document.getElementById("clients-panel-view")?.addEventListener("click", () => {
+    const client = allClients.find((item) => item.name === state.clientsActionPanel?.clientName) || allClients.find((item) => item.name === "Greyz Bistro") || allClients[0];
+    if (!client) return;
+    state.dashboardClientFilter = client.name;
+    state.dashboardDateFrom = "";
+    state.dashboardDateTo = "";
+    navigate("dashboard");
+  });
+  document.getElementById("clients-panel-reports")?.addEventListener("click", () => navigate("reports"));
+  document.getElementById("clients-panel-review")?.addEventListener("click", () => navigate("reviewqueue"));
+  document.getElementById("clients-panel-messages")?.addEventListener("click", () => {
+    const client = allClients.find((item) => item.profile?.status === "active") || allClients[0];
+    loadClientCommunicationPanel({ type: "messages", clientId: client?.id, clientName: client?.name });
+  });
+  document.getElementById("clients-panel-pending")?.addEventListener("click", () => {
+    state.clientStatusFilter = "unconfirmed";
+    state.clientsProgramFilter = "all";
+    state.clientsIndustryFilter = "all";
+    state.clientsSearch = "";
+    state.clientsActionPanel = null;
+    renderClientsView();
+  });
   document.getElementById("clients-quick-add")?.addEventListener("click", () => {
     if (!canManageClients) {
-      alert("Sign in with Tenyse's live owner account to add a client.");
+      openClientsActionPanel("import");
       return;
     }
     state.editingClient = true;
@@ -4406,6 +4529,15 @@ function renderHeaderComponent() {
             author: "Tenyse Williams",
           }
         : null,
+    notifications: {
+      title: "Owner Notifications",
+      intro: "Demo-ready items Tenyse can act on from this portal.",
+      items: [
+        "3 candidate mentions are ready in Review Queue.",
+        "Greyz Bistro has a coaching follow-up scheduled for Fri, Sep 9 at 2:00 PM.",
+        "Candlelit Care has a report draft ready for review and approval.",
+      ],
+    },
     onSearch: (term) => {
       state.searchTerm = term;
       if (state.view === "dashboard" || state.view === "placements" || state.view === "coaching" || state.view === "reports") renderCurrentView();

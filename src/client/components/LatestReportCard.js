@@ -27,8 +27,16 @@ export function renderReportCard(container, report, options = {}) {
         }
       </div>
       <div class="report-actions">
-        <button class="btn-secondary" data-report-preview ${!canPreview ? "disabled" : ""} title="${!canPreview ? "Save report content first" : ""}">View Report</button>
-        <button class="btn-primary" data-report-pdf ${!canDownload ? "disabled" : ""} title="${!canDownload ? "Save report content first" : ""}">Download PDF</button>
+        ${
+          canPreview
+            ? `<button class="btn-secondary" data-report-preview>View Report</button>`
+            : `<span class="report-action-note">Preview appears after summary approval.</span>`
+        }
+        ${
+          canDownload
+            ? `<button class="btn-primary" data-report-pdf>Download PDF</button>`
+            : `<span class="report-action-note">PDF appears after report approval.</span>`
+        }
       </div>
       ${
         report.executiveSummary

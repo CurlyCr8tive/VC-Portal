@@ -1455,6 +1455,17 @@ function renderHeaderComponent() {
           onClick: () => navigate("messages"),
         }
       : null,
+    notifications: {
+      title: "Client Notifications",
+      intro: "Recent items from Verified Consulting.",
+      items: supportsCoaching()
+        ? [
+            "Phase 5 homework has two items still open.",
+            "A client report is ready to review in Reports.",
+            "Tenyse added a resource for outreach assets.",
+          ]
+        : ["A new PR report is ready to review.", "Recent placements are available in Press Placements."],
+    },
     onSearch: (term) => {
       state.searchTerm = term;
       if (state.view === "dashboard" || state.view === "placements") renderCurrentView();

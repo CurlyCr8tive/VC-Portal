@@ -7,7 +7,10 @@ import { escapeHtml } from "../utils.js";
  * needing to know about it.
  */
 export function renderHeader(container, opts) {
-  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource, contextLabel, quoteCard } = opts;
+  const { client, onSearch, onHamburgerClick, greeting, subtitle, searchPlaceholder, extraAction, dataSource, contextLabel, quoteCard, notifications } = opts;
+  const notificationItems = notifications?.items || [];
+  const notificationTitle = notifications?.title || "Notifications";
+  const notificationIntro = notifications?.intro || "Recent portal activity that needs attention.";
 
   // Visible regardless of which view is scrolled to, since the header
   // renders on every page — the point is a viewer can never lose track of
@@ -35,7 +38,20 @@ export function renderHeader(container, opts) {
         <input id="portal-search" type="search" placeholder="${escapeHtml(searchPlaceholder || "Search placements, reports…")}" />
       </div>
       ${extraAction ? `<button class="new-client-btn" data-extra-action>${escapeHtml(extraAction.label)}</button>` : ""}
-      <button class="icon-btn" aria-label="Notifications">🔔</button>
+      <div class="header-notification-wrap">
+        <button class="icon-btn" type="button" aria-label="Notifications" aria-expanded="false" data-notification-toggle>🔔</button>
+        <div class="header-notification-panel" data-notification-panel hidden>
+          <strong>${escapeHtml(notificationTitle)}</strong>
+          <p>${escapeHtml(notificationIntro)}</p>
+          <ul>
+            ${
+              notificationItems.length
+                ? notificationItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")
+                : "<li>No unread notifications right now.</li>"
+            }
+          </ul>
+        </div>
+      </div>
       <div class="avatar" title="${escapeHtml(client.name)}" aria-hidden="true">${escapeHtml(client.avatarInitials)}</div>
       ${
         quoteCard
@@ -53,4 +69,11 @@ export function renderHeader(container, opts) {
   if (extraAction) {
     container.querySelector("[data-extra-action]").addEventListener("click", extraAction.onClick);
   }
+  const notificationButton = container.querySelector("[data-notification-toggle]");
+  const notificationPanel = container.querySelector("[data-notification-panel]");
+  notificationButton?.addEventListener("click", () => {
+    const willOpen = notificationPanel.hidden;
+    notificationPanel.hidden = !willOpen;
+    notificationButton.setAttribute("aria-expanded", String(willOpen));
+  });
 }
