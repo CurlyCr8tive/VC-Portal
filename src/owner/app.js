@@ -14,7 +14,7 @@ import {
   getAggregateRealChartSeries,
   getAggregateRealInsight,
   getRealReport,
-} from "../realDataSource.js?v=20260922-reports-prototype";
+} from "../realDataSource.js?v=20260922-populated-pages";
 import { formatCurrency, leadTimeDaysForPlacement } from "../calculations.js?v=20260919-report-builder";
 import { requireSession, logout } from "../auth.js?v=20260918-real-session-priority";
 import { getAccessToken, signOutReal } from "../supabaseAuthClient.js";
@@ -33,7 +33,7 @@ import { renderInsightCard } from "../client/components/CampaignInsightCard.js";
 import { renderReportCard } from "../client/components/LatestReportCard.js?v=20260919-live-ui";
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
-import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260922-reports-prototype";
+import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260922-populated-pages";
 import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260919-dashboard-alive";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-analytics-clicks";
 import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-live-ui";
@@ -294,6 +294,13 @@ function getClientsWithMetrics() {
     ...c,
     metrics: METRICS[c.id]["1y"],
     campaignNames: (CAMPAIGNS[c.id] || []).map((camp) => camp.name),
+  }));
+}
+
+function getOwnerClients() {
+  return getClientsWithMetrics().map((client) => ({
+    ...client,
+    name: client.name || client.profile?.name || "Unnamed Client",
   }));
 }
 
@@ -2599,6 +2606,24 @@ function renderMockReviewQueueSection() {
  */
 async function loadRealReviewQueue() {
   const listEl = document.getElementById("review-queue-list");
+  const previewQueueItems = shouldUseOwnerApi() ? [] : state.reviewQueue;
+  const renderPreviewQueue = () => {
+    if (!previewQueueItems.length) {
+      listEl.innerHTML = `<p class="hint">Review Queue preview is ready once mention scanning has results.</p>`;
+      return;
+    }
+    renderReviewQueue(listEl, previewQueueItems, {
+      confirmLabel: "Confirm Preview",
+      onConfirm: (id) => {
+        state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+        loadRealReviewQueue();
+      },
+      onReject: (id) => {
+        state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+        loadRealReviewQueue();
+      },
+    });
+  };
   try {
     // Demo-capable — a real scan (already demo-capable) can run before the
     // owner ever signs in, and its results need to be visible right here,
@@ -2610,7 +2635,7 @@ async function loadRealReviewQueue() {
     ]);
     const queueBody = await queueRes.json().catch(() => ({}));
     if (!queueRes.ok) {
-      listEl.innerHTML = `<p class="hint">Review Queue preview is ready once mention scanning has results.</p>`;
+      renderPreviewQueue();
       return;
     }
     const clientsBody = clientsRes.ok ? await clientsRes.json().catch(() => []) : [];
@@ -2627,18 +2652,23 @@ async function loadRealReviewQueue() {
       discoveredDate: row.discovered_at ? row.discovered_at.slice(0, 10) : "",
     }));
 
-    renderReviewQueue(listEl, [...state.demoDiscoveryQueue, ...items], {
+    renderReviewQueue(listEl, [...state.demoDiscoveryQueue, ...items, ...previewQueueItems], {
       confirmLabel: "Create Placement",
       showPlacementDetails: true,
       onConfirm: (id, details) => createPlacementFromReviewQueueItem(id, details),
       onReject: (id) => resolveRealReviewQueueItem(id, "rejected"),
     });
   } catch (err) {
-    listEl.innerHTML = `<p class="hint">Review Queue preview is ready once mention scanning has results.</p>`;
+    renderPreviewQueue();
   }
 }
 
 async function resolveRealReviewQueueItem(id, status) {
+  if (String(id).startsWith("rq")) {
+    state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+    loadRealReviewQueue();
+    return;
+  }
   if (String(id).startsWith("demo-discovery-")) {
     state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
     loadRealReviewQueue();
@@ -2662,6 +2692,11 @@ async function resolveRealReviewQueueItem(id, status) {
 }
 
 async function createPlacementFromReviewQueueItem(id, details = {}) {
+  if (String(id).startsWith("rq")) {
+    state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+    loadRealReviewQueue();
+    return;
+  }
   if (String(id).startsWith("demo-discovery-")) {
     alert("Demo discovery candidate reviewed. Sign in as the live owner before creating a client-facing placement from a candidate source.");
     return;
