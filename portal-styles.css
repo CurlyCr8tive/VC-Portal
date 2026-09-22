@@ -3027,6 +3027,552 @@ table.placements-table {
   font-size: 0.82rem;
 }
 
+.coaching-dashboard-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 20px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.coaching-dashboard-intro > p {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 680px;
+}
+
+.coaching-quote-card {
+  border: 1px solid #efd8d4;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #fff, #fff4f2);
+  padding: 13px 16px;
+  color: var(--color-navy);
+  box-shadow: var(--shadow-sm);
+}
+
+.coaching-quote-card p {
+  color: var(--color-navy);
+  font-family: var(--font-serif);
+  line-height: 1.35;
+  margin: 0 0 6px;
+}
+
+.coaching-quote-card strong {
+  font-size: 0.86rem;
+}
+
+.coaching-subnav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+
+.coaching-subnav button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-navy);
+  min-height: 42px;
+  padding: 0 0 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.coaching-subnav button.active {
+  border-color: var(--color-coral);
+  color: var(--color-coral);
+}
+
+.coaching-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.coaching-kpi-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 92px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+}
+
+.coaching-kpi-card > span {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  font-size: 1.25rem;
+}
+
+.coaching-kpi-card.coral > span {
+  background: #fff0ed;
+  color: var(--color-coral);
+}
+
+.coaching-kpi-card.green > span {
+  background: #eafaf6;
+  color: var(--color-green);
+}
+
+.coaching-kpi-card.purple > span {
+  background: #f1ecff;
+  color: #6650c8;
+}
+
+.coaching-kpi-card p,
+.coaching-kpi-card small {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.coaching-kpi-card strong {
+  display: block;
+  margin: 2px 0;
+  color: var(--color-navy);
+  font-family: var(--font-serif);
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.coaching-kpi-card small {
+  color: var(--color-green);
+}
+
+.coaching-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.88fr) minmax(330px, 0.92fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.coaching-dashboard-second-row {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(360px, 1.25fr) minmax(300px, 0.9fr);
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.coaching-dashboard-bottom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.coaching-panel {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  padding: 14px;
+  min-width: 0;
+}
+
+.coaching-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.coaching-panel h3,
+.coaching-panel-heading h3 {
+  margin: 0;
+  color: var(--color-navy);
+  font-size: 1.04rem;
+}
+
+.coaching-client-table-wrap {
+  overflow-x: auto;
+  margin: 0 -14px -14px;
+}
+
+.coaching-client-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 740px;
+  font-size: 0.78rem;
+}
+
+.coaching-client-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--color-navy);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  border-top: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  background: #fbf8f5;
+}
+
+.coaching-client-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--color-navy);
+  vertical-align: middle;
+}
+
+.coaching-client-table small {
+  display: block;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.coaching-client-cell {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.coaching-client-cell > span,
+.coaching-note-row > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #e9e8ff;
+  color: var(--color-navy);
+  font-weight: 800;
+}
+
+.coaching-progress-cell {
+  min-width: 112px;
+}
+
+.coaching-progress-cell > span {
+  display: inline-block;
+  min-width: 34px;
+  font-weight: 800;
+}
+
+.coaching-mini-progress {
+  display: inline-block;
+  vertical-align: middle;
+  width: 70px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ece9e6;
+  margin-left: 6px;
+  overflow: hidden;
+}
+
+.coaching-mini-progress b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-green);
+}
+
+.coaching-table-action {
+  border: 1px solid #f1beb4;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--color-coral);
+  padding: 7px 15px;
+  font-weight: 700;
+}
+
+.coaching-table-action:disabled,
+.coaching-overflow:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.coaching-overflow {
+  border: 0;
+  background: transparent;
+  color: var(--color-navy);
+  font-size: 1.15rem;
+  margin-left: 8px;
+}
+
+.coaching-program-overview-panel {
+  display: grid;
+  gap: 9px;
+}
+
+.coaching-program-row,
+.coaching-program-create {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 86px 14px;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.coaching-program-row > span,
+.coaching-program-create > span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #fff0ed;
+  color: var(--color-coral);
+  font-size: 1.2rem;
+}
+
+.coaching-program-row strong,
+.coaching-program-create strong {
+  color: var(--color-navy);
+}
+
+.coaching-program-row small,
+.coaching-program-row p,
+.coaching-program-create small {
+  display: block;
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
+.coaching-program-row em {
+  border-left: 1px solid var(--border-light);
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.coaching-program-row em b {
+  display: block;
+  color: var(--color-navy);
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.coaching-program-create {
+  border-style: dashed;
+  grid-template-columns: 48px minmax(0, 1fr) 14px;
+}
+
+.coaching-program-create em {
+  font-style: normal;
+  color: var(--color-navy);
+}
+
+.coaching-activity-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.coaching-activity-tabs button {
+  border: 0;
+  border-radius: 8px;
+  background: #fbf7f3;
+  color: var(--color-navy);
+  padding: 7px 14px;
+  font-size: 0.78rem;
+}
+
+.coaching-activity-tabs button.active {
+  color: var(--color-coral);
+  border-bottom: 2px solid var(--color-coral);
+}
+
+.coaching-activity-row,
+.coaching-note-row {
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-light);
+  padding: 9px 0;
+}
+
+.coaching-activity-row {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+}
+
+.coaching-activity-row:last-child,
+.coaching-note-row:last-child {
+  border-bottom: 0;
+}
+
+.coaching-activity-row > span {
+  color: var(--color-coral);
+}
+
+.coaching-activity-row strong,
+.coaching-note-row p {
+  color: var(--color-navy);
+  font-size: 0.82rem;
+}
+
+.coaching-activity-row small {
+  display: block;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.coaching-activity-row em {
+  border-radius: 6px;
+  background: #e8f1ff;
+  color: #2454a7;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.coaching-phase-chart {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  min-height: 210px;
+  align-items: end;
+  border-left: 1px solid var(--border-light);
+  border-bottom: 1px solid var(--border-light);
+  padding: 18px 10px 4px 14px;
+}
+
+.coaching-phase-bar {
+  display: grid;
+  grid-template-rows: 22px 118px auto;
+  justify-items: center;
+  gap: 6px;
+  height: 180px;
+}
+
+.coaching-phase-bar strong {
+  color: var(--color-navy);
+  font-size: 0.78rem;
+}
+
+.coaching-phase-bar span {
+  align-self: end;
+  width: 42px;
+  border-radius: 8px 8px 0 0;
+  background: var(--color-teal);
+}
+
+.coaching-phase-bar small {
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 0.68rem;
+  line-height: 1.15;
+}
+
+.coaching-phase-bar.phase-2 span { background: #a99ce7; }
+.coaching-phase-bar.phase-3 span { background: #ffc95c; }
+.coaching-phase-bar.phase-4 span { background: #f3a59a; }
+.coaching-phase-bar.phase-5 span { background: #f07b70; }
+.coaching-phase-bar.phase-6 span { background: #bcbcbc; }
+
+.coaching-note-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+}
+
+.coaching-note-row p {
+  margin: 0;
+  line-height: 1.3;
+}
+
+.coaching-note-row em {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.coaching-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.coaching-tool-card {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.coaching-tool-card > span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #f1ecff;
+  color: #6650c8;
+  font-size: 1.2rem;
+}
+
+.coaching-tool-card strong {
+  color: var(--color-navy);
+}
+
+.coaching-tool-card p {
+  margin: 2px 0 10px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.3;
+}
+
+.coaching-tool-card button,
+.coaching-quick-actions button {
+  border: 1px solid #f1beb4;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--color-coral);
+  padding: 8px 10px;
+  font-weight: 700;
+}
+
+.coaching-quick-actions-panel {
+  background: linear-gradient(135deg, #fff, #fff0ed);
+}
+
+.coaching-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.coaching-tab-panel {
+  min-height: 320px;
+}
+
+.coaching-back-link {
+  margin-bottom: 12px;
+}
+
 .owner-coaching-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 0.55fr);

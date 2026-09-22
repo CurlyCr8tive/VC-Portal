@@ -3320,6 +3320,13 @@ function renderCoachingView() {
   if (findClientByName("Greyz Bistro")) {
     seedGreyzBistroCoachingData();
   }
+  const liveCoachingData = state.realCoachingData || {};
+  const hasLiveCoachingRows = Boolean(
+    shouldUseOwnerApi() &&
+      ((liveCoachingData.phases || []).length ||
+        (liveCoachingData.opportunities || []).length ||
+        (liveCoachingData.resources || []).length)
+  );
   const coachingClients =
     state.dataSource === "real"
       ? getClientsWithMetrics()
@@ -3331,14 +3338,13 @@ function renderCoachingView() {
   renderCoachingAdminView(document.getElementById("coaching-content"), {
     coachingClients,
     initialClient,
-    // Preview mode reads/writes local storage (localCoachingDataForClient
-    // + the saveLocal*/removeLocal* handlers below) instead of null — the
-    // seed data was already there, nothing was ever passed a function to
-    // read it back.
-    coachingDataForClient: shouldUseOwnerApi() ? coachingDataForClient : localCoachingDataForClient,
-    syncStatus: shouldUseOwnerApi() ? state.realCoachingSync : "local",
+    // The live owner API can be signed in before the coaching tables have
+    // rows. In that case keep the demo grounded in the seeded VAAM curriculum
+    // instead of showing an empty dashboard.
+    coachingDataForClient: hasLiveCoachingRows ? coachingDataForClient : localCoachingDataForClient,
+    syncStatus: hasLiveCoachingRows ? state.realCoachingSync : "local",
     syncMessage: state.realCoachingSyncMessage,
-    onLoadTemplate: shouldUseOwnerApi()
+    onLoadTemplate: hasLiveCoachingRows
       ? async (clientName, template) => {
           let nextData = null;
           for (const phase of template.phases) {
@@ -3354,14 +3360,14 @@ function renderCoachingView() {
           return nextData;
         }
       : null,
-    onSavePhase: shouldUseOwnerApi() ? saveRealCoachingPhase : saveLocalCoachingPhase,
-    onAddHomework: shouldUseOwnerApi() ? createRealHomework : createLocalHomework,
-    onSaveHomework: shouldUseOwnerApi() ? saveRealHomework : saveLocalHomework,
-    onRemoveHomework: shouldUseOwnerApi() ? removeRealHomework : removeLocalHomework,
-    onSaveOpportunity: shouldUseOwnerApi() ? saveRealOpportunity : saveLocalOpportunity,
-    onRemoveOpportunity: shouldUseOwnerApi() ? removeRealOpportunity : removeLocalOpportunity,
-    onSaveResource: shouldUseOwnerApi() ? saveRealResource : saveLocalResource,
-    onRemoveResource: shouldUseOwnerApi() ? removeRealResource : removeLocalResource,
+    onSavePhase: hasLiveCoachingRows ? saveRealCoachingPhase : saveLocalCoachingPhase,
+    onAddHomework: hasLiveCoachingRows ? createRealHomework : createLocalHomework,
+    onSaveHomework: hasLiveCoachingRows ? saveRealHomework : saveLocalHomework,
+    onRemoveHomework: hasLiveCoachingRows ? removeRealHomework : removeLocalHomework,
+    onSaveOpportunity: hasLiveCoachingRows ? saveRealOpportunity : saveLocalOpportunity,
+    onRemoveOpportunity: hasLiveCoachingRows ? removeRealOpportunity : removeLocalOpportunity,
+    onSaveResource: hasLiveCoachingRows ? saveRealResource : saveLocalResource,
+    onRemoveResource: hasLiveCoachingRows ? removeRealResource : removeLocalResource,
   });
 }
 
@@ -3541,6 +3547,29 @@ function getOwnerHeaderContext() {
 
 function renderHeaderComponent() {
   const headerContext = getOwnerHeaderContext();
+  const extraAction =
+    state.view === "coaching"
+      ? {
+          label: "+ New Program",
+          onClick: () => {
+            state.coachingSelectedClient = "";
+            navigate("coaching");
+            setTimeout(() => {
+              document.querySelector('[data-overview-tab="programs"]')?.click();
+            }, 0);
+          },
+        }
+      : {
+          label: "+ New Client",
+          onClick: () => {
+            if (!shouldUseOwnerApi()) {
+              alert("Sign in with Tenyse's live owner account to add a client.");
+              return;
+            }
+            state.editingClient = true;
+            navigate("clients");
+          },
+        };
   renderHeader(document.getElementById("owner-header"), {
     client: { name: "Tenyse Williams", avatarInitials: "T" },
     dataSource: state.dataSource,
@@ -3548,17 +3577,7 @@ function renderHeaderComponent() {
     greeting: headerContext.greeting,
     subtitle: headerContext.subtitle,
     searchPlaceholder: "Search clients, campaigns, or programs...",
-    extraAction: {
-      label: "+ New Client",
-      onClick: () => {
-        if (!shouldUseOwnerApi()) {
-          alert("Sign in with Tenyse's live owner account to add a client.");
-          return;
-        }
-        state.editingClient = true;
-        navigate("clients");
-      },
-    },
+    extraAction,
     onSearch: (term) => {
       state.searchTerm = term;
       if (state.view === "dashboard" || state.view === "placements") renderCurrentView();
