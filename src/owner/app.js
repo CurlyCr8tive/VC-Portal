@@ -166,6 +166,9 @@ const state = {
   // said is current or closed) only show under "all", never silently
   // bucketed into either — see clientSchema.js's CLIENT_STATUSES comment.
   clientStatusFilter: "all",
+  clientsProgramFilter: "all",
+  clientsIndustryFilter: "all",
+  clientsSearch: "",
   clientCommsPanel: null,
   clientCommsStatus: "idle",
   clientCommsData: null,
@@ -413,6 +416,140 @@ function filterPlacements(placements, term) {
       (p.campaign || "").toLowerCase().includes(t) ||
       (p.clientName || "").toLowerCase().includes(t)
   );
+}
+
+const CLIENT_STATUS_LABELS = {
+  active: "Active",
+  past: "Past / Portfolio",
+  unconfirmed: "Unconfirmed",
+  prospect: "Prospect",
+  "coming-soon": "Coming Soon",
+  pending: "Pending",
+};
+
+const CLIENT_PROGRAM_LABELS = {
+  pr: "PR",
+  coaching: "Coaching",
+  pr_and_coaching: "PR + Coaching",
+};
+
+function clientStatusLabel(status = "unconfirmed") {
+  return CLIENT_STATUS_LABELS[status] || status.replace(/[-_]/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function clientProgramTags(client) {
+  const engagement = client.profile?.engagementType || "pr";
+  if (engagement === "pr_and_coaching") return ["PR", "Coaching"];
+  if (engagement === "coaching") return ["Coaching"];
+  if (engagement === "pr") return ["PR"];
+  return [];
+}
+
+function clientCampaignCount(client) {
+  return getAllCampaigns().filter((campaign) => campaign.clientName === client.name).length;
+}
+
+function clientSecondaryLine(client) {
+  const programs = clientProgramTags(client).join(" + ");
+  return programs || client.profile?.contactEmail || "Client profile";
+}
+
+function clientIndustryDisplay(client) {
+  const industry = client.profile?.industry || "";
+  if (!industry) return "—";
+  return industry
+    .split(/\s+—\s+|\s+-\s+|;/)[0]
+    .replace(/\s*\([^)]{12,}\)/g, "")
+    .trim() || industry;
+}
+
+function clientRowAve(client) {
+  const placements = Number(client.metrics?.totalPlacements || 0);
+  const ave = Number(client.metrics?.totalAVE || 0);
+  if (!placements && !ave) return "—";
+  return formatCurrency(ave);
+}
+
+function clientsFilterOptions(clients) {
+  const industries = [...new Set(clients.map(clientIndustryDisplay).filter((industry) => industry && industry !== "—"))].sort((a, b) => a.localeCompare(b));
+  const programs = [...new Set(clients.flatMap(clientProgramTags))].sort((a, b) => a.localeCompare(b));
+  return { industries, programs };
+}
+
+function applyClientsFilters(clients) {
+  const search = (state.clientsSearch || "").trim().toLowerCase();
+  return clients.filter((client) => {
+    const status = client.profile?.status || "unconfirmed";
+    const industry = clientIndustryDisplay(client);
+    const programs = clientProgramTags(client);
+    const matchesStatus = state.clientStatusFilter === "all" || status === state.clientStatusFilter;
+    const matchesProgram = state.clientsProgramFilter === "all" || programs.includes(state.clientsProgramFilter);
+    const matchesIndustry = state.clientsIndustryFilter === "all" || industry === state.clientsIndustryFilter;
+    const searchable = [
+      client.name,
+      industry,
+      client.profile?.contactEmail,
+      client.profile?.notes,
+      programs.join(" "),
+      (client.campaignNames || []).join(" "),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return matchesStatus && matchesProgram && matchesIndustry && (!search || searchable.includes(search));
+  });
+}
+
+function buildClientsSummary(clients) {
+  const activeClients = clients.filter((c) => c.profile?.status === "active").length;
+  const clientsInPrograms = clients.filter((c) => clientProgramTags(c).length || clientCampaignCount(c)).length;
+  const pending = clients.filter((c) => ["pending", "unconfirmed", "prospect"].includes(c.profile?.status || "unconfirmed")).length;
+  return {
+    totalClients: clients.length,
+    activeClients,
+    clientsInPrograms,
+    pending,
+  };
+}
+
+function buildClientsInsights(clients) {
+  const active = clients.filter((c) => c.profile?.status === "active").length;
+  const coaching = clients.filter((c) => ["coaching", "pr_and_coaching"].includes(c.profile?.engagementType || "")).length;
+  const unconfirmed = clients.filter((c) => ["pending", "unconfirmed", "prospect"].includes(c.profile?.status || "unconfirmed")).length;
+  const industryCounts = new Map();
+  clients.forEach((client) => {
+    const industry = clientIndustryDisplay(client);
+    if (!industry || industry === "—") return;
+    industryCounts.set(industry, (industryCounts.get(industry) || 0) + 1);
+  });
+  const topIndustry = [...industryCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return [
+    `${active} client${active === 1 ? " is" : "s are"} currently active.`,
+    topIndustry ? `${topIndustry[0]} is the largest represented industry (${topIndustry[1]} client${topIndustry[1] === 1 ? "" : "s"}).` : "Add industries to make portfolio mix visible.",
+    `${coaching} client${coaching === 1 ? " is" : "s are"} enrolled in coaching programs.`,
+    `${unconfirmed} client profile${unconfirmed === 1 ? "" : "s"} still need confirmation or follow-up.`,
+  ];
+}
+
+function clientsCsv(clients) {
+  const header = ["Client", "Status", "Industry", "Programs", "Campaigns", "Total Placements", "AVE", "Contact Email"];
+  const rows = clients.map((client) => [
+    client.name,
+    clientStatusLabel(client.profile?.status),
+    client.profile?.industry || "",
+    clientProgramTags(client).join(" + "),
+    clientCampaignCount(client),
+    client.metrics?.totalPlacements || 0,
+    client.metrics?.totalAVE || 0,
+    client.profile?.contactEmail || "",
+  ]);
+  return [header, ...rows]
+    .map((row) => row.map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+}
+
+function downloadClientsCsv(clients) {
+  downloadCsv(clientsCsv(clients), `verified-consulting-clients-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 // ---------------------------------------------------------------------------
@@ -2169,9 +2306,15 @@ function renderClientsView() {
   const canManageClients = shouldUseOwnerApi();
   const isEditing = canManageClients && state.editingClient;
   const editingRecord = isEditing && state.editingClient !== true ? findClientByName(state.editingClient) : null;
+  const allClients = getClientsWithMetrics();
+  const filteredClients = applyClientsFilters(allClients);
+  const summary = buildClientsSummary(allClients);
+  const { industries, programs } = clientsFilterOptions(allClients);
+  const insights = buildClientsInsights(allClients);
+  const statusOptions = [...new Set(allClients.map((c) => c.profile?.status || "unconfirmed"))].sort((a, b) => clientStatusLabel(a).localeCompare(clientStatusLabel(b)));
 
   target.innerHTML = `
-    <div class="section-heading"><h2>Clients ${sectionInfoButton({ title: "Clients", body: "Every client on file, real and status-tracked. “Unconfirmed” means Tenyse hasn't verified that client relationship or its figures yet — it is not a data error, and it should stay that way until she confirms it. Click a client to see their profile, campaigns, and placements, or use Scan for Mentions to run the Discovery Agent for them." })}</h2></div>
+    <div class="clients-dashboard">
     ${ownerApiAuthHint()}
     ${isEditing ? `<div class="card" id="client-detail-form-wrap" style="margin-bottom:24px;"></div>` : ""}
     ${
@@ -2179,21 +2322,151 @@ function renderClientsView() {
         ? `<p class="hint" style="margin-bottom:12px;">Using demo-ready client data for this walkthrough.</p>`
         : ""
     }
-    <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-      <label for="client-status-filter" style="font-size:0.82rem; font-weight:600; color:var(--color-navy);">Show</label>
-      <select id="client-status-filter" style="max-width:220px;">
-        <option value="all" ${state.clientStatusFilter === "all" ? "selected" : ""}>All clients</option>
-        <option value="active" ${state.clientStatusFilter === "active" ? "selected" : ""}>Current (Active)</option>
-        <option value="past" ${state.clientStatusFilter === "past" ? "selected" : ""}>Previous (Past / Portfolio)</option>
-        <option value="unconfirmed" ${state.clientStatusFilter === "unconfirmed" ? "selected" : ""}>Needs confirmation</option>
-      </select>
-    </div>
     ${renderClientCommunicationPanel()}
-    <div class="clients-grid" id="clients-full-grid"></div>
+    <section class="reports-kpi-grid clients-kpi-grid">
+      ${reportsMetricCard({ label: "Total Clients", value: String(summary.totalClients), delta: null, icon: "♟", iconBg: "#fbe2da", target: "clients", showNeutralComparison: false })}
+      ${reportsMetricCard({ label: "Active Clients", value: String(summary.activeClients), delta: null, icon: "♙", iconBg: "#dff8ed", target: "clients", showNeutralComparison: false })}
+      ${reportsMetricCard({ label: "Clients in Programs", value: String(summary.clientsInPrograms), delta: null, icon: "⌘", iconBg: "#efe8ff", target: "coaching", showNeutralComparison: false })}
+      ${reportsMetricCard({ label: "Pending / Unconfirmed", value: String(summary.pending), delta: null, icon: "◷", iconBg: "#fff0cf", target: "clients", showNeutralComparison: false })}
+    </section>
+
+    <section class="clients-filter-card">
+      <label>Status
+        <select id="client-status-filter">
+          <option value="all" ${state.clientStatusFilter === "all" ? "selected" : ""}>All Statuses</option>
+          ${statusOptions.map((status) => `<option value="${escapeHtml(status)}" ${state.clientStatusFilter === status ? "selected" : ""}>${escapeHtml(clientStatusLabel(status))}</option>`).join("")}
+        </select>
+      </label>
+      <label>Program
+        <select id="client-program-filter">
+          <option value="all" ${state.clientsProgramFilter === "all" ? "selected" : ""}>All Programs</option>
+          ${programs.map((program) => `<option value="${escapeHtml(program)}" ${state.clientsProgramFilter === program ? "selected" : ""}>${escapeHtml(program)}</option>`).join("")}
+        </select>
+      </label>
+      <label>Industry
+        <select id="client-industry-filter">
+          <option value="all" ${state.clientsIndustryFilter === "all" ? "selected" : ""}>All Industries</option>
+          ${industries.map((industry) => `<option value="${escapeHtml(industry)}" ${state.clientsIndustryFilter === industry ? "selected" : ""}>${escapeHtml(industry)}</option>`).join("")}
+        </select>
+      </label>
+      <label>Search
+        <input id="client-search-input" type="search" placeholder="Search clients, industries, or contacts..." value="${escapeHtml(state.clientsSearch || "")}" />
+      </label>
+      <button type="button" class="reports-apply-btn" id="clients-filter-apply">⚚ Apply</button>
+      <button type="button" class="link-btn clients-clear-btn" id="clients-filter-clear">Clear</button>
+    </section>
+
+    <div class="clients-content-grid">
+      <section class="reports-panel clients-table-panel">
+        <div class="reports-panel-head">
+          <h2>Clients <span>(${filteredClients.length})</span> ${sectionInfoButton({ title: "Clients", body: "Every client profile on file with real status, industry, program enrollment, campaign count, placement count, and AVE. Use View for the primary dashboard path and the overflow menu for secondary workflows such as editing, inviting, scheduling, and mention discovery." })}</h2>
+          <div class="clients-table-actions">
+            <button type="button" class="link-btn" id="clients-export-csv">↧ Export CSV</button>
+            <button type="button" class="icon-only-btn" aria-label="More client table options">⋮</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="reports-table clients-management-table">
+            <thead><tr><th>Client</th><th>Status</th><th>Industry</th><th>Programs</th><th>Campaigns</th><th>Total Placements</th><th>AVE</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${
+                filteredClients.length
+                  ? filteredClients
+                      .map(
+                        (client, index) => `
+                <tr>
+                  <td>
+                    <span class="client-initial client-avatar-${index % 4}">${escapeHtml(initialsForName(client.name))}</span>
+                    <span class="client-cell-copy"><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(clientSecondaryLine(client))}</small></span>
+                  </td>
+                  <td><span class="client-status-pill status-${escapeHtml(client.profile?.status || "unconfirmed")}">${escapeHtml(clientStatusLabel(client.profile?.status))}</span></td>
+                  <td>${escapeHtml(clientIndustryDisplay(client))}</td>
+                  <td><div class="reports-program-tags clients-program-tags">${clientProgramTags(client).map((tag) => `<span class="${tag === "Coaching" ? "coaching" : "pr"}">${escapeHtml(tag)}</span>`).join("") || "—"}</div></td>
+                  <td>${clientCampaignCount(client)}</td>
+                  <td>${client.metrics?.totalPlacements ?? "—"}</td>
+                  <td>${clientRowAve(client)}</td>
+                  <td>
+                    <div class="clients-row-actions">
+                      <button type="button" class="reports-action-button" data-client-view="${escapeHtml(client.name)}">View</button>
+                      <details class="clients-row-menu">
+                        <summary aria-label="More actions for ${escapeHtml(client.name)}">⋮</summary>
+                        <div class="clients-row-menu-list">
+                          ${canManageClients ? `<button type="button" data-client-edit="${escapeHtml(client.name)}">Edit Info</button>` : ""}
+                          ${shouldUseOwnerApi() ? `<button type="button" data-client-add-campaign="${escapeHtml(client.name)}">Add Campaign</button>` : ""}
+                          <button type="button" data-client-schedule="${escapeHtml(client.id)}">Schedule Meeting</button>
+                          <button type="button" data-client-messages="${escapeHtml(client.id)}">View Messages</button>
+                          <button type="button" data-client-files="${escapeHtml(client.id)}">View Files</button>
+                          ${shouldUseOwnerApi() ? `<button type="button" data-client-invite="${escapeHtml(client.id)}">Invite Client</button>` : ""}
+                          <button type="button" data-client-discovery="${escapeHtml(client.id)}">Scan for Mentions</button>
+                          ${
+                            ["coaching", "pr_and_coaching"].includes(client.profile?.engagementType || "")
+                              ? `<button type="button" data-client-coaching="${escapeHtml(client.name)}">View Coaching Program</button>`
+                              : ""
+                          }
+                        </div>
+                      </details>
+                    </div>
+                    <span class="clients-row-status" data-client-row-status="${escapeHtml(client.id)}"></span>
+                  </td>
+                </tr>`
+                      )
+                      .join("")
+                  : `<tr><td colspan="8"><p class="hint" style="margin:12px 0;">No clients match these filters.</p></td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="clients-table-footer">
+          <span>Showing ${filteredClients.length ? `1–${filteredClients.length}` : "0"} of ${allClients.length} clients</span>
+          <span class="clients-pagination"><button type="button" disabled>‹</button><strong>1</strong><button type="button" disabled>›</button></span>
+        </div>
+      </section>
+
+      <aside class="clients-side-stack">
+        <section class="reports-panel reports-quick-actions clients-quick-actions">
+          <h2>Quick Actions</h2>
+          <button type="button" id="clients-quick-add">＋ Add New Client</button>
+          <button type="button" disabled>⇩ Import Clients (CSV)</button>
+          <button type="button" id="clients-quick-export">⇧ Export Client Data (CSV)</button>
+          <button type="button" id="clients-quick-programs">▣ Manage Programs</button>
+          <button type="button" id="clients-quick-reports">▤ View Client Reports</button>
+          <button type="button" disabled>♙ Invite to Portal</button>
+          <button type="button" disabled>▣ Schedule Outreach</button>
+          <button type="button" id="clients-quick-inactive">◉ View Inactive Clients</button>
+        </section>
+        <section class="reports-panel reports-insights clients-insights">
+          <h2>💡 Insights</h2>
+          <ul>${insights.map((insight) => `<li>${escapeHtml(insight)}</li>`).join("")}</ul>
+        </section>
+      </aside>
+    </div>
+    </div>
   `;
 
-  document.getElementById("client-status-filter").addEventListener("change", (e) => {
-    state.clientStatusFilter = e.target.value;
+  const syncClientFilters = () => {
+    state.clientStatusFilter = document.getElementById("client-status-filter")?.value || "all";
+    state.clientsProgramFilter = document.getElementById("client-program-filter")?.value || "all";
+    state.clientsIndustryFilter = document.getElementById("client-industry-filter")?.value || "all";
+    state.clientsSearch = document.getElementById("client-search-input")?.value || "";
+  };
+  ["client-status-filter", "client-program-filter", "client-industry-filter"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", () => {
+      syncClientFilters();
+      renderClientsView();
+    });
+  });
+  document.getElementById("client-search-input")?.addEventListener("input", (e) => {
+    state.clientsSearch = e.target.value;
+  });
+  document.getElementById("clients-filter-apply")?.addEventListener("click", () => {
+    syncClientFilters();
+    renderClientsView();
+  });
+  document.getElementById("clients-filter-clear")?.addEventListener("click", () => {
+    state.clientStatusFilter = "all";
+    state.clientsProgramFilter = "all";
+    state.clientsIndustryFilter = "all";
+    state.clientsSearch = "";
     renderClientsView();
   });
   document.getElementById("client-comms-close")?.addEventListener("click", () => {
@@ -2227,42 +2500,141 @@ function renderClientsView() {
       },
     });
   }
+  wireMetricCardNavigation(target);
+  wireClientsTableActions({ allClients, filteredClients, canManageClients });
+}
 
-  const filteredClients =
-    state.clientStatusFilter === "all"
-      ? getClientsWithMetrics()
-      : getClientsWithMetrics().filter((c) => c.profile?.status === state.clientStatusFilter);
+function clientByIdOrName(clients, value) {
+  return clients.find((client) => client.id === value || client.name === value);
+}
 
-  renderClientsList(document.getElementById("clients-full-grid"), filteredClients, {
-    onInvite: shouldUseOwnerApi() ? inviteClient : undefined,
-    onViewDashboard: (clientName) => {
-      state.dashboardClientFilter = clientName;
+function rowStatusEl(clientId) {
+  return document.querySelector(`[data-client-row-status="${CSS.escape(clientId)}"]`);
+}
+
+function wireClientsTableActions({ allClients, filteredClients, canManageClients }) {
+  document.getElementById("clients-export-csv")?.addEventListener("click", () => downloadClientsCsv(filteredClients));
+  document.getElementById("clients-quick-export")?.addEventListener("click", () => downloadClientsCsv(allClients));
+  document.getElementById("clients-quick-add")?.addEventListener("click", () => {
+    if (!canManageClients) {
+      alert("Sign in with Tenyse's live owner account to add a client.");
+      return;
+    }
+    state.editingClient = true;
+    renderClientsView();
+  });
+  document.getElementById("clients-quick-programs")?.addEventListener("click", () => navigate("coaching"));
+  document.getElementById("clients-quick-reports")?.addEventListener("click", () => navigate("reports"));
+  document.getElementById("clients-quick-inactive")?.addEventListener("click", () => {
+    state.clientStatusFilter = "past";
+    state.clientsProgramFilter = "all";
+    state.clientsIndustryFilter = "all";
+    state.clientsSearch = "";
+    renderClientsView();
+  });
+
+  document.querySelectorAll("[data-client-view]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.dashboardClientFilter = btn.dataset.clientView;
       state.dashboardDateFrom = "";
       state.dashboardDateTo = "";
       navigate("dashboard");
-    },
-    onEditInfo: canManageClients
-      ? (clientName) => {
-          state.editingClient = clientName;
-          renderClientsView();
-        }
-      : undefined,
-    onAddCampaign:
-      shouldUseOwnerApi()
-        ? (clientName) => {
-            state.addCampaignForClient = clientName;
-            state.editingCampaignId = null;
-            navigate("campaigns");
-          }
-        : undefined,
-    onDiscoveryScan: discoveryScanClient,
-    onScheduleMeeting: scheduleClientMeeting,
-    onViewMessages: ({ clientId, clientName }) => loadClientCommunicationPanel({ type: "messages", clientId, clientName }),
-    onViewFiles: ({ clientId, clientName }) => loadClientCommunicationPanel({ type: "files", clientId, clientName }),
-    onViewCoaching: (clientName) => {
-      state.coachingSelectedClient = clientName;
+    });
+  });
+  document.querySelectorAll("[data-client-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.editingClient = btn.dataset.clientEdit;
+      renderClientsView();
+    });
+  });
+  document.querySelectorAll("[data-client-add-campaign]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.addCampaignForClient = btn.dataset.clientAddCampaign;
+      state.editingCampaignId = null;
+      navigate("campaigns");
+    });
+  });
+  document.querySelectorAll("[data-client-coaching]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.coachingSelectedClient = btn.dataset.clientCoaching;
       navigate("coaching");
-    },
+    });
+  });
+  document.querySelectorAll("[data-client-messages]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const client = clientByIdOrName(allClients, btn.dataset.clientMessages);
+      loadClientCommunicationPanel({ type: "messages", clientId: client?.id, clientName: client?.name });
+    });
+  });
+  document.querySelectorAll("[data-client-files]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const client = clientByIdOrName(allClients, btn.dataset.clientFiles);
+      loadClientCommunicationPanel({ type: "files", clientId: client?.id, clientName: client?.name });
+    });
+  });
+  document.querySelectorAll("[data-client-schedule]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const client = clientByIdOrName(allClients, btn.dataset.clientSchedule);
+      const statusEl = rowStatusEl(client?.id || "");
+      const startDate = window.prompt("Meeting date (YYYY-MM-DD):", new Date().toISOString().slice(0, 10));
+      if (!startDate) return;
+      const startTime = window.prompt("Meeting time (24-hour HH:MM):", "10:00");
+      if (!startTime) return;
+      btn.disabled = true;
+      if (statusEl) statusEl.textContent = "Scheduling meeting...";
+      try {
+        const result = await scheduleClientMeeting({
+          clientName: client?.name,
+          contactEmail: client?.profile?.contactEmail,
+          notes: client?.profile?.notes,
+          startDate,
+          startTime,
+        });
+        if (statusEl) statusEl.textContent = result.ok ? result.message || "Meeting scheduled." : result.message || "Scheduling note saved for the demo.";
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "Scheduling note saved for the demo.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+  document.querySelectorAll("[data-client-invite]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const client = clientByIdOrName(allClients, btn.dataset.clientInvite);
+      const statusEl = rowStatusEl(client?.id || "");
+      const email = window.prompt(`Email address to send ${client?.name || "this client"}'s invite to:`, client?.profile?.contactEmail || "");
+      if (!email || !email.trim()) return;
+      btn.disabled = true;
+      if (statusEl) statusEl.textContent = "Sending invite...";
+      try {
+        const result = await inviteClient({ clientId: client?.id, clientName: client?.name, email: email.trim() });
+        if (statusEl) statusEl.textContent = result.ok ? `Invite sent to ${result.invitedEmail || email.trim()}` : result.message || "Invite flow previewed.";
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "Invite flow previewed.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+  document.querySelectorAll("[data-client-discovery]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const client = clientByIdOrName(allClients, btn.dataset.clientDiscovery);
+      const statusEl = rowStatusEl(client?.id || "");
+      btn.disabled = true;
+      if (statusEl) statusEl.textContent = "Scanning mentions...";
+      try {
+        const result = await discoveryScanClient({ clientName: client?.name });
+        if (statusEl) {
+          statusEl.textContent = result.ok
+            ? `${result.demoPreview ? "Demo-safe scan: " : ""}${result.matched ?? 0} matched, ${result.inserted ?? 0} added to Review Queue.`
+            : result.message || "Scan could not complete.";
+        }
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "Scan could not complete.";
+      } finally {
+        btn.disabled = false;
+      }
+    });
   });
 }
 
@@ -3111,10 +3483,12 @@ function cssId(str) {
   return String(str).replace(/[^a-zA-Z0-9]+/g, "-");
 }
 
-function reportsMetricCard({ label, value, delta, icon, iconBg, target }) {
+function reportsMetricCard({ label, value, delta, icon, iconBg, target, showNeutralComparison = true }) {
   const deltaHtml =
     delta == null
-      ? `<small class="muted">No prior-period comparison</small>`
+      ? showNeutralComparison
+        ? `<small class="muted">No prior-period comparison</small>`
+        : ""
       : `<small class="${delta >= 0 ? "positive" : "negative"}">${delta >= 0 ? "\u2191" : "\u2193"} ${Math.abs(delta)}% vs. previous period</small>`;
   const interactiveClass = target ? " is-interactive" : "";
   const interactionAttrs = target ? ` role="button" tabindex="0" data-metric-goto="${escapeHtml(target)}"` : "";
@@ -4012,7 +4386,12 @@ function renderHeaderComponent() {
     contextLabel: headerContext.contextLabel,
     greeting: headerContext.greeting,
     subtitle: headerContext.subtitle,
-    searchPlaceholder: state.view === "reports" ? "Search clients, campaigns, or media..." : "Search clients, campaigns, placements...",
+    searchPlaceholder:
+      state.view === "reports"
+        ? "Search clients, campaigns, or media..."
+        : state.view === "clients"
+        ? "Search clients, campaigns, or contacts..."
+        : "Search clients, campaigns, placements...",
     extraAction,
     quoteCard:
       state.view === "reports"
