@@ -34,7 +34,7 @@ import { renderReportCard } from "../client/components/LatestReportCard.js?v=202
 import { renderLoadingState } from "../client/components/LoadingState.js";
 import { renderErrorState } from "../client/components/ErrorState.js";
 import { renderOwnerSidebar } from "./components/OwnerSidebar.js?v=20260922-populated-pages";
-import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260919-dashboard-alive";
+import { installInfoPopoverDelegate, sectionInfoButton } from "./components/InfoPopover.js?v=20260922-popover-capture";
 import { renderAveByClientChart, renderStatusBreakdownChart, renderSentimentChart, renderLeadTimeSection, renderDonutChart, renderWeeklyTrendChart } from "./components/AnalyticsCharts.js?v=20260919-analytics-clicks";
 import { renderClientsList } from "./components/ClientsListCard.js?v=20260919-live-ui";
 import { renderReviewQueue } from "./components/ReviewQueueCard.js?v=20260919-live-ui";

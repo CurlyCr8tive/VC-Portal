@@ -6599,8 +6599,8 @@ body:has(#owner-header) .avatar {
 }
 
 .info-popover {
-  position: absolute;
-  z-index: 1000;
+  position: fixed;
+  z-index: 10000;
   background: var(--text-on-navy);
   border: 1px solid #e4d9bd;
   border-radius: var(--radius-md);

@@ -44,6 +44,15 @@ function ensurePopoverEl() {
   return popoverEl;
 }
 
+function escapePopoverText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function closePopover() {
   cancelPopoverClose();
   if (popoverEl) popoverEl.hidden = true;
@@ -57,10 +66,10 @@ function openPopoverFor(button) {
   el.innerHTML = `
     <div class="info-popover-inner">
       <div class="info-popover-head">
-        <strong>${title}</strong>
+        <strong>${escapePopoverText(title)}</strong>
         <button type="button" class="info-popover-close" aria-label="Close">&times;</button>
       </div>
-      <p>${body}</p>
+      <p>${escapePopoverText(body)}</p>
     </div>
   `;
   el.hidden = false;
@@ -69,10 +78,11 @@ function openPopoverFor(button) {
   // bottom of the viewport, clamped so it never runs off either side.
   const rect = button.getBoundingClientRect();
   const width = 300;
-  let left = rect.left + window.scrollX;
-  left = Math.max(12, Math.min(left, window.scrollX + document.documentElement.clientWidth - width - 12));
+  const height = el.offsetHeight || 160;
+  let left = rect.left;
+  left = Math.max(12, Math.min(left, document.documentElement.clientWidth - width - 12));
   const spaceBelow = window.innerHeight - rect.bottom;
-  const top = spaceBelow > 180 ? rect.bottom + window.scrollY + 6 : rect.top + window.scrollY - el.offsetHeight - 6;
+  const top = spaceBelow > height + 12 ? rect.bottom + 6 : Math.max(12, rect.top - height - 6);
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
   el.style.width = `${width}px`;
@@ -86,6 +96,27 @@ function openPopoverFor(button) {
  * working through every future innerHTML re-render — no per-page wiring.
  */
 export function installInfoPopoverDelegate() {
+  // Capture phase matters because many new dashboard surfaces are themselves
+  // clickable cards. Without catching this before those parent handlers, the
+  // section info button can accidentally trigger navigation instead of
+  // opening its explanation.
+  document.addEventListener(
+    "click",
+    (e) => {
+      const trigger = e.target.closest(".info-popover-trigger");
+      if (!trigger) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const alreadyOpenForThis = popoverEl && !popoverEl.hidden && popoverEl.dataset.openFor === trigger.dataset.infoTitle;
+      if (alreadyOpenForThis) {
+        closePopover();
+      } else {
+        openPopoverFor(trigger);
+      }
+    },
+    true
+  );
+
   document.addEventListener("pointerover", (e) => {
     const trigger = e.target.closest(".info-popover-trigger");
     if (!trigger) return;
@@ -112,18 +143,6 @@ export function installInfoPopoverDelegate() {
   });
 
   document.addEventListener("click", (e) => {
-    const trigger = e.target.closest(".info-popover-trigger");
-    if (trigger) {
-      e.preventDefault();
-      e.stopPropagation();
-      const alreadyOpenForThis = popoverEl && !popoverEl.hidden && popoverEl.dataset.openFor === trigger.dataset.infoTitle;
-      if (alreadyOpenForThis) {
-        closePopover();
-      } else {
-        openPopoverFor(trigger);
-      }
-      return;
-    }
     if (popoverEl && !popoverEl.hidden && !popoverEl.contains(e.target)) closePopover();
   });
   document.addEventListener("keydown", (e) => {
