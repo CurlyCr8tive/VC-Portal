@@ -3675,6 +3675,81 @@ function realWritingContextFor(clientName) {
   };
 }
 
+function placementProofSentence(placements) {
+  if (!placements.length) return "No confirmed placements are attached yet, so this draft is a planning placeholder until coverage is added.";
+  const outlets = [...new Set(placements.map((p) => p.publication).filter(Boolean))].slice(0, 6);
+  const campaignNames = [...new Set(placements.map((p) => p.campaign).filter(Boolean))].slice(0, 3);
+  const outletText = outlets.length ? outlets.join(", ") : "tracked outlets";
+  const campaignText = campaignNames.length ? ` tied to ${campaignNames.join(", ")}` : "";
+  return `${placements.length} confirmed placement${placements.length === 1 ? "" : "s"}${campaignText} across ${outletText}.`;
+}
+
+function buildLocalExecutiveSummaryDraft(clientName, ctx = realWritingContextFor(clientName)) {
+  const valueText = ctx.totalAVE ? `${formatCurrency(ctx.totalAVE)} in estimated publicity value` : "tracked visibility value still being completed";
+  const reachText = ctx.totalReach ? `${formatCompactNumber(ctx.totalReach)} estimated audience reach` : "audience reach where source data is available";
+  const proof = placementProofSentence(ctx.placements);
+  const details = ctx.notableDetails.length ? ` Notable supporting details include ${ctx.notableDetails.slice(0, 2).join("; ")}.` : "";
+  return `Problem:
+${clientName} needed a clearer way to connect press activity to visible business outcomes during ${ctx.periodLabel}.
+
+Solution:
+Tenyse organized the coverage story around ${ctx.campaignContext}, using the confirmed placements and client context already tracked in the portal.
+
+Results:
+The current reporting set includes ${proof} Together, this represents ${valueText} and ${reachText}.${details}
+
+Next Step:
+Review this draft, tighten the language for the client relationship, then save and approve it before using it in a client-facing report or Canva export.`;
+}
+
+function buildLocalReportNarrativeDraft(clientName, ctx = realWritingContextFor(clientName)) {
+  const placements = ctx.placements.slice(0, 8);
+  const placementLines = placements.length
+    ? placements
+        .map((p) => {
+          const date = p.publicationDate || p.landedDate || "date not entered";
+          const value = p.aveValue ? `, ${formatCurrency(p.aveValue)} AVE` : "";
+          const reach = p.audienceReach ? `, ${formatCompactNumber(p.audienceReach)} reach` : "";
+          return `- ${p.publication || "Outlet"}: ${p.headline || "Coverage headline"} (${date}${value}${reach})`;
+        })
+        .join("\n")
+    : "- No confirmed placements are attached yet. Add approved coverage rows before using this as a final report narrative.";
+  const details = ctx.notableDetails.length ? `\n\nAdditional context to weave in:\n${ctx.notableDetails.map((item) => `- ${item}`).join("\n")}` : "";
+  return `Report narrative draft for ${clientName}
+
+Reporting period: ${ctx.periodLabel}
+Campaign context: ${ctx.campaignContext}
+
+${clientName}'s coverage story during this period centers on turning visibility into proof. The work captured in the portal shows how outreach, confirmed placements, audience reach, and estimated publicity value come together as one client-ready narrative instead of scattered activity.
+
+Confirmed coverage used for this draft:
+${placementLines}
+
+Draft storyline:
+The strongest report angle is that ${clientName} is building measurable visibility through confirmed press and campaign activity. The current placement set supports a report narrative focused on credibility, audience growth, and momentum. Where AVE and reach are available, those figures should be used as supporting evidence; where source data is missing, the report should say that plainly rather than overstate the result.
+
+Recommended client-facing close:
+The next step is to use these proof points to shape the next outreach angle, identify the outlets or partners most aligned with the client's goals, and keep the reporting loop clear for the next campaign window.${details}`;
+}
+
+function buildReportPreviewForClient(clientName) {
+  const summary = loadSummary(clientName);
+  const ctx = realWritingContextFor(clientName);
+  const approved = Boolean(summary?.approvedAt);
+  const saved = Boolean(summary?.savedAt);
+  const date = (summary?.approvedAt || summary?.savedAt || new Date().toISOString()).slice(0, 10);
+  return {
+    title: `${clientName} — ${approved ? "Coverage Summary" : "Draft Coverage Preview"}`,
+    period: ctx.periodLabel === "the current reporting period" ? "All confirmed placements to date" : ctx.periodLabel,
+    datePublished: date,
+    executiveSummary: summary?.text || buildLocalExecutiveSummaryDraft(clientName, ctx),
+    viewUrl: "",
+    pdfUrl: "",
+    isDraft: !approved,
+    statusLabel: approved ? `Published ${date}` : saved ? `Draft saved ${date}` : "Draft preview generated from saved data",
+  };
+}
+
 function renderSummaryForm(container, clientName) {
   const existing = loadSummary(clientName);
   const statusLine = existing?.approvedAt
@@ -3746,11 +3821,13 @@ function renderSummaryForm(container, clientName) {
       notableDetails: ctx.notableDetails,
     });
     generateBtn.disabled = false;
+    const textarea = container.querySelector(`#summary-text-${cssId(clientName)}`);
     if (result.ok) {
-      container.querySelector(`#summary-text-${cssId(clientName)}`).value = result.text;
-      generateStatus.textContent = "Draft ready — review, then Save Draft.";
+      textarea.value = result.text;
+      generateStatus.textContent = `Draft ready${result.providerUsed ? ` via ${result.providerUsed}` : ""} — review, then Save Draft.`;
     } else {
-      generateStatus.textContent = result.message;
+      textarea.value = buildLocalExecutiveSummaryDraft(clientName, ctx);
+      generateStatus.textContent = "Live AI did not answer, so a grounded demo draft was generated from the saved placement data. Review, then Save Draft.";
     }
   });
 }
@@ -3803,9 +3880,10 @@ function renderReportNarrativeForm(container, clientName) {
     const textarea = container.querySelector(`#narrative-text-${cssId(clientName)}`);
     if (result.ok) {
       textarea.value = result.text;
-      statusEl.textContent = "Draft ready — review, then copy into the final report.";
+      statusEl.textContent = `Draft ready${result.providerUsed ? ` via ${result.providerUsed}` : ""} — review, then copy into the final report.`;
     } else {
-      statusEl.textContent = result.message;
+      textarea.value = buildLocalReportNarrativeDraft(clientName, ctx);
+      statusEl.textContent = "Live AI did not answer, so a grounded demo narrative was generated from the saved placement data.";
     }
   });
 
@@ -4139,7 +4217,7 @@ function renderReportsOverview(container) {
     btn.addEventListener("click", () => {
       const clientName = btn.dataset.downloadReport || "";
       const client = getRealClients().find((item) => item.name === clientName);
-      const report = getRealReport(clientName);
+      const report = buildReportPreviewForClient(clientName);
       if (report?.executiveSummary) {
         downloadReportPdf(report);
         return;
@@ -4267,7 +4345,7 @@ function renderReportsView() {
   if (state.dataSource === "real") renderReportsOverview(document.getElementById("reports-overview-wrap"));
 
   clients.forEach((c) => {
-    const report = state.dataSource === "real" ? getRealReport(c.name) : REPORTS[c.id] || null;
+    const report = state.dataSource === "real" ? buildReportPreviewForClient(c.name) : REPORTS[c.id] || null;
     renderReportCard(document.getElementById(`report-${c.id}`), report);
 
     if (state.dataSource === "real") {
