@@ -304,6 +304,105 @@ function getOwnerClients() {
   }));
 }
 
+function getAveScopePlacements({ clientName = "", campaignName = "" } = {}) {
+  return getAllPlacements().filter((placement) => {
+    const placementClient = placement.clientName || placement.client || "";
+    const placementCampaign = placement.campaign || "";
+    const matchesClient = !clientName || placementClient === clientName;
+    const matchesCampaign = !campaignName || placementCampaign === campaignName;
+    return matchesClient && matchesCampaign;
+  });
+}
+
+function buildAveCalculationSummary({ clientName = "", campaignName = "" } = {}) {
+  const placements = getAveScopePlacements({ clientName, campaignName });
+  const withAve = placements.filter((placement) => Number(placement.aveValue || 0) > 0);
+  const totalAVE = withAve.reduce((sum, placement) => sum + Number(placement.aveValue || 0), 0);
+  const totalReach = placements.reduce((sum, placement) => sum + Number(placement.estimatedReach || placement.audience || 0), 0);
+  const outletCounts = new Map();
+  placements.forEach((placement) => {
+    const outlet = placement.publication || "Unknown outlet";
+    outletCounts.set(outlet, (outletCounts.get(outlet) || 0) + 1);
+  });
+  const topOutlets = [...outletCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 4);
+  return {
+    placements,
+    withAve,
+    totalAVE,
+    avgAVE: withAve.length ? totalAVE / withAve.length : 0,
+    totalReach,
+    missingAve: placements.length - withAve.length,
+    topOutlets,
+  };
+}
+
+function renderAveCalculationPanel(container, { clientName = "", campaignName = "" } = {}) {
+  if (!container) return;
+  const summary = buildAveCalculationSummary({ clientName, campaignName });
+  const scopeLabel = [clientName, campaignName].filter(Boolean).join(" / ") || "All clients";
+  const rows = summary.placements
+    .slice(0, 6)
+    .map(
+      (placement) => `
+        <tr>
+          <td><strong>${escapeHtml(placement.publication || "Unknown outlet")}</strong><small>${escapeHtml(placement.headline || "")}</small></td>
+          <td>${escapeHtml(placement.publicationDate || placement.landedDate || "—")}</td>
+          <td>${formatCurrency(Number(placement.aveValue || 0))}</td>
+        </tr>`
+    )
+    .join("");
+
+  container.innerHTML = `
+    <article class="ave-calculation-panel" tabindex="-1">
+      <div class="ave-calculation-head">
+        <div>
+          <p class="eyebrow">AVE Calculation</p>
+          <h3>${escapeHtml(scopeLabel)}</h3>
+          <p class="hint">Calculated from saved placement records. Missing AVE values should be opened in Press Placements and researched with the placement-level AVE tool.</p>
+        </div>
+        <button type="button" class="ghost-button" data-close-ave-panel>Close</button>
+      </div>
+      <div class="ave-calculation-grid">
+        <div><span>Total AVE</span><strong>${formatCurrency(summary.totalAVE)}</strong></div>
+        <div><span>Placements Counted</span><strong>${summary.withAve.length} of ${summary.placements.length}</strong></div>
+        <div><span>Avg. Value / Win</span><strong>${formatCurrency(summary.avgAVE)}</strong></div>
+        <div><span>Estimated Reach</span><strong>${formatCompactNumber(summary.totalReach)}</strong></div>
+      </div>
+      <div class="ave-calculation-body">
+        <div>
+          <h4>Top outlets</h4>
+          <p>${summary.topOutlets.length ? summary.topOutlets.map(([outlet, count]) => `${escapeHtml(outlet)} (${count})`).join(", ") : "No outlets are attached yet."}</p>
+          ${
+            summary.missingAve
+              ? `<p class="ave-warning">${summary.missingAve} placement${summary.missingAve === 1 ? "" : "s"} still need AVE values researched or entered.</p>`
+              : `<p class="ave-success">Every placement in this scope has an AVE value.</p>`
+          }
+        </div>
+        <table class="ave-mini-table">
+          <thead><tr><th>Placement</th><th>Date</th><th>AVE</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="3">No placements found for this scope yet.</td></tr>`}</tbody>
+        </table>
+      </div>
+      <div class="ave-calculation-actions">
+        <button type="button" class="primary-button" data-ave-open-placements="${escapeHtml(clientName || campaignName || "")}">Open Press Placements</button>
+        <button type="button" class="secondary-button" data-goto="analytics">View AVE Benchmarks</button>
+      </div>
+    </article>
+  `;
+  container.querySelector("[data-close-ave-panel]")?.addEventListener("click", () => {
+    container.innerHTML = "";
+  });
+  container.querySelector("[data-ave-open-placements]")?.addEventListener("click", (event) => {
+    state.searchTerm = event.currentTarget.dataset.aveOpenPlacements || "";
+    navigate("placements");
+  });
+  container.querySelector("[data-goto='analytics']")?.addEventListener("click", () => navigate("analytics"));
+  container.querySelector(".ave-calculation-panel")?.focus({ preventScroll: true });
+  container.querySelector(".ave-calculation-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
 function filterPlacements(placements, term) {
   if (!term) return placements;
   const t = term.toLowerCase();
@@ -2251,6 +2350,7 @@ function renderCampaignsOverview(container) {
         actionLabel: "Open clients",
       })}
     </div>
+    <div id="campaigns-ave-calculation-panel"></div>
 
     <div class="card" style="margin-bottom:24px;">
       <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:16px;">
@@ -2264,7 +2364,7 @@ function renderCampaignsOverview(container) {
       </div>
       <div class="table-scroll">
         <table class="placements-table">
-          <thead><tr><th>Campaign</th><th>Client</th><th>Status</th><th>Placements</th><th>AVE</th><th>Start Date</th><th>Progress</th></tr></thead>
+          <thead><tr><th>Campaign</th><th>Client</th><th>Status</th><th>Placements</th><th>AVE</th><th>Start Date</th><th>Progress</th><th>AVE Tools</th></tr></thead>
           <tbody>
             ${
               filtered.length
@@ -2283,10 +2383,11 @@ function renderCampaignsOverview(container) {
                     ? `<span class="hint">Not yet tracked</span>`
                     : `<div class="progress-bar-track"><div class="progress-bar-fill" style="width:${r.progressPercent}%;"></div></div><span class="hint">${r.progressPercent}%</span>`
                 }</td>
+                <td><button type="button" class="reports-action-button" data-campaign-ave-client="${escapeHtml(r.clientName)}" data-campaign-ave-name="${escapeHtml(r.name)}">Calculate AVE</button></td>
               </tr>`
                     )
                     .join("")
-                : `<tr><td colspan="7"><p class="hint" style="margin:12px 0;">No campaigns match this filter.</p></td></tr>`
+                : `<tr><td colspan="8"><p class="hint" style="margin:12px 0;">No campaigns match this filter.</p></td></tr>`
             }
           </tbody>
         </table>
@@ -2304,6 +2405,14 @@ function renderCampaignsOverview(container) {
   searchInput.addEventListener("input", (e) => {
     state.campaignsSearch = e.target.value;
     renderCampaignsOverview(container);
+  });
+  container.querySelectorAll("[data-campaign-ave-name]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      renderAveCalculationPanel(document.getElementById("campaigns-ave-calculation-panel"), {
+        clientName: btn.dataset.campaignAveClient || "",
+        campaignName: btn.dataset.campaignAveName || "",
+      });
+    });
   });
   wireMetricCardNavigation(container);
   // Keep focus + caret position across the re-render triggered by typing.
@@ -2563,10 +2672,13 @@ function renderReviewQueueView() {
       <div class="section-heading"><h2>Review Queue</h2></div>
       <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:-6px;">
         Preview only — these rows show the confirm/reject workflow, including a same-name false positive
-        to reject. Sign in with the live owner account to run the Discovery Agent.
+        to reject. The Discovery Agent button below runs live when the API is configured and adds a safe
+        demo preview if the external scan cannot complete.
       </p>
+      ${reviewDiscoveryCtaHtml()}
       <div class="card" id="review-queue-list"></div>
     `;
+    wireReviewDiscoveryCta();
     renderMockReviewQueueSection();
     return;
   }
@@ -2578,19 +2690,75 @@ function renderReviewQueueView() {
       headline, article link, and which client it matched are all shown per row below. Reject a false
       positive here directly; turning one into a real placement${shouldUseOwnerApi() ? "" : " needs the live owner account signed in"}.
     </p>
+    ${reviewDiscoveryCtaHtml()}
     <div class="card" id="review-queue-list"><p class="hint">Loading…</p></div>
   `;
+  wireReviewDiscoveryCta();
   loadRealReviewQueue();
 }
 
+function reviewDiscoveryCtaHtml() {
+  const clients = getOwnerClients();
+  const options = clients
+    .map((client) => `<option value="${escapeHtml(client.name)}">${escapeHtml(client.name)}</option>`)
+    .join("");
+  return `
+    <section class="review-discovery-cta" aria-label="Discover mentions">
+      <div>
+        <p class="eyebrow">Discovery Agent</p>
+        <h3>Find new press mentions for review.</h3>
+        <p class="hint">Run a safe scan for a selected client, then confirm or reject candidates here before anything becomes a placement.</p>
+      </div>
+      <div class="review-discovery-controls">
+        <label>
+          <span>Client</span>
+          <select id="review-discovery-client">${options || `<option value="">No clients yet</option>`}</select>
+        </label>
+        <button type="button" class="primary-button" id="review-discovery-run" ${options ? "" : "disabled"}>Discover Mentions</button>
+      </div>
+      <p class="review-discovery-status" id="review-discovery-status" aria-live="polite"></p>
+    </section>
+  `;
+}
+
+function wireReviewDiscoveryCta() {
+  const button = document.getElementById("review-discovery-run");
+  const select = document.getElementById("review-discovery-client");
+  const status = document.getElementById("review-discovery-status");
+  if (!button || !select || !status) return;
+  button.addEventListener("click", async () => {
+    const clientName = select.value;
+    if (!clientName) return;
+    button.disabled = true;
+    status.textContent = `Scanning for ${clientName} mentions…`;
+    try {
+      const result = await discoveryScanClient({ clientName });
+      status.textContent = result?.demoPreview
+        ? `Demo-safe scan added a preview mention for ${clientName}.`
+        : `Discovery scan complete for ${clientName}. Review the results below.`;
+      if (state.dataSource === "real") {
+        await loadRealReviewQueue();
+      } else {
+        renderMockReviewQueueSection();
+      }
+    } catch (err) {
+      status.textContent = err.message || "Discovery scan could not run. Check the API key and try again.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 function renderMockReviewQueueSection() {
-  renderReviewQueue(document.getElementById("review-queue-list"), state.reviewQueue, {
+  renderReviewQueue(document.getElementById("review-queue-list"), [...state.demoDiscoveryQueue, ...state.reviewQueue], {
     onConfirm: (id) => {
-      state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+      if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
+      else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
       renderMockReviewQueueSection();
     },
     onReject: (id) => {
-      state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+      if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
+      else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
       renderMockReviewQueueSection();
     },
   });
@@ -2608,18 +2776,21 @@ async function loadRealReviewQueue() {
   const listEl = document.getElementById("review-queue-list");
   const previewQueueItems = shouldUseOwnerApi() ? [] : state.reviewQueue;
   const renderPreviewQueue = () => {
-    if (!previewQueueItems.length) {
+    const items = [...state.demoDiscoveryQueue, ...previewQueueItems];
+    if (!items.length) {
       listEl.innerHTML = `<p class="hint">Review Queue preview is ready once mention scanning has results.</p>`;
       return;
     }
-    renderReviewQueue(listEl, previewQueueItems, {
+    renderReviewQueue(listEl, items, {
       confirmLabel: "Confirm Preview",
       onConfirm: (id) => {
-        state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+        if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
+        else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
         loadRealReviewQueue();
       },
       onReject: (id) => {
-        state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
+        if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
+        else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
         loadRealReviewQueue();
       },
     });
@@ -3147,6 +3318,8 @@ function renderReportsOverview(container) {
       })}
     </section>
 
+    <div id="reports-ave-calculation-panel"></div>
+
     <section class="reports-chart-grid">
       <article class="reports-panel reports-trend-card">
         <div class="reports-panel-head"><h2>Placement Trends</h2><div class="reports-chart-legend"><span><i class="navy"></i>Press placements</span><span><i class="blue"></i>Estimated reach</span></div></div>
@@ -3175,7 +3348,12 @@ function renderReportsOverview(container) {
                 <td>${formatCompactNumber(r.totalReach)}</td>
                 <td>${r.topOutlets.map((o) => escapeHtml(o)).join(", ") || "—"}</td>
                 <td><div class="reports-program-tags">${reportsProgramTags(r.client).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div></td>
-                <td><button type="button" class="reports-action-button" data-view-report="${escapeHtml(r.client)}">View Reports</button></td>
+                <td>
+                  <div class="reports-action-stack">
+                    <button type="button" class="reports-action-button" data-view-report="${escapeHtml(r.client)}">View Reports</button>
+                    <button type="button" class="reports-action-button secondary" data-ave-client="${escapeHtml(r.client)}">Calculate AVE</button>
+                  </div>
+                </td>
               </tr>`
               )
               .join("")}
@@ -3232,6 +3410,13 @@ function renderReportsOverview(container) {
     btn.addEventListener("click", () => {
       const el = document.getElementById(`report-${slugifyClientId(btn.dataset.viewReport)}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  container.querySelectorAll("[data-ave-client]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      renderAveCalculationPanel(document.getElementById("reports-ave-calculation-panel"), {
+        clientName: btn.dataset.aveClient || "",
+      });
     });
   });
   container.querySelectorAll("[data-report-builder-action]").forEach((btn) => {
