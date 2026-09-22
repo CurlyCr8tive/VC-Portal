@@ -53,6 +53,7 @@ export function renderCoachingAdminView(
   let activeTab = "phases";
   let activeOverviewTab = "overview";
   let activeActivityFilter = "calls";
+  let activeCoachingAction = null;
 
   render();
 
@@ -101,8 +102,26 @@ export function renderCoachingAdminView(
         selectedClient = btn.dataset.openClient;
         detailMode = true;
         activeTab = "phases";
+        activeCoachingAction = null;
         render();
       });
+    });
+
+    container.querySelectorAll("[data-coaching-action]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeCoachingAction = {
+          type: btn.dataset.coachingAction,
+          client: btn.dataset.actionClient,
+        };
+        detailMode = false;
+        render();
+        container.querySelector(".coaching-action-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+
+    container.querySelector("[data-close-coaching-action]")?.addEventListener("click", () => {
+      activeCoachingAction = null;
+      render();
     });
 
     container.querySelector("[data-back-overview]")?.addEventListener("click", () => {
@@ -167,6 +186,7 @@ export function renderCoachingAdminView(
     const visibleActivity =
       activeActivityFilter === "all" ? activityItems : activityItems.filter((item) => item.type === activeActivityFilter);
     return `
+      ${activeCoachingAction ? coachingActionPanelHtml(activeCoachingAction) : ""}
       <section class="coaching-kpi-grid">
         ${coachingKpiCard("users", "Coaching Clients", "3", "+1 this month", "coral")}
         ${coachingKpiCard("bars", "Active Programs", "2", "1 cohort starting soon", "coral")}
@@ -310,9 +330,9 @@ export function renderCoachingAdminView(
         action: "View",
         openClient: "Greyz Bistro",
       },
-      { initials: "RL", client: "Raise Local Cohort 1", sub: "(Coming Soon)", program: "Cultural Intelligence", programSub: "(6-Week Track)", progress: 0, phase: "Not Started", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Setup", overviewTab: "programs" },
-      { initials: "UE", client: "Urban Eats Collective", sub: "", program: "Visibility to Revenue", programSub: "(90-Day VAAM)", progress: 25, phase: "Phase 2", phaseSub: "Founder Positioning", nextCall: "Wed, Sep 23", nextCallSub: "11:00 AM", action: "View", overviewTab: "clients" },
-      { initials: "NB", client: "Nourish Brooklyn", sub: "(Interested)", program: "TBD", programSub: "", progress: null, phase: "—", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Invite", overviewTab: "clients" },
+      { initials: "RL", client: "Raise Local Cohort 1", sub: "(Coming Soon)", program: "Cultural Intelligence", programSub: "(6-Week Track)", progress: 0, phase: "Not Started", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Setup", actionType: "setup" },
+      { initials: "UE", client: "Urban Eats Collective", sub: "", program: "Visibility to Revenue", programSub: "(90-Day VAAM)", progress: 25, phase: "Phase 2", phaseSub: "Founder Positioning", nextCall: "Wed, Sep 23", nextCallSub: "11:00 AM", action: "View", actionType: "view" },
+      { initials: "NB", client: "Nourish Brooklyn", sub: "(Interested)", program: "TBD", programSub: "", progress: null, phase: "—", phaseSub: "", nextCall: "—", nextCallSub: "", action: "Invite", actionType: "invite" },
     ];
     return rows;
   }
@@ -340,11 +360,107 @@ export function renderCoachingAdminView(
         <td><strong>${escapeHtml(row.phase)}</strong><small>${escapeHtml(row.phaseSub)}</small></td>
         <td><strong>${escapeHtml(row.nextCall)}</strong><small>${escapeHtml(row.nextCallSub)}</small></td>
         <td>
-          <button type="button" class="coaching-table-action" ${row.openClient ? `data-open-client="${escapeHtml(row.openClient)}"` : `data-overview-tab="${escapeHtml(row.overviewTab || "clients")}"`}>${escapeHtml(row.action)}</button>
-          <button type="button" class="coaching-overflow" aria-label="More actions for ${escapeHtml(row.client)}" data-overview-tab="${escapeHtml(row.overviewTab || "clients")}">⋮</button>
+          <button type="button" class="coaching-table-action" ${
+            row.openClient
+              ? `data-open-client="${escapeHtml(row.openClient)}"`
+              : `data-coaching-action="${escapeHtml(row.actionType || "view")}" data-action-client="${escapeHtml(row.client)}"`
+          }>${escapeHtml(row.action)}</button>
+          <button type="button" class="coaching-overflow" aria-label="More actions for ${escapeHtml(row.client)}" data-coaching-action="menu" data-action-client="${escapeHtml(row.client)}">⋮</button>
         </td>
       </tr>
     `;
+  }
+
+  function coachingActionData(clientName) {
+    const row = coachingClientRows().find((item) => item.client === clientName) || coachingClientRows()[0];
+    const content = {
+      "Raise Local Cohort 1": {
+        title: "Set Up Raise Local Cohort 1",
+        eyebrow: "Program setup",
+        summary: "This cohort is staged for the Cultural Intelligence track. The next step is to confirm the cohort dates, import the participant list, and attach the six-week curriculum template.",
+        stats: ["6 modules planned", "0 clients enrolled", "Kickoff target: Oct 2026"],
+        tasks: ["Confirm cohort audience and eligibility", "Add the nonprofit/business matchmaking curriculum", "Upload kickoff worksheet and partner-fit checklist", "Schedule the first group call"],
+        cta: "Open program setup",
+      },
+      "Urban Eats Collective": {
+        title: "Urban Eats Collective Coaching Snapshot",
+        eyebrow: "Client progress",
+        summary: "Urban Eats is in Phase 2: Founder Positioning. The client has shared a new community event opportunity and needs founder story refinement before the next media or partnership push.",
+        stats: ["25% progress", "Phase 2 active", "Next call: Wed, Sep 23 at 11:00 AM"],
+        tasks: ["Review founder bio positioning", "Score new event opportunity", "Draft community visibility talking points", "Assign LinkedIn update homework"],
+        cta: "Open client workspace",
+      },
+      "Nourish Brooklyn": {
+        title: "Invite Nourish Brooklyn",
+        eyebrow: "Prospect follow-up",
+        summary: "Nourish Brooklyn is interested but not enrolled. This preview shows the invite flow Tenyse would use to send portal access and convert the intro call into a starter roadmap.",
+        stats: ["Status: Interested", "Program: TBD", "Suggested fit: Visibility to Revenue"],
+        tasks: ["Send portal invite to the primary contact", "Attach discovery intake worksheet", "Schedule a 30-minute fit call", "Choose 90-day VAAM or custom starter track"],
+        cta: "Preview invite email",
+      },
+    };
+    return { row, ...(content[clientName] || content["Urban Eats Collective"]) };
+  }
+
+  function coachingActionPanelHtml(action) {
+    const data = coachingActionData(action.client);
+    const primaryAttr =
+      data.row.openClient
+        ? `data-open-client="${escapeHtml(data.row.openClient)}"`
+        : `data-coaching-action="${escapeHtml(action.type)}" data-action-client="${escapeHtml(data.row.client)}"`;
+    const titleByType = {
+      setup: data.title,
+      invite: data.title,
+      view: data.title,
+      menu: `More Actions for ${data.row.client}`,
+    };
+    const menuTasks = [
+      "View client notes and latest homework",
+      "Schedule or reschedule the next coaching call",
+      "Open resources, files, and missing assets",
+      "Prepare a client-facing progress update",
+    ];
+    const tasks = action.type === "menu" ? menuTasks : data.tasks;
+    return `
+      <section class="coaching-action-panel" role="status" aria-live="polite">
+        <div class="coaching-action-panel-head">
+          <div>
+            <p class="eyebrow">${escapeHtml(data.eyebrow)}</p>
+            <h3>${escapeHtml(titleByType[action.type] || data.title)}</h3>
+            <p>${escapeHtml(data.summary)}</p>
+          </div>
+          <button type="button" class="icon-only-btn" data-close-coaching-action aria-label="Close coaching action panel">×</button>
+        </div>
+        <div class="coaching-action-stats">
+          ${data.stats.map((stat) => `<span>${escapeHtml(stat)}</span>`).join("")}
+        </div>
+        <div class="coaching-action-body">
+          <div>
+            <h4>Next steps</h4>
+            <ul>${tasks.map((task) => `<li>${escapeHtml(task)}</li>`).join("")}</ul>
+          </div>
+          <div class="coaching-action-copy">
+            <h4>${action.type === "invite" ? "Invite copy" : action.type === "setup" ? "Setup note" : "Coach note"}</h4>
+            <p>${escapeHtml(coachingActionCopy(action.type, data.row.client))}</p>
+          </div>
+        </div>
+        <div class="coaching-action-buttons">
+          <button type="button" class="btn-primary" ${primaryAttr}>${escapeHtml(data.cta)}</button>
+          <button type="button" class="btn-secondary" data-overview-tab="resources">Open resources</button>
+          <button type="button" class="btn-secondary" data-overview-tab="opportunities">Open opportunities</button>
+        </div>
+      </section>
+    `;
+  }
+
+  function coachingActionCopy(type, clientName) {
+    if (type === "invite") {
+      return `Hi ${clientName}, Tenyse has prepared a client portal workspace for your coaching roadmap. Inside you will be able to review the proposed program, complete the discovery intake, upload missing assets, and schedule the next fit call.`;
+    }
+    if (type === "setup") {
+      return "Cultural Intelligence cohort setup should include module dates, participant criteria, intake questions, resource library items, and the first call agenda before clients are invited.";
+    }
+    return `${clientName} needs the next coaching touchpoint tied back to visible progress: current phase, open homework, opportunity decisions, resources needed, and what Tenyse will review before the next call.`;
   }
 
   function programOverviewRow(icon, title, meta, body, count, label) {
@@ -390,6 +506,7 @@ export function renderCoachingAdminView(
     if (tab === "clients") {
       return `
         <section class="coaching-panel coaching-tab-panel">
+          ${activeCoachingAction ? coachingActionPanelHtml(activeCoachingAction) : ""}
           <div class="coaching-panel-heading"><h3>Coaching Clients</h3><button type="button" class="link-btn" data-overview-tab="overview">Back to Overview</button></div>
           <div class="coaching-client-table-wrap"><table class="coaching-client-table"><tbody>${filteredCoachingRows().map(clientProgressRowHtml).join("")}</tbody></table></div>
         </section>

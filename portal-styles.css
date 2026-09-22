@@ -4658,6 +4658,84 @@ body:has(#owner-header) .avatar {
   font-size: 1.04rem;
 }
 
+.coaching-action-panel {
+  border: 1px solid #f1beb4;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fff, #fff7f3);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+
+.coaching-action-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.coaching-action-panel h3 {
+  margin: 2px 0 8px;
+  color: var(--color-navy);
+  font-size: 1.25rem;
+}
+
+.coaching-action-panel p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.coaching-action-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.coaching-action-stats span {
+  border: 1px solid #e8ddd2;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--color-navy);
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 6px 10px;
+}
+
+.coaching-action-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.coaching-action-body h4 {
+  margin: 0 0 8px;
+  color: var(--color-navy);
+}
+
+.coaching-action-body ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+
+.coaching-action-copy {
+  border-left: 3px solid var(--color-teal);
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.coaching-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .coaching-client-table-wrap {
   overflow-x: auto;
   margin: 0 -14px -14px;

@@ -43,7 +43,7 @@ import { renderCampaignForm } from "./components/CampaignForm.js";
 import { renderCampaignManageList } from "./components/CampaignManageList.js?v=20260919-report-builder";
 import { renderCanvaExportPanel } from "./components/CanvaExportPanel.js?v=20260919-live-ui";
 import { renderClientDetailForm } from "./components/ClientDetailForm.js";
-import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260921-rich-greyz-owner";
+import { renderCoachingAdminView } from "./components/CoachingAdminView.js?v=20260922-coaching-actions";
 import { renderErrorLogPanel } from "./components/ErrorLogPanel.js";
 import { renderOutletRatesView } from "./components/OutletRatesView.js?v=20260919-report-builder";
 import { renderCampaignDetail } from "../client/components/CampaignDetailView.js?v=20260919-live-ui";
