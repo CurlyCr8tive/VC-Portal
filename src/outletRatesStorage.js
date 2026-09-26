@@ -18,6 +18,7 @@
 // everywhere else.
 
 import { logError } from "./errorLog.js";
+import { recordAgentLearningEvent } from "./agentLearningMemory.js";
 
 const STORAGE_KEY = "vc_outlet_rates_v1";
 
@@ -80,6 +81,17 @@ export function saveRate(outletName, rateEstimate, multiplier = 1) {
     updatedAt: new Date().toISOString(),
   };
   saveAll(all);
+  recordAgentLearningEvent({
+    agentType: "ave",
+    lessonType: "outlet_rate_saved",
+    ownerAction: "saved",
+    entityType: "outlet_rate",
+    entityId: key,
+    inputSummary: `${trimmedName} outlet rate`,
+    outputSummary: `$${numericRate.toLocaleString("en-US", { maximumFractionDigits: 2 })} at ${Number(multiplier) || 1}x multiplier`,
+    lesson: `${trimmedName}: use the owner-saved outlet rate of $${numericRate.toLocaleString("en-US", { maximumFractionDigits: 2 })} before researching or estimating from audience formulas.`,
+    metadata: { outletName: trimmedName, rateEstimate: numericRate, multiplier: Number(multiplier) || 1 },
+  });
   return all[key];
 }
 

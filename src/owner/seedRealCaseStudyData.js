@@ -747,8 +747,8 @@ export function seedRealCaseStudyData() {
     // intact, and one code path guarantees what actually reaches storage is
     // plain prose. Nothing downstream renders Markdown — this text lands in
     // a textarea, on the client's dashboard, and in a Canva export.
-    saveSummary(clientName, toReportProse(text));
-    approveSummary(clientName);
+    saveSummary(clientName, toReportProse(text), { recordLearning: false });
+    approveSummary(clientName, { recordLearning: false });
   }
 
   let clientsAdded = 0;

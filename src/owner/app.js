@@ -63,6 +63,7 @@ import { calculateCoachingProgress } from "../coachingProgress.js";
 import { applyDemoMetricFallbacks, demoAVEForPlacement } from "../demoFallbacks.js";
 import { loadNotesForCampaign, addNote } from "../notesStorage.js";
 import { loadSummary, saveSummary, approveSummary, normalizeStoredSummaryFormatting } from "../summaryStorage.js";
+import { recordAgentLearningEvent } from "../agentLearningMemory.js";
 import { escapeHtml } from "../client/utils.js";
 import { generateCanvaExport, downloadCsv } from "./canvaExport.js?v=20260919-live-ui";
 import { downloadReportPdf } from "../reportPdf.js";
@@ -3482,17 +3483,39 @@ function wireReviewDiscoveryCta() {
 }
 
 function renderMockReviewQueueSection() {
+  const items = [...state.demoDiscoveryQueue, ...state.reviewQueue];
   renderReviewQueue(document.getElementById("review-queue-list"), [...state.demoDiscoveryQueue, ...state.reviewQueue], {
     onConfirm: (id) => {
+      recordLocalDiscoveryLearning(items.find((item) => item.id === id), "confirmed");
       if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
       else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
       renderMockReviewQueueSection();
     },
     onReject: (id) => {
+      recordLocalDiscoveryLearning(items.find((item) => item.id === id), "rejected");
       if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
       else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
       renderMockReviewQueueSection();
     },
+  });
+}
+
+function recordLocalDiscoveryLearning(item, ownerAction) {
+  if (!item) return;
+  recordAgentLearningEvent({
+    agentType: "discovery",
+    lessonType: "review_queue_resolution",
+    ownerAction,
+    clientName: item.client || item.clientName || "",
+    entityType: "review_queue_preview",
+    entityId: item.id,
+    inputSummary: `${item.publication || "Unknown outlet"} — ${item.headline || "Untitled candidate"}`,
+    outputSummary: `Owner marked this preview candidate ${ownerAction}.`,
+    lesson:
+      ownerAction === "rejected"
+        ? `Do not resurface this same candidate pattern without stronger evidence. Matched on: ${item.matchedOn || "unknown"}.`
+        : `This candidate pattern was confirmed in the demo queue. Matched on: ${item.matchedOn || "unknown"}.`,
+    metadata: { articleUrl: item.articleUrl || "", matchedOn: item.matchedOn || "" },
   });
 }
 
@@ -3516,11 +3539,13 @@ async function loadRealReviewQueue() {
     renderReviewQueue(listEl, items, {
       confirmLabel: "Confirm Preview",
       onConfirm: (id) => {
+        recordLocalDiscoveryLearning(items.find((item) => item.id === id), "confirmed");
         if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
         else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
         loadRealReviewQueue();
       },
       onReject: (id) => {
+        recordLocalDiscoveryLearning(items.find((item) => item.id === id), "rejected");
         if (id.startsWith("demo-discovery-")) state.demoDiscoveryQueue = state.demoDiscoveryQueue.filter((item) => item.id !== id);
         else state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
         loadRealReviewQueue();
@@ -3559,7 +3584,11 @@ async function loadRealReviewQueue() {
       confirmLabel: "Create Placement",
       showPlacementDetails: true,
       onConfirm: (id, details) => createPlacementFromReviewQueueItem(id, details),
-      onReject: (id) => resolveRealReviewQueueItem(id, "rejected"),
+      onReject: (id) => {
+        const localItem = [...state.demoDiscoveryQueue, ...previewQueueItems].find((item) => item.id === id);
+        recordLocalDiscoveryLearning(localItem, "rejected");
+        resolveRealReviewQueueItem(id, "rejected");
+      },
     });
   } catch (err) {
     renderPreviewQueue();
@@ -3596,11 +3625,13 @@ async function resolveRealReviewQueueItem(id, status) {
 
 async function createPlacementFromReviewQueueItem(id, details = {}) {
   if (String(id).startsWith("rq")) {
+    recordLocalDiscoveryLearning(state.reviewQueue.find((item) => item.id === id), "confirmed");
     state.reviewQueue = state.reviewQueue.filter((item) => item.id !== id);
     loadRealReviewQueue();
     return;
   }
   if (String(id).startsWith("demo-discovery-")) {
+    recordLocalDiscoveryLearning(state.demoDiscoveryQueue.find((item) => item.id === id), "confirmed");
     alert("Demo discovery candidate reviewed. Sign in as the live owner before creating a client-facing placement from a candidate source.");
     return;
   }

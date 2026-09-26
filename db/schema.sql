@@ -340,6 +340,32 @@ create table agent_runs (
 );
 
 -- ---------------------------------------------------------------------------
+-- agent_learning_events — owner feedback memory for agent loops.
+-- ---------------------------------------------------------------------------
+-- agent_runs answers "what happened this time?" This table answers "what did
+-- the owner teach the system that should shape the next run?" It stores
+-- confirmations, rejections, approved drafts, edited drafts, AVE overrides,
+-- and export mapping lessons. It is product memory, not model training.
+create table agent_learning_events (
+  id uuid primary key default gen_random_uuid(),
+  agent_type text not null check (agent_type in ('discovery', 'ave', 'writing', 'campaign_outreach', 'coaching', 'canva_export', 'security')),
+  lesson_type text not null default 'feedback',
+  owner_action text not null check (owner_action in ('approved', 'rejected', 'edited', 'overridden', 'saved', 'copied', 'exported', 'failed', 'confirmed')),
+  client_id uuid references clients(id) on delete set null,
+  campaign_id uuid references campaigns(id) on delete set null,
+  placement_id uuid references placements(id) on delete set null,
+  entity_type text,
+  entity_id text,
+  input_summary text,
+  output_summary text,
+  lesson text,
+  confidence text not null default 'owner_feedback',
+  metadata jsonb not null default '{}'::jsonb,
+  created_by uuid references profiles(id),
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- client_invites — owner-visible invite history around Supabase Auth invites.
 -- Auth remains the source of truth for login; this table gives the portal a
 -- simple sent/accepted/failed audit trail.
@@ -516,6 +542,7 @@ alter table client_messages enable row level security;
 alter table client_files enable row level security;
 alter table client_reports enable row level security;
 alter table agent_runs enable row level security;
+alter table agent_learning_events enable row level security;
 alter table client_invites enable row level security;
 alter table coaching_phases enable row level security;
 alter table coaching_homework enable row level security;
@@ -656,6 +683,9 @@ create policy "pr_client reads approved client_reports" on client_reports
 
 -- agent_runs/client_invites are owner-only operational records.
 create policy "owner full access - agent_runs" on agent_runs
+  for all using (is_owner());
+
+create policy "owner full access - agent_learning_events" on agent_learning_events
   for all using (is_owner());
 
 create policy "owner full access - client_invites" on client_invites

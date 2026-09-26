@@ -16,24 +16,68 @@
 import "dotenv/config";
 import express from "express";
 import { supabase, isSupabaseConfigured, requireClient } from "./lib/supabaseClient.js";
-import { sendNoteNotification } from "./lib/gmailNotify.js";
+import { sendNoteNotification, isGmailConfigured } from "./lib/gmailNotify.js";
 
 // process.env.PORT first — same reasoning as owner-api/index.js: Render
 // assigns the port dynamically via PORT, CLIENT_API_PORT/4002 are the
 // local-dev fallback only.
 const PORT = process.env.PORT || process.env.CLIENT_API_PORT || 4002;
+const IS_PRODUCTION = String(process.env.NODE_ENV || "").toLowerCase() === "production";
 
 const FILE_BUCKET = process.env.CLIENT_FILE_BUCKET || "client-files";
 const MAX_UPLOAD_BYTES = Number(process.env.CLIENT_FILE_MAX_BYTES || 8 * 1024 * 1024);
+const ALLOWED_UPLOAD_TYPES = new Set(
+  String(process.env.CLIENT_FILE_ALLOWED_TYPES || "application/pdf,image/png,image/jpeg,text/plain,text/csv")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 const app = express();
 app.use(express.json({ limit: "12mb" }));
 
-// Dev-only convenience, not a production CORS policy. See owner-api/index.js's
-// matching comment — Allow-Headers/Methods and the OPTIONS short-circuit are
-// required for any browser call that sends a Content-Type header, not optional.
+function configuredOrigins() {
+  return new Set(
+    [
+      process.env.APP_BASE_URL,
+      process.env.CLIENT_APP_BASE_URL,
+      process.env.CORS_ALLOWED_ORIGINS,
+      process.env.APP_ALLOWED_ORIGINS,
+      IS_PRODUCTION ? "" : "http://localhost:8420,http://127.0.0.1:8420,file:",
+    ]
+      .filter(Boolean)
+      .flatMap((value) => String(value).split(","))
+      .map((value) => value.trim().replace(/\/$/, ""))
+      .filter(Boolean)
+  );
+}
+
+const ALLOWED_ORIGINS = configuredOrigins();
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (origin === "null") return ALLOWED_ORIGINS.has("file:");
+  return ALLOWED_ORIGINS.has(origin.replace(/\/$/, ""));
+}
+
+function applySecurityHeaders(res) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+}
+
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  applySecurityHeaders(res);
+  const origin = String(req.headers.origin || "");
+  if (!isAllowedOrigin(origin)) {
+    return res.status(403).json({ error: "origin_not_allowed", message: "This origin is not allowed to access the client API." });
+  }
+  if (origin && origin !== "null") {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
@@ -41,7 +85,16 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "client-api", supabaseConnected: isSupabaseConfigured });
+  res.json({
+    status: "ok",
+    service: "client-api",
+    supabaseConnected: isSupabaseConfigured,
+    nodeEnv: process.env.NODE_ENV || "development",
+    corsAllowedOriginsConfigured: ALLOWED_ORIGINS.size,
+    gmailNotificationsConfigured: isGmailConfigured,
+    maxUploadBytes: MAX_UPLOAD_BYTES,
+    allowedUploadTypes: Array.from(ALLOWED_UPLOAD_TYPES),
+  });
 });
 
 /** Wraps a route handler so `requireClient` failures short-circuit before the handler body runs. */
@@ -463,6 +516,12 @@ app.post(
     const mimeType = String(req.body?.mimeType || "application/octet-stream").trim();
     const rawBase64 = String(req.body?.dataBase64 || "").replace(/^data:[^;]+;base64,/, "");
     if (!rawBase64) return res.status(400).json({ error: "invalid_body", message: "Choose a file before uploading." });
+    if (!ALLOWED_UPLOAD_TYPES.has(mimeType.toLowerCase())) {
+      return res.status(415).json({
+        error: "unsupported_file_type",
+        message: `Upload ${mimeType || "file"} is not allowed. Allowed types: ${Array.from(ALLOWED_UPLOAD_TYPES).join(", ")}.`,
+      });
+    }
 
     const buffer = Buffer.from(rawBase64, "base64");
     if (!buffer.length) return res.status(400).json({ error: "invalid_body", message: "The selected file could not be read." });

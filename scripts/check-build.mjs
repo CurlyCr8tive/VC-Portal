@@ -9,6 +9,7 @@ import { createPlacement, applyPlacementEdit } from "../src/schema.js";
 import { summarizeFlaggedAVE, findDuplicateAVEAcrossClients } from "../src/aveDataQuality.js";
 import { estimateAVE, AUDIENCE_METRICS } from "../src/aveEstimation.js";
 import { OUTLET_TRAFFIC_REFERENCE } from "../src/outletTrafficReference.js";
+import { createAgentLearningEvent, summarizeAgentLearning } from "../src/agentLearningMemory.js";
 
 const root = process.cwd();
 const skippedDirs = new Set([".git", "node_modules"]);
@@ -219,6 +220,57 @@ function runAveEstimationChecks() {
 
 runAveEstimationChecks();
 
+function runAgentLearningChecks() {
+  const rejectedDiscovery = createAgentLearningEvent({
+    agentType: "discovery",
+    ownerAction: "rejected",
+    clientName: "Greyz Bistro",
+    inputSummary: "Wrong same-name article",
+    lesson: "Do not resurface same-name mentions without location evidence.",
+  });
+  const savedRate = createAgentLearningEvent({
+    agentType: "ave",
+    ownerAction: "saved",
+    entityType: "outlet_rate",
+    outputSummary: "$6,750 at 1x multiplier",
+  });
+  const approvedWriting = createAgentLearningEvent({
+    agentType: "writing",
+    ownerAction: "approved",
+    clientName: "Candlelit Care",
+    outputSummary: "Problem, solution, results approved narrative.",
+  });
+
+  assert.equal(rejectedDiscovery.confidence, "owner_feedback");
+  assert.ok(rejectedDiscovery.id.startsWith("learn_"));
+
+  const summary = summarizeAgentLearning([rejectedDiscovery, savedRate, approvedWriting]);
+  assert.equal(summary.discovery.rejectedPatterns.length, 1);
+  assert.equal(summary.ave.savedRates[0], "$6,750 at 1x multiplier");
+  assert.equal(summary.writing.approvedDrafts[0], "Problem, solution, results approved narrative.");
+}
+
+runAgentLearningChecks();
+
+function runSecurityRegressionChecks() {
+  const ownerApi = readFileSync(join(root, "server/owner-api/index.js"), "utf8");
+  const clientApi = readFileSync(join(root, "server/client-api/index.js"), "utf8");
+
+  for (const [label, source] of [
+    ["owner-api", ownerApi],
+    ["client-api", clientApi],
+  ]) {
+    assert.ok(!source.includes('Access-Control-Allow-Origin", "*"'), `${label} must not use wildcard CORS`);
+    assert.ok(source.includes("X-Content-Type-Options"), `${label} must set basic security headers`);
+    assert.ok(source.includes("isAllowedOrigin"), `${label} must gate browser origins through an allowlist`);
+  }
+
+  assert.ok(ownerApi.includes("Refusing to start owner-api with ALLOW_LOCAL_DEMO_AUTH=true in production."), "owner-api must fail closed if demo auth is enabled in production");
+  assert.ok(clientApi.includes("CLIENT_FILE_ALLOWED_TYPES"), "client-api must enforce an upload MIME allowlist");
+}
+
+runSecurityRegressionChecks();
+
 console.log(
-  `Build check passed: ${checkedFiles.length} JavaScript files parsed, ${htmlFiles.length} HTML files checked, both API packages are installed, and coaching, AVE data-quality, and AVE estimation checks passed.`
+  `Build check passed: ${checkedFiles.length} JavaScript files parsed, ${htmlFiles.length} HTML files checked, both API packages are installed, and coaching, AVE data-quality, AVE estimation, agent learning, and security regression checks passed.`
 );

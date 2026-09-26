@@ -8,6 +8,7 @@
 // displayed.
 
 import { logError } from "./errorLog.js";
+import { recordAgentLearningEvent } from "./agentLearningMemory.js";
 import { toReportProse, hasMarkdownArtifacts } from "./reportProse.js";
 
 const STORAGE_KEY = "vc_exec_summaries_v1";
@@ -61,7 +62,7 @@ export function normalizeStoredSummaryFormatting() {
   return changed;
 }
 
-export function saveSummary(clientName, text) {
+export function saveSummary(clientName, text, { recordLearning = true } = {}) {
   const trimmed = String(text || "").trim();
   const all = loadAll();
   if (!trimmed) {
@@ -74,6 +75,18 @@ export function saveSummary(clientName, text) {
     // second time. Silently keeping the old approval would mean edited
     // text could reach a client-facing export without ever being reviewed.
     all[clientName] = { text: trimmed, savedAt: new Date().toISOString() };
+    if (recordLearning) {
+      recordAgentLearningEvent({
+        agentType: "writing",
+        lessonType: "draft_saved",
+        ownerAction: "saved",
+        clientName,
+        entityType: "client_report_summary",
+        outputSummary: trimmed.slice(0, 600),
+        lesson: `${clientName}: owner saved this report summary draft. Future report writing should preserve its problem/solution/results framing unless the owner edits it.`,
+        metadata: { textLength: trimmed.length },
+      });
+    }
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 }
@@ -86,7 +99,7 @@ export function saveSummary(clientName, text) {
  * textarea contents, so there's never ambiguity about which exact text got
  * approved.
  */
-export function approveSummary(clientName) {
+export function approveSummary(clientName, { recordLearning = true } = {}) {
   const all = loadAll();
   const existing = all[clientName];
   if (!existing) {
@@ -94,4 +107,16 @@ export function approveSummary(clientName) {
   }
   all[clientName] = { ...existing, approvedAt: new Date().toISOString() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  if (recordLearning) {
+    recordAgentLearningEvent({
+      agentType: "writing",
+      lessonType: "summary_approved",
+      ownerAction: "approved",
+      clientName,
+      entityType: "client_report_summary",
+      outputSummary: String(existing.text || "").slice(0, 600),
+      lesson: `${clientName}: owner approved this client-facing summary. Use it as voice, structure, and evidence precedent for future report drafts.`,
+      metadata: { approvedAt: all[clientName].approvedAt, textLength: String(existing.text || "").length },
+    });
+  }
 }

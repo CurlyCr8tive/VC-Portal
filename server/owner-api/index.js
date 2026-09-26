@@ -36,26 +36,56 @@ import { createCalendarEvent, isGoogleWorkspaceConfigured, searchGmailForPitchDa
 // not a fixed one. OWNER_API_PORT/4001 stay as the local-dev fallback.
 const PORT = process.env.PORT || process.env.OWNER_API_PORT || 4001;
 const FILE_BUCKET = process.env.CLIENT_FILE_BUCKET || "client-files";
+const IS_PRODUCTION = String(process.env.NODE_ENV || "").toLowerCase() === "production";
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
-// Dev-only convenience so the static frontend (served separately on 8420)
-// can eventually call this without a proxy. Not a production CORS policy —
-// revisit this once real hosting/domains exist.
-//
-// Access-Control-Allow-Headers/Methods and the explicit OPTIONS short-
-// circuit are not decoration — every real call this app makes sends a
-// Content-Type header (fetch's JSON.stringify body, or authedJsonHeaders()
-// even on a plain GET), which makes the browser send a CORS preflight
-// OPTIONS request first. Without an Allow-Headers response naming
-// Content-Type/Authorization, the browser silently blocks the real
-// request after the preflight — found live via Playwright while
-// verifying the Discovery Agent frontend: every owner-api call failed
-// with a CORS console error, invisible to curl-based testing since CORS
-// is a browser-enforced restriction, not a server one.
+function configuredOrigins() {
+  return new Set(
+    [
+      process.env.APP_BASE_URL,
+      process.env.OWNER_APP_BASE_URL,
+      process.env.CORS_ALLOWED_ORIGINS,
+      process.env.APP_ALLOWED_ORIGINS,
+      IS_PRODUCTION ? "" : "http://localhost:8420,http://127.0.0.1:8420,file:",
+    ]
+      .filter(Boolean)
+      .flatMap((value) => String(value).split(","))
+      .map((value) => value.trim().replace(/\/$/, ""))
+      .filter(Boolean)
+  );
+}
+
+const ALLOWED_ORIGINS = configuredOrigins();
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (origin === "null") return ALLOWED_ORIGINS.has("file:");
+  return ALLOWED_ORIGINS.has(origin.replace(/\/$/, ""));
+}
+
+function applySecurityHeaders(res) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+}
+
+// Browser access is allowlisted by origin. Local preview keeps localhost/file
+// support; production must set APP_BASE_URL, OWNER_APP_BASE_URL, or
+// CORS_ALLOWED_ORIGINS to the deployed frontend origin.
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  applySecurityHeaders(res);
+  const origin = String(req.headers.origin || "");
+  if (!isAllowedOrigin(origin)) {
+    return res.status(403).json({ error: "origin_not_allowed", message: "This origin is not allowed to access the owner API." });
+  }
+  if (origin && origin !== "null") {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-VC-Demo-AI");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(204);
@@ -63,7 +93,14 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "owner-api", supabaseConnected: isSupabaseConfigured });
+  res.json({
+    status: "ok",
+    service: "owner-api",
+    supabaseConnected: isSupabaseConfigured,
+    nodeEnv: process.env.NODE_ENV || "development",
+    corsAllowedOriginsConfigured: ALLOWED_ORIGINS.size,
+    localDemoAuthEnabled: ALLOW_LOCAL_DEMO_AUTH,
+  });
 });
 
 app.get(
@@ -111,6 +148,10 @@ function ownerRoute(handler) {
 // ALLOW_LOCAL_DEMO_AUTH=true in server/owner-api/.env for local work.
 // NEVER set it in the deployed environment's variables.
 const ALLOW_LOCAL_DEMO_AUTH = String(process.env.ALLOW_LOCAL_DEMO_AUTH || "").toLowerCase() === "true";
+
+if (IS_PRODUCTION && ALLOW_LOCAL_DEMO_AUTH) {
+  throw new Error("Refusing to start owner-api with ALLOW_LOCAL_DEMO_AUTH=true in production.");
+}
 
 if (ALLOW_LOCAL_DEMO_AUTH) {
   console.warn(
@@ -232,6 +273,47 @@ async function logAgentRun(req, { agentType, clientId = null, campaignId = null,
     });
   } catch (err) {
     console.warn(`[agent_runs] could not log ${agentType}: ${err.message}`);
+  }
+}
+
+async function logAgentLearningEvent(
+  req,
+  {
+    agentType,
+    lessonType = "feedback",
+    ownerAction,
+    clientId = null,
+    campaignId = null,
+    placementId = null,
+    entityType = "",
+    entityId = "",
+    inputSummary = "",
+    outputSummary = "",
+    lesson = "",
+    confidence = "owner_feedback",
+    metadata = {},
+  }
+) {
+  if (!isSupabaseConfigured || !supabase) return;
+  try {
+    await supabase.from("agent_learning_events").insert({
+      agent_type: agentType,
+      lesson_type: lessonType,
+      owner_action: ownerAction,
+      client_id: clientId,
+      campaign_id: campaignId,
+      placement_id: placementId,
+      entity_type: entityType || null,
+      entity_id: entityId || null,
+      input_summary: inputSummary || null,
+      output_summary: outputSummary || null,
+      lesson: lesson || null,
+      confidence,
+      metadata,
+      created_by: profileIdForDb(req),
+    });
+  } catch (err) {
+    console.warn(`[agent_learning_events] could not log ${agentType}: ${err.message}`);
   }
 }
 
@@ -1187,6 +1269,21 @@ app.patch(
       .single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: "not_found", message: "No review_queue row with that id." });
+    await logAgentLearningEvent(req, {
+      agentType: "discovery",
+      lessonType: "review_queue_resolution",
+      ownerAction: status === "confirmed" ? "confirmed" : "rejected",
+      clientId: data.client_id,
+      entityType: "review_queue",
+      entityId: data.id,
+      inputSummary: `${data.publication || "Unknown outlet"} — ${data.headline || "Untitled candidate"}`,
+      outputSummary: `Owner marked this candidate ${status}.`,
+      lesson:
+        status === "rejected"
+          ? `Do not resurface this same candidate pattern for the client without stronger evidence. Matched on: ${data.matched_on || "unknown"}.`
+          : `This candidate pattern was confirmed by the owner. Matched on: ${data.matched_on || "unknown"}.`,
+      metadata: { matchedOn: data.matched_on, articleUrl: data.article_url },
+    });
     res.status(200).json(data);
   })
 );
@@ -1254,6 +1351,21 @@ app.post(
       .eq("id", item.id);
     if (queueError) throw queueError;
 
+    await logAgentLearningEvent(req, {
+      agentType: "discovery",
+      lessonType: "placement_confirmed",
+      ownerAction: "confirmed",
+      clientId: client.id,
+      campaignId: campaignResult.campaign?.id || null,
+      placementId: placement.id,
+      entityType: "review_queue",
+      entityId: item.id,
+      inputSummary: `${item.publication || "Unknown outlet"} — ${item.headline || "Untitled candidate"}`,
+      outputSummary: `Confirmed into placement ${placement.id}.`,
+      lesson: `${client.name}: owner confirmed this discovered mention as a real press placement. Future discovery should treat similar outlet/headline/client matches as higher confidence.`,
+      metadata: { articleUrl: item.article_url, campaign: req.body?.campaign || null },
+    });
+
     res.status(201).json({
       reviewItemId: item.id,
       placement: placementRowToApi(placement, { clientName: client.name, campaignName: campaignResult.campaign?.name }),
@@ -1287,6 +1399,9 @@ app.post(
     const email = String(req.body?.email || "").trim();
     if (!email) {
       return res.status(400).json({ error: "invalid_body", message: "An email address is required to send an invite." });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "invalid_body", message: "Enter a valid email address before sending an invite." });
     }
 
     const { data: client, error: clientError } = await supabase
