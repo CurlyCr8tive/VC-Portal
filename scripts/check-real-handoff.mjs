@@ -17,6 +17,15 @@ function extractWindowValue(source, name) {
   return match?.[1] || "";
 }
 
+function extractConfigValue(source, name) {
+  const match = source.match(new RegExp(`${name}\\s*:\\s*["']([^"']*)["']`));
+  return match?.[1] || "";
+}
+
+function resolvedPublicValue(configSource, fallbackSource, name) {
+  return extractConfigValue(configSource, name) || extractWindowValue(fallbackSource, name);
+}
+
 function envValue(source, key) {
   const line = source
     .split(/\r?\n/)
@@ -42,18 +51,19 @@ async function readHealth(label, url) {
 }
 
 const supabaseConfig = readIfExists(join(root, "src/supabaseConfig.js"));
+const runtimeConfig = readIfExists(join(root, "config.js"));
 const ownerEnv = readIfExists(join(root, "server/owner-api/.env"));
 const clientEnv = readIfExists(join(root, "server/client-api/.env"));
 
-const publicSupabaseUrl = extractWindowValue(supabaseConfig, "SUPABASE_URL");
-const publicAnonKey = extractWindowValue(supabaseConfig, "SUPABASE_ANON_KEY");
-const ownerApiBase = extractWindowValue(supabaseConfig, "OWNER_API_BASE_URL");
-const clientApiBase = extractWindowValue(supabaseConfig, "CLIENT_API_BASE_URL");
+const publicSupabaseUrl = resolvedPublicValue(runtimeConfig, supabaseConfig, "SUPABASE_URL");
+const publicAnonKey = resolvedPublicValue(runtimeConfig, supabaseConfig, "SUPABASE_ANON_KEY");
+const ownerApiBase = resolvedPublicValue(runtimeConfig, supabaseConfig, "OWNER_API_BASE_URL");
+const clientApiBase = resolvedPublicValue(runtimeConfig, supabaseConfig, "CLIENT_API_BASE_URL");
 
 add(publicSupabaseUrl ? "pass" : "fail", "Frontend Supabase URL", publicSupabaseUrl ? `Configured: ${publicSupabaseUrl}` : "window.SUPABASE_URL is blank.");
 add(publicAnonKey ? "pass" : "fail", "Frontend anon key", publicAnonKey ? "Configured. Confirm this is the anon/public key, never service_role." : "window.SUPABASE_ANON_KEY is blank.");
-add(ownerApiBase && !ownerApiBase.includes("localhost") ? "pass" : "warn", "Owner API frontend URL", ownerApiBase || "Missing. Localhost is okay only for local testing.");
-add(clientApiBase && !clientApiBase.includes("localhost") ? "pass" : "warn", "Client API frontend URL", clientApiBase || "Missing. Localhost is okay only for local testing.");
+add(ownerApiBase && !ownerApiBase.includes("localhost") ? "pass" : "warn", "Owner API frontend URL", ownerApiBase ? `${ownerApiBase}. Set config.js to the deployed owner API URL before live testing.` : "Missing. Localhost is okay only for local testing.");
+add(clientApiBase && !clientApiBase.includes("localhost") ? "pass" : "warn", "Client API frontend URL", clientApiBase ? `${clientApiBase}. Set config.js to the deployed client API URL before live testing.` : "Missing. Localhost is okay only for local testing.");
 
 const ownerNodeEnv = envValue(ownerEnv, "NODE_ENV");
 const ownerDemoAuth = envValue(ownerEnv, "ALLOW_LOCAL_DEMO_AUTH");

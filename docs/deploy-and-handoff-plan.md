@@ -88,10 +88,14 @@ CLIENT_FILE_ALLOWED_TYPES=application/pdf,image/png,image/jpeg,text/plain,text/c
 Frontend config must point at deployed services:
 
 ```js
-window.SUPABASE_URL = "<Supabase project URL>";
-window.SUPABASE_ANON_KEY = "<Supabase anon/public key>";
-window.OWNER_API_BASE_URL = "<deployed owner API URL>";
-window.CLIENT_API_BASE_URL = "<deployed client API URL>";
+// config.js
+window.VC_PORTAL_CONFIG = {
+  SUPABASE_URL: "<Supabase project URL>",
+  SUPABASE_ANON_KEY: "<Supabase anon/public key>",
+  APP_BASE_URL: "<deployed frontend URL>",
+  OWNER_API_BASE_URL: "<deployed owner API URL>",
+  CLIENT_API_BASE_URL: "<deployed client API URL>",
+};
 ```
 
 ### 3. Run Readiness Checks

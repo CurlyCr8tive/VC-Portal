@@ -117,7 +117,7 @@ Important technical note:
 - Vercel can host the static HTML/CSS/JS frontend as-is.
 - The current owner/client APIs are Express servers, not Vercel serverless functions.
 - For full live functionality, deploy `server/owner-api` and `server/client-api` to a backend host such as Render, Railway, Fly, or convert them to Vercel serverless functions.
-- After the API deployment, update `src/supabaseConfig.js`:
+- After the API deployment, update `config.js`:
   - `window.OWNER_API_BASE_URL`
   - `window.CLIENT_API_BASE_URL`
 - Also update `APP_BASE_URL` in API environment variables to the deployed Vercel frontend URL.
@@ -134,7 +134,7 @@ Static-only Vercel deployment can still show demo-mode pages, but live owner/cli
 6. Confirm `owner.html`, `client.html`, `login.html`, and `index.html` load.
 7. Deploy owner API.
 8. Deploy client API.
-9. Update `src/supabaseConfig.js` API base URLs to deployed API origins.
+9. Update `config.js` API base URLs to deployed API origins.
 10. Set owner/client API env vars.
 11. Set API `APP_BASE_URL` to deployed Vercel frontend origin.
 12. Test real owner login.

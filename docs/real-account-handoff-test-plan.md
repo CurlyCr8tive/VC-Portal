@@ -25,10 +25,11 @@ Required backend env vars:
 
 Required frontend config:
 
-- `window.SUPABASE_URL`
-- `window.SUPABASE_ANON_KEY`
-- `window.OWNER_API_BASE_URL=<deployed owner API URL>`
-- `window.CLIENT_API_BASE_URL=<deployed client API URL>`
+- `config.js` -> `SUPABASE_URL`
+- `config.js` -> `SUPABASE_ANON_KEY`
+- `config.js` -> `OWNER_API_BASE_URL=<deployed owner API URL>`
+- `config.js` -> `CLIENT_API_BASE_URL=<deployed client API URL>`
+- `config.js` -> `APP_BASE_URL=<deployed frontend URL>`
 
 Never put `SUPABASE_SERVICE_ROLE_KEY` in frontend files.
 
