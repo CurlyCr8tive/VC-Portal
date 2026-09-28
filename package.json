@@ -19,6 +19,7 @@
     "data:backfill-audience-reach": "node scripts/backfill-audience-reach.mjs",
     "data:seed-greyz-coaching": "node scripts/seed-greyz-coaching-supabase.mjs",
     "handoff:check-real": "node scripts/check-real-handoff.mjs",
+    "test:local-user-flow": "node scripts/local-user-flow-check.mjs",
     "auth:provision-test-accounts": "node scripts/provision-test-accounts.mjs",
     "auth:set-owner-password": "node scripts/set-owner-password.mjs"
   }

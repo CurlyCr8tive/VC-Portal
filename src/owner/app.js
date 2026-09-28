@@ -2060,11 +2060,19 @@ async function inviteClient({ clientId, clientName, email }) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return { ok: false, message: "Live invite sending is planned for handoff." };
+      return {
+        ok: false,
+        message:
+          body.message ||
+          "Invite could not be sent. Confirm the owner API is running, Supabase Auth email is configured, and the address is unused.",
+      };
     }
     return { ok: true, invitedEmail: body.invitedEmail };
   } catch (err) {
-    return { ok: false, message: "Live invite sending is planned for handoff." };
+    return {
+      ok: false,
+      message: "Invite could not be sent because the owner API is unreachable. Start the local owner API and try again.",
+    };
   }
 }
 
