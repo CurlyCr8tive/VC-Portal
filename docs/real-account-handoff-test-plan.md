@@ -1,6 +1,8 @@
 # Real Account And Notification Handoff Test Plan
 
-Use this plan to move from mock/demo proof to real accounts, real invites, real passwords, and real notifications before the Tuesday handoff.
+Use this plan to move the PR platform from mock/demo proof to real accounts, real invites, real passwords, and real notifications before the September 30 handoff.
+
+Scope note: this plan applies to the PR platform / VC Portal only. Raise Local account setup, nonprofit/business matching, Grove Park demo prep, and Google Places work are separate.
 
 ## Core Rule
 
@@ -30,6 +32,42 @@ Required frontend config:
 
 Never put `SUPABASE_SERVICE_ROLE_KEY` in frontend files.
 
+### 1A. Provision The Real Handoff Accounts
+
+Use the provisioning script in dry-run mode first. It reads `server/owner-api/.env`, checks the real Supabase project, and prepares:
+
+- Tenyse owner/admin
+- Jessica tester/admin, when her email is supplied
+- one internal `pr_client` test account tied to an existing client row
+- one pilot invite target to send through the live owner portal
+
+Dry run:
+
+```bash
+npm run auth:provision-test-accounts -- \
+  --jessica-email "jessica@example.com" \
+  --jessica-name "Jessica" \
+  --internal-client-name "Greyz Bistro" \
+  --internal-client-email "internal-client-test@example.com" \
+  --pilot-client-name "Candlelit Care" \
+  --pilot-client-email "pilot-client@example.com"
+```
+
+Apply only after confirming the emails:
+
+```bash
+npm run auth:provision-test-accounts -- \
+  --jessica-email "jessica@example.com" \
+  --jessica-name "Jessica" \
+  --internal-client-name "Greyz Bistro" \
+  --internal-client-email "internal-client-test@example.com" \
+  --pilot-client-name "Candlelit Care" \
+  --pilot-client-email "pilot-client@example.com" \
+  --write
+```
+
+The pilot client invite should still be sent from the owner portal using `Invite Client`. That tests the real invite email, password setup page, Supabase Auth metadata trigger, and `profiles.role = pr_client` / `profiles.client_id` wiring end to end.
+
 ### 2. Create Or Confirm Tenyse's Owner Account
 
 The owner account must have:
@@ -45,6 +83,8 @@ Test:
 - Confirm owner dashboard loads.
 - Confirm owner can see all clients.
 - Confirm owner-only pages load: Review Queue, Reports, Analytics, Settings.
+
+If Jessica needs to test owner/admin flows, create or confirm a separate real owner/admin testing account for her too. Do not share passwords between testers.
 
 ### 3. Create One Internal Test Client
 
@@ -87,6 +127,13 @@ Trigger a real notification:
 2. Post a campaign note or general message.
 3. Confirm note saves.
 4. Confirm owner notification email is sent to `GOOGLE_NOTIFY_TO` / `GMAIL_NOTIFY_TO`.
+5. Send/confirm test notifications to Tenyse and Jessica if both are part of the testing or handoff notification path.
+
+Expected:
+
+- Tenyse and Jessica may receive test emails during this process.
+- Every expected email has a named purpose: invite, password setup, confirmation, or owner notification.
+- Any missing email is logged as a blocker or known limitation with the exact recipient, action, and timestamp.
 
 If notification does not send:
 
@@ -139,11 +186,12 @@ Warnings are acceptable for local testing. Failures must be fixed before product
 | Production guard | `ALLOW_LOCAL_DEMO_AUTH=true` in production | Owner API refuses to start |
 | CORS | Unknown origin calls API | API returns blocked origin |
 
-## Before Tuesday Handoff
+## Before September 30 Handoff
 
 Complete these before declaring real accounts ready:
 
 - Tenyse owner login confirmed.
+- Jessica tester/admin access confirmed, if applicable.
 - At least one real client invite/password flow confirmed.
 - At least one client notification email confirmed.
 - At least one approved client report visible to assigned client only.

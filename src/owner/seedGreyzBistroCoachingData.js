@@ -21,8 +21,8 @@ import { addOpportunity, loadOpportunitiesForClient, updateOpportunity } from ".
 import { createResource } from "../coachingResourceSchema.js";
 import { addResource, deleteResource, loadResourcesForClient, updateResource } from "../coachingResourceStorage.js";
 
-const CLIENT = "Greyz Bistro";
-const PHASES = [
+export const GREYZ_COACHING_CLIENT = "Greyz Bistro";
+export const GREYZ_COACHING_PHASES = [
   {
     phaseNumber: 1,
     name: "Research & Discovery",
@@ -127,7 +127,7 @@ const PHASES = [
   },
 ];
 
-const OPPORTUNITIES = [
+export const GREYZ_COACHING_OPPORTUNITIES = [
   {
     title: "WIADCA Carnival — VIP Breakfast & Stage Premium Tasting Partner",
     description: "Two activations: VIP Breakfast and Stage Premium Tasting Partner, Aug 20 and Sept 7.",
@@ -158,7 +158,7 @@ const OPPORTUNITIES = [
   },
 ];
 
-const RESOURCES = [
+export const GREYZ_COACHING_RESOURCES = [
   {
     kind: "resource",
     title: "LinkedIn Audit & Fix Plan",
@@ -240,6 +240,10 @@ const RESOURCES = [
 
 /** Idempotent — checks by (client, phaseNumber)/(client, title) before adding, same pattern as seedRealCaseStudyData.js. */
 export function seedGreyzBistroCoachingData() {
+  const CLIENT = GREYZ_COACHING_CLIENT;
+  const PHASES = GREYZ_COACHING_PHASES;
+  const OPPORTUNITIES = GREYZ_COACHING_OPPORTUNITIES;
+  const RESOURCES = GREYZ_COACHING_RESOURCES;
   const existingPhases = loadPhasesForClient(CLIENT);
   let phasesAdded = 0;
   for (const p of PHASES) {

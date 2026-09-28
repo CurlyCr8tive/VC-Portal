@@ -1,8 +1,10 @@
-# Deploy Today, Test This Weekend, Final Handoff Tuesday
+# PR Platform Deploy, Test, And Final Handoff Plan
 
-Target final handoff date: **Tuesday, September 29, 2026**
+Target final handoff deadline: **Wednesday, September 30, 2026**
 
-Goal: deploy a real-account testing version today, give Tenyse access for testing, collect issues over the weekend, and complete final handoff Tuesday with documentation, account ownership, and known limitations clear.
+Goal: deploy the PR platform with real-account testing access today, give Jessica and Tenyse login details for the ideal user flow, collect issues immediately after deployment, finalize fixes by end of day Tuesday, and complete final handoff by September 30 with documentation, account ownership, and known limitations clear.
+
+Scope note: this document covers the **PR platform / VC Portal only**. Raise Local, Grove Park, Google Places, nonprofit/business matching, and the YES Academy/Sofia & Grace demo flow belong to the separate Raise Local platform and are intentionally excluded here.
 
 ## Current State
 
@@ -24,7 +26,7 @@ Built and ready for real-account validation:
 - Security Phase 1 hardening
 - Real handoff readiness command: `npm run handoff:check-real`
 
-Still needs live setup before Tenyse can test properly:
+Still needs live setup before Jessica and Tenyse can test properly:
 
 - Deployed frontend URL
 - Deployed owner API URL
@@ -34,21 +36,26 @@ Still needs live setup before Tenyse can test properly:
 - `CORS_ALLOWED_ORIGINS=<deployed frontend URL>`
 - `APP_BASE_URL=<deployed frontend URL>`
 - Gmail/Google OAuth notification credentials
-- At least one real owner account
+- Real owner/admin accounts for Tenyse and any handoff tester who needs owner access
 - At least one real client invite/password setup test
 
-## Today: Deployment And Meeting Prep
+Repo handoff note: Jessica should use GitHub access for the VC Portal repo. ZIP/email attachment sharing is not reliable because Google/Gmail blocked ZIP delivery during the handoff meeting. Until the live cleanup/deploy is complete, the deployed live-candidate URL should be treated as the testing source of truth because the repository may still contain older demo fixtures.
 
-### 1. Freeze Demo Mode
+## Tonight / Today: PR Platform Live-Account Prep
 
-Do not remove demo/mock data yet. Keep it as fallback and rehearsal data.
+### 1. Remove Or Quarantine PR Mock Data
 
-But from today forward:
+For the PR platform, remove mock/demo data from the live testing path and replace it with real accounts and vetted real records.
+
+Keep any mock fixtures only where they are clearly isolated as developer/demo fallback data. They should not appear in Jessica/Tenyse's live-account test flow.
+
+Rules:
 
 - Do not treat demo data as production truth.
 - Do not invite real users into mock accounts.
 - Do not copy fake/demo clients into final production unless explicitly approved.
-- Use demo only to compare expected UI behavior.
+- Do not allow demo-only data to appear in real reports, client portals, exports, or notifications.
+- Use demo only to compare expected UI behavior during development.
 
 ### 2. Deploy A Testable Staging/Production Candidate
 
@@ -104,11 +111,12 @@ Expected:
 
 ### 4. Create Real Test Accounts
 
-Minimum today:
+Minimum before sending testing access:
 
-- 1 real owner account for Tenyse
+- 1 real owner/admin account for Tenyse
+- 1 real owner/admin or reviewer account for Jessica, if she will test owner flows
 - 1 internal test client account
-- 1 real or pilot client invite, if Tenyse is ready
+- 1 real or pilot client invite, if Tenyse/Jessica are ready to test the client flow
 
 Owner account requirements:
 
@@ -124,7 +132,7 @@ Client account requirements:
 
 ### 5. Test The Real Account Chain
 
-Before sending to Tenyse, verify:
+Before sending to Jessica and Tenyse, verify:
 
 - Owner can log in.
 - Owner dashboard loads.
@@ -137,22 +145,30 @@ Before sending to Tenyse, verify:
 - Client sees only their own portal/data.
 - Client can post a note/message.
 - Owner notification email sends if Gmail is configured.
+- Send notification test emails to both Jessica and Tenyse if both should receive handoff/testing alerts.
 
-### 6. Prepare Today’s Meeting Talking Points
+Expected email-test behavior:
+
+- Tenyse and Jessica may receive test invite, password setup, confirmation, or notification messages while the real-account flow is being validated.
+- If either person does not receive an expected email, treat that as a handoff blocker until the missing delivery path is explained or fixed.
+- If notifications fail but in-app actions still save, document the saved-action behavior and keep notification delivery on the blocker list.
+
+### 6. Meeting Talking Points
 
 Use this in the meeting:
 
 > The demo/mock layer proved the workflows and UI. The work now is validating the real handoff layer: real Supabase accounts, real owner login, real client invites, password setup, real notifications, and client-specific access controls.  
 >
-> Today I’m deploying a testable live-candidate version so you can start using it with real accounts. This weekend I’ll be checking account setup, notification delivery, reports, uploads, exports, and client data scoping. Tuesday will be the final handoff with documentation, access, known limitations, and next-step instructions.
+> Today I’m deploying a testable live-candidate version of the PR platform so Jessica and Tenyse can start testing the ideal flow with real accounts. I’ll use their feedback to close issues, finalize changes by end of day Tuesday, and complete the full handoff by September 30 with documentation, access, known limitations, and next-step instructions.
 
-## Weekend Testing Plan
+## Post-Deployment Testing Plan
 
-### Friday Evening / Saturday Morning
+### Immediately After Deployment
 
 Focus: real auth and access.
 
 - Owner login
+- Jessica/Tenyse tester login
 - Client invite
 - Client password setup
 - Client login
@@ -160,40 +176,39 @@ Focus: real auth and access.
 - Client-only report visibility
 - Owner-only page protection
 
-### Saturday
+### Next Testing Pass
 
 Focus: client workflows.
 
 - Client messages/notes
 - Gmail notification delivery
+- Notification delivery to Tenyse
+- Notification delivery to Jessica, if she is part of the alert loop
 - Client file upload/download
 - Approved report visibility
 - Canva CSV export
 - PDF/report preview behavior
 - Review Queue approval/rejection
 
-### Sunday
+### End Of Day Tuesday
 
-Focus: polish and fixes.
+Focus: all PR platform changes finalized.
 
-- Fix broken CTAs found during real testing.
-- Replace any remaining empty states.
+- Fix issues flagged by Jessica and Tenyse.
+- Remove or quarantine any remaining mock/demo PR data from live flows.
+- Replace any remaining empty states in real mode.
 - Confirm no demo labels appear in real mode.
 - Confirm hover/detail panels still render.
 - Confirm data totals and AVE values are explainable.
-
-### Monday
-
-Focus: handoff readiness.
-
 - Run full checks.
 - Finalize docs.
 - Confirm Tenyse owner access.
+- Confirm Jessica's access path, if applicable.
 - Confirm at least one client access path.
 - Prepare known limitations list.
 - Prepare maintenance/admin notes.
 
-### Tuesday
+### September 30 Final Handoff
 
 Focus: final handoff.
 
@@ -208,7 +223,7 @@ Focus: final handoff.
 
 ## Handoff Documentation Requirements
 
-Must be ready by Tuesday:
+Must be ready by September 30:
 
 ### Access And Accounts
 
@@ -285,7 +300,7 @@ The build is ready for Tuesday handoff when:
 
 ## Immediate Blockers To Resolve
 
-Based on the latest handoff check:
+Based on the latest PR platform handoff check:
 
 - `ALLOW_LOCAL_DEMO_AUTH=true` must be turned off for deployed/live testing.
 - `NODE_ENV=production` must be set in deployed APIs.
@@ -293,13 +308,14 @@ Based on the latest handoff check:
 - `APP_BASE_URL` must be set to the deployed frontend URL so invite links do not point to localhost.
 - Frontend API base URLs must point to deployed APIs, not localhost.
 - Gmail/Google OAuth notification env vars must be completed for real email notifications.
+- Test notifications must be sent to Tenyse and Jessica if both need handoff visibility.
 
-## What To Send Tenyse After Deploying Today
+## What To Send Jessica And Tenyse After Deploying Today
 
 Send:
 
 - Owner portal URL
-- Owner login email
+- Owner/admin login email(s)
 - Temporary/password setup instructions, depending on auth setup
 - One test client portal flow
 - Known testing focus list
@@ -307,6 +323,6 @@ Send:
 
 Suggested message:
 
-> Hi Tenyse, I’m sending over the live-candidate version for testing. The demo version proved the workflow; this version is for validating real accounts, real client access, invite/password setup, notifications, and report visibility.  
+> Hi Tenyse and Jessica, I’m sending over the PR platform live-candidate version for testing. The demo version proved the workflow; this version is for validating real accounts, real client access, invite/password setup, notifications, and report visibility.
 >
-> Today/this weekend, please focus on logging in, checking the owner dashboard, reviewing client data, and confirming anything you would need before Tuesday’s final handoff. I’ll be using your feedback to close out fixes and finalize documentation before Tuesday.
+> Please focus on logging in, checking the owner dashboard, reviewing client data, and confirming anything you would need before the September 30 handoff. I’ll be using your feedback to close out fixes and finalize documentation before end of day Tuesday.
