@@ -15,7 +15,7 @@
 //     --jessica-email jessica@example.com \
 //     --internal-client-name "Greyz Bistro" \
 //     --internal-client-email internal-client-test@example.com \
-//     --pilot-client-name "Candlelit Care" \
+//     --pilot-client-name "Greyz Bistro" \
 //     --pilot-client-email client@example.com
 //
 //   node scripts/provision-test-accounts.mjs ... --write
