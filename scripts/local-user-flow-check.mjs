@@ -37,7 +37,7 @@ async function fetchJson(label, url, options = {}) {
     add("pass", label, `${url} responded ok`);
     return body;
   } catch (err) {
-    add("fail", label, `${url} not reachable (${err.message})`);
+    add("fail", label, `${url} not reachable (${err.message}). Start the local stack first with: npm run start:local`);
     return null;
   }
 }
@@ -47,7 +47,7 @@ async function fetchHead(label, url) {
     const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(5000) });
     add(res.ok ? "pass" : "fail", label, `${url} responded ${res.status}`);
   } catch (err) {
-    add("fail", label, `${url} not reachable (${err.message})`);
+    add("fail", label, `${url} not reachable (${err.message}). Start the local stack first with: npm run start:local`);
   }
 }
 
@@ -165,5 +165,13 @@ for (const check of checks) {
 const failed = checks.filter((check) => check.status === "fail");
 const warned = checks.filter((check) => check.status === "warn");
 console.log(`\nLocal user flow check complete: ${failed.length} failed, ${warned.length} warnings, ${checks.length} total checks.`);
+
+if (failed.some((check) => check.detail.includes("Start the local stack first"))) {
+  console.log("\nLocal stack help:");
+  console.log("  1. Open a new terminal in this repo.");
+  console.log("  2. Run: npm run start:local");
+  console.log("  3. Leave that terminal open.");
+  console.log("  4. In another terminal, rerun: npm run handoff:check-real && npm run test:local-user-flow");
+}
 
 if (failed.length) process.exitCode = 1;

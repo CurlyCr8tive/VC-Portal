@@ -4,7 +4,19 @@ Use this before deployment to confirm the build is usable with real Supabase Aut
 
 ## Start The Local Stack
 
-Run these in three terminals:
+Recommended: run the whole local stack in one terminal:
+
+```bash
+npm run start:local
+```
+
+Leave that terminal open while testing. It starts:
+
+- owner API on `http://localhost:4001`
+- client API on `http://localhost:4002`
+- static frontend on `http://localhost:8420`
+
+Alternative: run these in three separate terminals:
 
 ```bash
 npm run start:owner-api
