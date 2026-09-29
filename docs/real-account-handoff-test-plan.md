@@ -51,7 +51,7 @@ npm run auth:provision-test-accounts -- \
   --internal-client-name "Greyz Bistro" \
   --internal-client-email "internal-client-test@example.com" \
   --pilot-client-name "Candlelit Care" \
-  --pilot-client-email "pilot-client@example.com"
+  --pilot-client-email "TheEsmereldaCo@gmail.com"
 ```
 
 Apply only after confirming the emails:
@@ -63,7 +63,7 @@ npm run auth:provision-test-accounts -- \
   --internal-client-name "Greyz Bistro" \
   --internal-client-email "internal-client-test@example.com" \
   --pilot-client-name "Candlelit Care" \
-  --pilot-client-email "pilot-client@example.com" \
+  --pilot-client-email "TheEsmereldaCo@gmail.com" \
   --write
 ```
 

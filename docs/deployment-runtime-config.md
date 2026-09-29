@@ -18,7 +18,8 @@ Use this checklist when moving the PR platform from local/demo testing to a depl
    - Set this in `config.js` as `CLIENT_API_BASE_URL`.
 
 4. Separate unused pilot client email:
-   - Use an email that is not already attached to a Supabase user/profile.
+   - Use `TheEsmereldaCo@gmail.com` for the pilot invite test unless the handoff owner gives you a different unused inbox.
+   - Confirm the email is not already attached to a Supabase user/profile before sending.
    - Do not reuse `chericeheron@gmail.com`; it is already the internal Greyz Bistro test client.
    - A plus alias is acceptable only if the receiving inbox supports it, for example `chericeheron+pilot@gmail.com`.
 

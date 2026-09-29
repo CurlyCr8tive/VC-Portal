@@ -66,11 +66,11 @@ OWNER_TEST_EMAIL="tenyse@verifiedconsulting.com" \
 OWNER_TEST_PASSWORD="<owner password>" \
 SEND_PILOT_INVITE=true \
 PILOT_CLIENT_NAME="<client row name>" \
-PILOT_CLIENT_EMAIL="<unused pilot email>" \
+PILOT_CLIENT_EMAIL="TheEsmereldaCo@gmail.com" \
 npm run test:local-user-flow
 ```
 
-Only send a pilot invite to an unused email address. Do not reuse an email already attached to a Supabase user/profile.
+Only send a pilot invite to an unused email address. The pilot email for this handoff test is `TheEsmereldaCo@gmail.com`. Do not reuse an email already attached to a Supabase user/profile.
 
 ## Manual User Test
 
