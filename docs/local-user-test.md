@@ -14,14 +14,14 @@ Leave that terminal open while testing. It starts:
 
 - owner API on `http://localhost:4001`
 - client API on `http://localhost:4002`
-- static frontend on `http://localhost:8420`
+- browser frontend on `http://localhost:8420`
 
 Alternative: run these in three separate terminals:
 
 ```bash
 npm run start:owner-api
 npm run start:client-api
-npm run serve:static
+npm run serve:frontend
 ```
 
 Open:

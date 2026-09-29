@@ -32,12 +32,12 @@ Current uncommitted documentation/deployment-prep changes after the Sep 20 meeti
 
 ## Project Shape
 
-- Static frontend: root HTML files plus vanilla JavaScript modules in `src/`
+- Browser frontend: root HTML files plus vanilla JavaScript modules in `src/`
 - Owner portal: `owner.html`, `src/owner/app.js`, `src/owner/components/`
 - Client portal: `client.html`, `src/client/app.js`, `src/client/components/`
 - Owner API: `server/owner-api`, default local port `4001`
 - Client API: `server/client-api`, default local port `4002`
-- Static server: `npm run serve:static`, default local port `8420`
+- Browser frontend server: `npm run serve:frontend`, default local port `8420`
 - Build/health check: `npm run check`
 
 The app intentionally keeps local demo fallbacks. Do not remove localStorage/demo fallback paths while wiring production features.
@@ -50,10 +50,10 @@ From the repo root:
 cd "/Users/chericeheron/Desktop/VC Dashboard"
 ```
 
-Run the static frontend:
+Run the browser frontend:
 
 ```sh
-npm run serve:static
+npm run serve:frontend
 ```
 
 Run the owner API:
@@ -107,14 +107,14 @@ Do not center the demo on lead time. Lead time is present with demo/mock data, b
 
 PR Platform target:
 
-- Deploy static frontend to Vercel free tier.
+- Deploy the browser frontend to Vercel free tier.
 - Keep demo logins for demo/testing only.
 - Replace demo access with official owner/client account creation after deployment.
 - Use Supabase for auth/data.
 
 Important technical note:
 
-- Vercel can host the static HTML/CSS/JS frontend as-is.
+- Vercel can host the browser HTML/CSS/JS frontend as-is.
 - The current owner/client APIs are Express servers, not Vercel serverless functions.
 - For full live functionality, deploy `server/owner-api` and `server/client-api` to a backend host such as Render, Railway, Fly, or convert them to Vercel serverless functions.
 - After the API deployment, update `config.js`:
@@ -122,7 +122,7 @@ Important technical note:
   - `window.CLIENT_API_BASE_URL`
 - Also update `APP_BASE_URL` in API environment variables to the deployed Vercel frontend URL.
 
-Static-only Vercel deployment can still show demo-mode pages, but live owner/client saves, agents, invites, messages, and files need the APIs reachable.
+A frontend-only Vercel deployment can still show demo-mode pages, but live owner/client saves, agents, invites, messages, and files need the owner/client APIs reachable.
 
 ## Deployment Readiness Checklist
 

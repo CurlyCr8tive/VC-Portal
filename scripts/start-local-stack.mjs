@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 
 const commands = [
-  { name: "owner-api", cmd: "npm", args: ["run", "start:owner-api"] },
-  { name: "client-api", cmd: "npm", args: ["run", "start:client-api"] },
-  { name: "static", cmd: "npm", args: ["run", "serve:static"] },
+  { name: "owner-api", cmd: "npm", args: ["run", "start:owner-api"], healthUrl: "http://localhost:4001/health" },
+  { name: "client-api", cmd: "npm", args: ["run", "start:client-api"], healthUrl: "http://localhost:4002/health" },
+  { name: "frontend", cmd: "npm", args: ["run", "serve:frontend"], healthUrl: "http://localhost:8420/login.html", method: "HEAD" },
 ];
 
 const children = [];
@@ -32,6 +32,18 @@ function shutdown(code = 0) {
   setTimeout(() => process.exit(code), 250);
 }
 
+async function isHealthy(entry) {
+  try {
+    const res = await fetch(entry.healthUrl, {
+      method: entry.method || "GET",
+      signal: AbortSignal.timeout(1000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 console.log("Starting local PR platform stack...");
 console.log("- Frontend: http://localhost:8420/login.html");
 console.log("- Owner API: http://localhost:4001/health");
@@ -40,7 +52,12 @@ console.log("\nLeave this terminal open. Run checks in another terminal:");
 console.log("  npm run handoff:check-real");
 console.log("  npm run test:local-user-flow\n");
 
-commands.forEach((entry, index) => {
+for (const [index, entry] of commands.entries()) {
+  if (await isHealthy(entry)) {
+    log(entry.name, index, `already running at ${entry.healthUrl}; reusing it`);
+    continue;
+  }
+
   const child = spawn(entry.cmd, entry.args, {
     cwd: process.cwd(),
     env: process.env,
@@ -56,7 +73,13 @@ commands.forEach((entry, index) => {
     console.error(`[${entry.name}] exited early (${reason}). Stopping the local stack.`);
     shutdown(code || 1);
   });
-});
+}
+
+if (!children.length) {
+  console.log("\nAll local PR platform services are already running. Nothing new was started.");
+  console.log("Use the terminal that originally started them to stop those processes.");
+  process.exit(0);
+}
 
 process.on("SIGINT", () => {
   console.log("\nStopping local PR platform stack...");
