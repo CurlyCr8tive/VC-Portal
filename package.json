@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "check": "node scripts/check-build.mjs",
+    "build:frontend": "node scripts/build-frontend.mjs",
     "start:owner-api": "npm --prefix server/owner-api start",
     "start:client-api": "npm --prefix server/client-api start",
     "serve:frontend": "python3 -m http.server 8420",

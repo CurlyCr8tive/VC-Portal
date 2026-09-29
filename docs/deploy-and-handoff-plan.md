@@ -61,9 +61,11 @@ Rules:
 
 Deploy these pieces:
 
-- Static frontend
+- Browser frontend
 - Owner API
 - Client API
+
+Preferred deployment path: use the Render Blueprint in `render.yaml`. See `docs/render-deployment-checklist.md` for the exact services, env vars, and post-deployment test sequence.
 
 Recommended environment stance:
 

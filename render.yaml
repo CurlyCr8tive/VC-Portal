@@ -1,0 +1,95 @@
+services:
+  - type: web
+    runtime: static
+    name: vc-portal-frontend
+    buildCommand: npm ci && npm run build:frontend
+    staticPublishPath: ./dist
+    envVars:
+      - key: PUBLIC_SUPABASE_URL
+        sync: false
+      - key: PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: PUBLIC_APP_BASE_URL
+        sync: false
+      - key: PUBLIC_OWNER_API_BASE_URL
+        sync: false
+      - key: PUBLIC_CLIENT_API_BASE_URL
+        sync: false
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+
+  - type: web
+    runtime: node
+    name: vc-portal-owner-api
+    rootDir: server/owner-api
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ALLOW_LOCAL_DEMO_AUTH
+        value: "false"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NEWSDATA_API_KEY
+        sync: false
+      - key: CURRENTS_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false
+
+  - type: web
+    runtime: node
+    name: vc-portal-client-api
+    rootDir: server/client-api
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CLIENT_FILE_BUCKET
+        value: client-files
+      - key: CLIENT_FILE_MAX_BYTES
+        value: "8388608"
+      - key: CLIENT_FILE_ALLOWED_TYPES
+        value: application/pdf,image/png,image/jpeg,text/plain,text/csv
+      - key: GOOGLE_NOTIFY_TO
+        value: tenyse@verifiedconsulting.com
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REFRESH_TOKEN
+        sync: false
