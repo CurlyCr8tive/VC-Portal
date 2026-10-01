@@ -36,6 +36,7 @@ Use these for user-facing handoff and testing.
 | --- | --- |
 | [Tenyse Use Guide](tenyse-use-guide.md) | Founder-facing guide for using the PR platform and understanding the workflows. |
 | [Final Client Handoff Email And Doc](final-client-handoff-email-and-doc.md) | Client-facing email draft and Google Doc copy for the final handoff. |
+| [L3 Capstone Handoff Sheet](l3-capstone-handoff-sheet.md) | Supporting detail sheet behind the handoff email, following the Pursuit template. |
 | [Client Onboarding](client-onboarding.md) | How client invites/password setup should work. |
 | [Local User Test](local-user-test.md) | Local testing steps before deployed URLs exist. |
 | [Render Deployment Checklist](render-deployment-checklist.md) | Step-by-step Render deployment and env var checklist. |
