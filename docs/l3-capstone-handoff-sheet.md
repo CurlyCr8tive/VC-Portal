@@ -34,8 +34,6 @@ Not fully included in this capstone scope:
 - final production deployment QA after Render URLs are created
 - fully validated Gmail notification delivery until Google OAuth env vars are configured
 - long-term maintenance
-- full Google Places integration
-- broader Raise Local Phase 2 discovery/matching features
 - ongoing hosting/API costs after handoff
 
 ### Completed Features
@@ -177,7 +175,7 @@ Primary repo documentation starts here:
 
 ### Context
 
-The presentation and lookbook should describe the problem Verified Consulting brought to the project: making PR, coaching, reporting, and partnership work more visible and easier to act on. The PR Platform is the immediate workflow solution, while Raise Local is a related but separate platform direction.
+The presentation and lookbook should describe the problem Verified Consulting brought to the project: making PR, coaching, reporting, and client visibility more organized and easier to act on. The PR Platform is the handoff focus for this document.
 
 ## 6. Credentials, Access, And Cost Safety
 
@@ -256,10 +254,6 @@ Workaround: Add owner-controlled API keys to backend environment variables and t
 **Limitation: Demo workflows are not production accounts.**  
 Impact: Demo workflows are useful for walkthroughs but should not be treated as real client access.  
 Workaround: Use Supabase Auth accounts and the real invite/password setup flow for production testing.
-
-**Limitation: Google Places integration is Phase 2.**  
-Impact: Public business discovery for Raise Local / Grove Park demo is not part of this PR Platform handoff.  
-Workaround: Use manually curated potential businesses for the Grove Park presentation and scope Google Places as a future build.
 
 ### Recommended Next Steps
 

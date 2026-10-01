@@ -166,7 +166,6 @@ Known limitations at handoff:
 - Provider-backed AI/search features require configured API keys in the owner API environment.
 - Deployed production URLs must be added after Render services are created.
 - Demo workflows are still available for rehearsal, but real handoff testing should use Supabase Auth accounts.
-- Google Places / broader Raise Local public business discovery is Phase 2 and not part of this PR Platform handoff.
 
 ## 8. Recommended Next Steps
 
