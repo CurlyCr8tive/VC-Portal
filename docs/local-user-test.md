@@ -42,7 +42,7 @@ npm run test:local-user-flow
 
 This checks:
 
-- static login page responds
+- login page responds
 - owner API health
 - client API health
 - Supabase connection

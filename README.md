@@ -8,14 +8,23 @@ summaries, AVE estimates) should be calibrated against her real case-study
 voice and numbers, not generic PR boilerplate — see `docs/agent-notes.md`
 for the reference data and specifics.
 
+## Handoff Docs
+
+Start with:
+
+- [Handoff Index](docs/handoff-index-2026-10-01.md)
+- [Render Deployment Checklist](docs/render-deployment-checklist.md)
+- [Technical Handoff](docs/technical-handoff.md)
+
 ## Build Shape
 
 This repo is intentionally lightweight:
 
-- Static browser pages live at the repo root and import ES modules from `src/`.
+- Browser pages live at the repo root and import ES modules from `src/`.
 - The owner API lives in `server/owner-api`.
 - The client API lives in `server/client-api`.
-- There is no bundler step yet; the current "build" check is syntax + package sanity.
+- The deploy build copies browser-safe files into `dist` with `npm run build:frontend`.
+- The current "check" command is syntax + package sanity.
 
 ## Local Setup
 
@@ -31,28 +40,24 @@ Run the build check:
 npm run check
 ```
 
-Serve the static portal:
+Run the local browser frontend and both APIs:
 
 ```sh
-npm run serve:static
+npm run start:local
 ```
 
 Then open:
 
 - `http://localhost:8420/login.html`
-- `http://localhost:8420/owner.html`
-- `http://localhost:8420/client.html`
 
-Run the APIs in separate terminals when you need real Supabase-backed routes:
+The APIs expose `/health`, but protected routes require each service to have a
+`.env` copied from its `.env.example` with real Supabase values.
+
+Build the deployable browser frontend:
 
 ```sh
-npm run start:owner-api
-npm run start:client-api
+npm run build:frontend
 ```
-
-The APIs start without Supabase credentials and expose `/health`, but protected
-routes return `503` until each service has a `.env` copied from its
-`.env.example` with real Supabase values.
 
 Live-only features such as client invites, Discovery scans, AI writing
 helpers, AVE rate research, Google Workspace, and live saves have their own

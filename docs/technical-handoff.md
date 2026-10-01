@@ -2,7 +2,7 @@
 
 _Verified Consulting PR Platform_
 
-_Last updated: September 20, 2026._
+_Last updated: October 1, 2026._
 
 ## Repository
 
@@ -18,17 +18,11 @@ Local project path:
 /Users/chericeheron/Desktop/VC Dashboard
 ```
 
-Current pushed checkpoint:
+Current handoff index:
 
 ```text
-06ae457 Polish demo flows and coaching request path
+docs/handoff-index-2026-10-01.md
 ```
-
-Current uncommitted documentation/deployment-prep changes after the Sep 20 meeting may include:
-
-- refreshed handoff docs
-- `vercel.json`
-- API URL globals in `src/supabaseConfig.js`
 
 ## Project Shape
 
@@ -38,6 +32,7 @@ Current uncommitted documentation/deployment-prep changes after the Sep 20 meeti
 - Owner API: `server/owner-api`, default local port `4001`
 - Client API: `server/client-api`, default local port `4002`
 - Browser frontend server: `npm run serve:frontend`, default local port `8420`
+- Browser deploy build: `npm run build:frontend`
 - Build/health check: `npm run check`
 
 The app intentionally keeps local demo fallbacks. Do not remove localStorage/demo fallback paths while wiring production features.
@@ -50,21 +45,17 @@ From the repo root:
 cd "/Users/chericeheron/Desktop/VC Dashboard"
 ```
 
-Run the browser frontend:
+Run the full local stack:
+
+```sh
+npm run start:local
+```
+
+Alternative individual commands:
 
 ```sh
 npm run serve:frontend
-```
-
-Run the owner API:
-
-```sh
 npm run start:owner-api
-```
-
-Run the client API:
-
-```sh
 npm run start:client-api
 ```
 
@@ -74,9 +65,9 @@ Run checks:
 npm run check
 ```
 
-If a port is already in use, it usually means that service is already running:
+If a port is already in use, `npm run start:local` checks health and reuses already-running services:
 
-- static frontend: `8420`
+- browser frontend: `8420`
 - owner API: `4001`
 - client API: `4002`
 
@@ -103,46 +94,39 @@ The PR Platform demo should focus on:
 
 Do not center the demo on lead time. Lead time is present with demo/mock data, but full Gmail/Calendar auth is post-demo.
 
-## Deployment Plan From Sep 20 Meeting
+## Deployment Plan
 
 PR Platform target:
 
-- Deploy the browser frontend to Vercel free tier.
-- Keep demo logins for demo/testing only.
-- Replace demo access with official owner/client account creation after deployment.
+- Deploy the browser frontend, owner API, and client API through Render Blueprint.
+- Keep demo/preview links separate from real owner/client login testing.
 - Use Supabase for auth/data.
+- Use real owner/admin/client accounts for deployed QA.
 
 Important technical note:
 
-- Vercel can host the browser HTML/CSS/JS frontend as-is.
-- The current owner/client APIs are Express servers, not Vercel serverless functions.
-- For full live functionality, deploy `server/owner-api` and `server/client-api` to a backend host such as Render, Railway, Fly, or convert them to Vercel serverless functions.
-- After the API deployment, update `config.js`:
-  - `window.OWNER_API_BASE_URL`
-  - `window.CLIENT_API_BASE_URL`
-- Also update `APP_BASE_URL` in API environment variables to the deployed Vercel frontend URL.
+- `render.yaml` defines all three services.
+- The frontend build writes browser-safe files to `dist`.
+- Frontend public env vars are converted into `dist/config.js` during `npm run build:frontend`.
+- Backend secrets live only in Render env vars.
 
-A frontend-only Vercel deployment can still show demo-mode pages, but live owner/client saves, agents, invites, messages, and files need the owner/client APIs reachable.
+Use [Render Deployment Checklist](render-deployment-checklist.md) for exact steps.
 
 ## Deployment Readiness Checklist
 
 1. Push latest repo changes to GitHub.
-2. Create/import the project in Vercel from `CurlyCr8tive/VC-Portal`.
-3. Framework preset: Other/static.
-4. Build command: leave empty or use `echo static`.
-5. Output directory: repo root.
-6. Confirm `owner.html`, `client.html`, `login.html`, and `index.html` load.
-7. Deploy owner API.
-8. Deploy client API.
-9. Update `config.js` API base URLs to deployed API origins.
-10. Set owner/client API env vars.
-11. Set API `APP_BASE_URL` to deployed Vercel frontend origin.
-12. Test real owner login.
-13. Test real client login.
-14. Test Reports workflow.
-15. Test message/coaching request flow.
-16. Test Canva CSV export.
-17. Keep Google/Gmail/Calendar deferred unless there is time after core demo is stable.
+2. Create Render Blueprint from `CurlyCr8tive/VC-Portal`.
+3. Confirm Render detects `render.yaml`.
+4. Add frontend public env vars.
+5. Add owner API env vars.
+6. Add client API env vars.
+7. Redeploy owner API, client API, then frontend.
+8. Confirm both API `/health` endpoints.
+9. Test real owner/admin login.
+10. Test Greyz Bistro pilot invite to `TheEsmereldaCo@gmail.com`.
+11. Test pilot client password setup and login.
+12. Test Reports, Coaching, notes/messages, file flows, and CTA feedback.
+13. Configure Gmail OAuth notifications or mark them Phase 2.
 
 ## Supabase
 
@@ -180,9 +164,9 @@ Do not commit real passwords or service-role keys into the repo. Share them in a
 | Supabase anon key | Browser auth | `src/supabaseConfig.js` | Public anon key, protected by RLS |
 | Supabase service-role key | Server database access | API host env vars only | Private; never expose in frontend |
 | GitHub repo | Source/version control | GitHub | `https://github.com/CurlyCr8tive/VC-Portal.git` |
-| PR Platform Vercel URL | Static frontend | Vercel | Fill after deploy |
-| Owner API URL | Owner backend | API host | Fill after deploy |
-| Client API URL | Client backend | API host | Fill after deploy |
+| PR Platform frontend URL | Browser frontend | Render `vc-portal-frontend` | Fill after deploy |
+| Owner API URL | Owner backend | Render `vc-portal-owner-api` | Fill after deploy |
+| Client API URL | Client backend | Render `vc-portal-client-api` | Fill after deploy |
 | Demo password | Demo/testing only | Private handoff note | Current meeting note says `Testing123`; replace with official accounts post-deploy |
 | LLM API keys | AI drafting/discovery helpers | API host env vars | Use Tenyse-owned keys when possible |
 
@@ -259,7 +243,7 @@ Post-demo:
 
 - Gmail/Calendar-based lead-time tracking
 - production Google email notifications
-- deployed static frontend/API hosting
+- deployed Render browser frontend/API hosting
 - CORS locked to deployed origin
 - final file storage policies
 - production user onboarding and password reset flow

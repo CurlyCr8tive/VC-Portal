@@ -2,7 +2,7 @@
 
 _Verified Consulting PR Platform + Raise Local demo handoff_
 
-_Last updated: September 20, 2026._
+_Last updated: October 1, 2026._
 
 ## What This Build Is For
 
@@ -20,7 +20,7 @@ Raise Local is the next evolution: a relationship-building platform for matching
 
 ## Demo Links
 
-Use these local links when the static server is running. Replace them with the deployed URLs after the PR Platform is live on Vercel:
+Use these local links when the local browser frontend is running. Replace them with the deployed Render frontend URL after the PR Platform is live:
 
 - Owner PR Platform: `http://127.0.0.1:8420/owner.html?demo=owner&recording=pr-platform`
 - Greyz Bistro coaching client: `http://127.0.0.1:8420/client.html?demo=greyz-bistro&view=coaching&recording=pr-platform`
@@ -39,7 +39,7 @@ Use this chart as the handoff tracker. Fill the final live credentials in after 
 | PR Platform client demos | Client preview accounts | Demo previews from the login page; demo password currently `Testing123` if using the login form | Clients should create official logins after live deployment |
 | Supabase | Database/auth backend | Tenyse has the Supabase login; credentials should be shared privately | Keep service-role keys private; do not put them in frontend files |
 | GitHub repo | Full source code and version history | `https://github.com/CurlyCr8tive/VC-Portal.git` | Future CTO/developer can download, clone, or continue from this repo |
-| PR Platform deployed URL | Live website | To be added after Vercel deployment | Use this for handoff once deployment is complete |
+| PR Platform deployed URL | Live website | To be added after Render deployment | Use this for handoff once deployment is complete |
 | Owner API URL | Live owner backend | To be added after API deployment | Needed for real owner login, reports, agents, invites, messages |
 | Client API URL | Live client backend | To be added after API deployment | Needed for real client portal saves/messages/files |
 
