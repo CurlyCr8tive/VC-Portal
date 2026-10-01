@@ -12,7 +12,7 @@ Use this document as the copy source for the final Google Doc and the handoff em
 **CC:** `devika@pursuit.org`, `avni@pursuit.org`, `gregh@pursuit.org`, `stefano@pursuit.org`  
 **Optional CC:** Jessica, if she should receive the technical handoff email directly.
 
-**Subject:** Pursuit Capstone Project Handoff: Verified Consulting PR Platform
+**Subject:** Google SMB Project Handoff: Verified Consulting PR Platform
 
 Hi Tenyse and team,
 
@@ -195,4 +195,3 @@ Suggested share set:
 - `docs/cta-link-qa-protocol.md`
 
 Technical documents such as service-role keys, OAuth secrets, API keys, and private passwords should not be pasted into the shared handoff document.
-

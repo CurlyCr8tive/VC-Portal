@@ -1,4 +1,4 @@
-# L3 Capstone Handoff Sheet
+# Google SMB Handoff Sheet
 
 _Project: Verified Consulting PR Platform_
 
@@ -288,4 +288,3 @@ For live data export/deletion:
 - use Supabase table exports
 - use app-level CSV exports where available
 - have a developer run scoped deletion scripts only after confirming the target records
-
