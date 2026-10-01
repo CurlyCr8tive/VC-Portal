@@ -7,7 +7,7 @@
   <meta http-equiv="Expires" content="0" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Verified Consulting — Log In</title>
-  <link rel="stylesheet" href="portal-styles.css?v=20260918-clarify-login" />
+  <link rel="stylesheet" href="portal-styles.css?v=20261001-handoff-login" />
 </head>
 <body>
   <div class="login-shell">
@@ -33,29 +33,44 @@
         <button type="submit" class="btn-primary">Log In</button>
       </form>
 
-      <div class="demo-accounts" id="real-accounts-wrap" style="display:none; background:#eafaf6; border:1px solid #bfe8dc; border-radius:var(--radius-md); padding:12px 14px;">
-        <p style="margin:0 0 6px; font-weight:700; color:#146c56;">✓ This is your real login.</p>
-        <p style="margin:0;">Click your email below to fill it in, then type your real password above and click Log In:</p>
+      <div class="real-login-panel" id="real-accounts-wrap" style="display:none;">
+        <p class="panel-kicker">Real Supabase login</p>
+        <p>Click an approved account to fill the email, then type the temporary or permanent password assigned in Supabase Auth.</p>
         <ul id="real-account-list"></ul>
       </div>
 
-      <div class="demo-accounts" style="margin-top:14px;">
-        <p style="font-weight:700; color:#8a5a12;">Demo preview links</p>
-        <p style="margin-top:-4px;">Use these for a quick walkthrough without a password. Use the form above for the live account.</p>
-        <ul id="demo-account-list">
-          <li><a class="demo-login-link" href="owner.html?demo=owner&preview=1&v=20260916-direct-login-3" data-email="tenyse@verifiedconsulting.com">Preview only — Owner view (no login)</a></li>
-          <li><a class="demo-login-link" href="client.html?demo=greyz-bistro&preview=1&view=coaching&v=20260917-coaching-entry-1" data-email="hello@greyzbistro.com">Preview only — Greyz Bistro client view</a></li>
-          <li><a class="demo-login-link" href="client.html?demo=veganhood&preview=1&v=20260916-direct-login-3" data-email="hello@veganhood.com">Preview only — VeganHood client view</a></li>
-          <li><a class="demo-login-link" href="client.html?demo=vegan-dining-month&preview=1&v=20260916-direct-login-3" data-email="hello@vegandiningmonth.com">Preview only — Vegan Dining Month client view</a></li>
-          <li><a class="demo-login-link" href="client.html?demo=snap-co&preview=1&v=20260916-direct-login-3" data-email="hello@snapco.com">Preview only — SNAP Co. client view</a></li>
-          <li><a class="demo-login-link" href="client.html?demo=sunny-sparkling&preview=1&v=20260916-direct-login-3" data-email="hello@sunnysparkling.com">Preview only — Sunny Sparkling Co. client view</a></li>
-        </ul>
+      <div class="demo-accounts">
+        <div class="demo-preview-header">
+          <div>
+            <p class="panel-kicker">Demo workflows</p>
+            <p>Use these password-free preview flows for handoff walkthroughs. They are separate from real live accounts.</p>
+          </div>
+          <button type="button" class="btn-secondary demo-reset-button" id="reset-demo-data">Reset demo data</button>
+        </div>
+        <p class="demo-reset-status" id="reset-demo-status" role="status" aria-live="polite"></p>
+        <div class="demo-workflow-grid" id="demo-account-list">
+          <a class="demo-workflow-card" href="owner.html?demo=owner&preview=1&v=20261001-handoff-login" data-email="tenyse@verifiedconsulting.com">
+            <span>Owner/Admin Demo</span>
+            <strong>Tenyse dashboard workflow</strong>
+            <small>Review clients, campaigns, reports, coaching, and invite actions in preview mode.</small>
+          </a>
+          <a class="demo-workflow-card" href="client.html?demo=veganhood&preview=1&v=20261001-handoff-login" data-email="hello@veganhood.com">
+            <span>PR Client Demo</span>
+            <strong>Client PR portal workflow</strong>
+            <small>Open a client view with campaign progress, placements, reports, files, and notes.</small>
+          </a>
+          <a class="demo-workflow-card" href="client.html?demo=greyz-bistro&preview=1&view=coaching&v=20261001-handoff-login" data-email="hello@greyzbistro.com">
+            <span>Coaching Client Demo</span>
+            <strong>Greyz Bistro coaching workflow</strong>
+            <small>Open the client-side coaching program with phases, homework, calls, and resources.</small>
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="config.js"></script>
   <script src="src/supabaseConfig.js"></script>
-  <script type="module" src="src/loginApp.js?v=20260922-preview-switch"></script>
+  <script type="module" src="src/loginApp.js?v=20261001-handoff-login"></script>
 </body>
 </html>

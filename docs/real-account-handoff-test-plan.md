@@ -42,6 +42,14 @@ Use the provisioning script in dry-run mode first. It reads `server/owner-api/.e
 - one internal `pr_client` test account tied to an existing client row
 - one pilot invite target to send through the live owner portal
 
+Required owner/admin emails for this handoff pass:
+
+- `tenyse@verifiedconsulting.com` — owner/admin
+- `jessicadorismond@gmail.com` — admin/developer tester, if she is testing owner flows
+- `cjerice.heron@pursuit.org` — admin/developer tester
+
+The login page lists these as real Supabase sign-in choices, but it does not store passwords in frontend code. Temporary passwords must be created in Supabase Auth or through the owner password utility and shared privately.
+
 Dry run:
 
 ```bash
@@ -68,6 +76,17 @@ npm run auth:provision-test-accounts -- \
 ```
 
 The pilot client invite should still be sent from the owner portal using `Invite Client`. That tests the real invite email, password setup page, Supabase Auth metadata trigger, and `profiles.role = pr_client` / `profiles.client_id` wiring end to end.
+
+To create or reset a single owner/admin account without touching the other accounts:
+
+```bash
+npm run auth:set-owner-password -- \
+  --email "cjerice.heron@pursuit.org" \
+  --password "<temporary password shared privately>" \
+  --name "Cherice Heron"
+```
+
+This command creates the Supabase Auth user if it does not already exist, confirms the email, and upserts `profiles.role = owner`.
 
 ### 2. Create Or Confirm Tenyse's Owner Account
 

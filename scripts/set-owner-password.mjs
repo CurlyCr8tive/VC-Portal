@@ -1,8 +1,9 @@
 // scripts/set-owner-password.mjs
 //
-// Reset one owner Auth user's password via Supabase Admin API and ensure the
-// matching profiles row has owner access. This bypasses email reset links for
-// local/demo-day administration without printing service-role credentials.
+// Create or reset one owner/admin Auth user's password via Supabase Admin API
+// and ensure the matching profiles row has owner access. This bypasses email
+// reset links for local/handoff administration without printing service-role
+// credentials.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -81,22 +82,38 @@ async function rest(pathSuffix, { method = "GET", body, prefer } = {}) {
   return parsed;
 }
 
-const users = await admin("/users?page=1&per_page=1000");
-const user = users.users?.find((candidate) => candidate.email?.toLowerCase() === email);
-
-if (!user) {
-  console.error(`No Supabase Auth user found for ${email}.`);
-  process.exit(1);
+async function listUsers() {
+  const users = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const result = await admin(`/users?page=${page}&per_page=1000`);
+    const chunk = result.users || [];
+    users.push(...chunk);
+    if (chunk.length < 1000) break;
+  }
+  return users;
 }
 
-await admin(`/users/${user.id}`, {
-  method: "PUT",
-  body: {
-    password,
-    email_confirm: true,
-    user_metadata: { ...(user.user_metadata || {}), name, email_verified: true },
-  },
-});
+const users = await listUsers();
+const existingUser = users.find((candidate) => candidate.email?.toLowerCase() === email);
+const userMetadata = { ...(existingUser?.user_metadata || {}), name, role: "owner", email_verified: true };
+const user = existingUser
+  ? await admin(`/users/${existingUser.id}`, {
+      method: "PUT",
+      body: {
+        password,
+        email_confirm: true,
+        user_metadata: userMetadata,
+      },
+    })
+  : await admin("/users", {
+      method: "POST",
+      body: {
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: userMetadata,
+      },
+    });
 
 await rest("profiles", {
   method: "POST",
@@ -104,4 +121,4 @@ await rest("profiles", {
   prefer: "resolution=merge-duplicates,return=minimal",
 });
 
-console.log(`Password reset and owner profile verified for ${email}.`);
+console.log(`${existingUser ? "Password reset" : "Owner user created"} and owner profile verified for ${email}.`);

@@ -22,6 +22,7 @@ Raise Local is the next evolution: a relationship-building platform for matching
 
 Use these local links when the local browser frontend is running. Replace them with the deployed Render frontend URL after the PR Platform is live:
 
+- Login / handoff start page: `http://127.0.0.1:8420/login.html`
 - Owner PR Platform: `http://127.0.0.1:8420/owner.html?demo=owner&recording=pr-platform`
 - Greyz Bistro coaching client: `http://127.0.0.1:8420/client.html?demo=greyz-bistro&view=coaching&recording=pr-platform`
 - PR-only client preview: use VeganHood, SNAP Co., or another PR-only client preview from the login page.
@@ -29,14 +30,25 @@ Use these local links when the local browser frontend is running. Replace them w
 
 Do not show real login credentials during a recording or live presentation. Share production credentials separately and privately.
 
+The login page now includes three explicit demo workflow buttons:
+
+- Owner/Admin Demo
+- PR Client Demo
+- Coaching Client Demo
+
+It also includes a `Reset demo data` button. Use that button before a rehearsal if the browser has old local preview edits, uploaded files, notes, report drafts, or seeded demo state.
+
 ## Access And Credentials Chart
 
 Use this chart as the handoff tracker. Fill the final live credentials in after deployment and official account creation.
 
 | Item | What It Is | Current / Demo Access | Final Handoff Note |
 | --- | --- | --- | --- |
-| PR Platform owner demo | Tenyse owner preview | `owner.html?demo=owner`; demo password currently `Testing123` if using the login form | Replace with Tenyse's official live account after deployment |
-| PR Platform client demos | Client preview accounts | Demo previews from the login page; demo password currently `Testing123` if using the login form | Clients should create official logins after live deployment |
+| Tenyse PR Platform account | Owner/admin live Supabase login | `tenyse@verifiedconsulting.com`; password must be shared privately | Must have `profiles.role = owner` and no `client_id` |
+| Jessica PR Platform account | Admin/developer live Supabase login | `jessicadorismond@gmail.com`; temporary password must be shared privately | Must have `profiles.role = owner` and no `client_id` if she is testing owner/admin flows |
+| Cherice PR Platform account | Admin/developer live Supabase login | `cjerice.heron@pursuit.org`; temporary password set by developer handoff command | Must have `profiles.role = owner` and no `client_id` |
+| PR Platform owner demo | Tenyse owner preview | Login page `Owner/Admin Demo` workflow | Preview only; use live account for production testing |
+| PR Platform client demos | PR and coaching client previews | Login page `PR Client Demo` and `Coaching Client Demo` workflows | Clients should create official logins after live deployment |
 | Supabase | Database/auth backend | Tenyse has the Supabase login; credentials should be shared privately | Keep service-role keys private; do not put them in frontend files |
 | GitHub repo | Full source code and version history | `https://github.com/CurlyCr8tive/VC-Portal.git` | Future CTO/developer can download, clone, or continue from this repo |
 | PR Platform deployed URL | Live website | To be added after Render deployment | Use this for handoff once deployment is complete |

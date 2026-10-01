@@ -10,13 +10,15 @@ import { isRealAuthConfigured, signInReal } from "./supabaseAuthClient.js";
 // Supabase Auth; the button only fills the email to avoid steering users
 // toward stale temp accounts during a walkthrough.
 const REAL_ACCOUNTS = [
-  { email: "tenyse@verifiedconsulting.com", label: "owner" },
+  { email: "tenyse@verifiedconsulting.com", label: "Owner/Admin" },
+  { email: "jessicadorismond@gmail.com", label: "Admin/Developer" },
+  { email: "cjerice.heron@pursuit.org", label: "Admin/Developer" },
 ];
 
 if (isRealAuthConfigured()) {
   document.getElementById("real-accounts-wrap").style.display = "block";
   document.getElementById("real-account-list").innerHTML = REAL_ACCOUNTS.map(
-    (a) => `<li><button type="button" data-real-email="${a.email}">${a.email}</button> — ${a.label}</li>`
+    (a) => `<li><button type="button" data-real-email="${a.email}">${a.email}</button><span>${a.label}</span></li>`
   ).join("");
   document.querySelectorAll("[data-real-email]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -47,6 +49,35 @@ listEl.addEventListener("click", (event) => {
   if (!btn) return;
   selectDemoAccount(btn.dataset.email);
 });
+
+const resetDemoBtn = document.getElementById("reset-demo-data");
+const resetDemoStatus = document.getElementById("reset-demo-status");
+
+function resetDemoData() {
+  let removed = 0;
+  for (const storage of [window.localStorage, window.sessionStorage].filter(Boolean)) {
+    const keys = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key?.startsWith("vc_")) keys.push(key);
+    }
+    keys.forEach((key) => {
+      storage.removeItem(key);
+      removed += 1;
+    });
+  }
+
+  selectedDemoEmail = "";
+  document.getElementById("email").value = "";
+  document.getElementById("password").value = "";
+  errorEl.classList.remove("visible");
+  resetDemoStatus.textContent = removed
+    ? `Demo data reset. Removed ${removed} saved preview item${removed === 1 ? "" : "s"} from this browser.`
+    : "Demo data is already clean in this browser.";
+  resetDemoStatus.classList.add("visible");
+}
+
+resetDemoBtn?.addEventListener("click", resetDemoData);
 
 const form = document.getElementById("login-form");
 const errorEl = document.getElementById("auth-error");

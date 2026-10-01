@@ -30,6 +30,12 @@ Open:
 http://localhost:8420/login.html
 ```
 
+The login page should show:
+
+- real Supabase login choices for `tenyse@verifiedconsulting.com`, `jessicadorismond@gmail.com`, and `cjerice.heron@pursuit.org`
+- `Owner/Admin Demo`, `PR Client Demo`, and `Coaching Client Demo` workflow buttons
+- a `Reset demo data` button that clears browser-local preview state before a rehearsal
+
 For local testing only, `APP_BASE_URL=http://localhost:8420` is correct because invite links need to return to the local setup page. Before deployment, replace it with the deployed frontend URL.
 
 ## Automated Local Check
@@ -57,6 +63,21 @@ OWNER_TEST_PASSWORD="<owner password>" \
 CLIENT_TEST_EMAIL="<test client email>" \
 CLIENT_TEST_PASSWORD="<client password>" \
 npm run test:local-user-flow
+```
+
+For the Cherice admin/developer test account, the requested handoff email is:
+
+```text
+cjerice.heron@pursuit.org
+```
+
+The password should be set privately through Supabase Auth or:
+
+```bash
+npm run auth:set-owner-password -- \
+  --email "cjerice.heron@pursuit.org" \
+  --password "<temporary password shared privately>" \
+  --name "Cherice Heron"
 ```
 
 To send one real pilot invite from localhost:

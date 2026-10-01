@@ -6423,7 +6423,7 @@ body:has(#owner-header) .avatar {
 
 .login-card {
   width: 100%;
-  max-width: 380px;
+  max-width: 720px;
   background: var(--card-bg);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
@@ -6480,6 +6480,68 @@ body:has(#owner-header) .avatar {
   margin-top: 4px;
 }
 
+.real-login-panel {
+  margin-top: 18px;
+  background: #eafaf6;
+  border: 1px solid #bfe8dc;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.real-login-panel .panel-kicker,
+.demo-accounts .panel-kicker {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-coral);
+}
+
+.real-login-panel p {
+  margin: 0 0 10px;
+}
+
+.real-login-panel ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.real-login-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(20, 108, 86, 0.18);
+  border-radius: var(--radius-sm);
+}
+
+.real-login-panel button {
+  appearance: none;
+  background: none;
+  border: none;
+  color: var(--color-navy);
+  font: inherit;
+  font-weight: 800;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.real-login-panel span {
+  color: #146c56;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .auth-error {
   background: #fdeceb;
   color: #a13d2b;
@@ -6499,40 +6561,115 @@ body:has(#owner-header) .avatar {
   margin-top: 22px;
   padding-top: 18px;
   border-top: 1px dashed var(--border-light);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
 }
 
 .demo-accounts p {
-  margin: 0 0 8px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.demo-accounts ul {
   margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.demo-accounts li {
-  padding: 4px 0;
+.demo-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
 }
 
-.demo-accounts button {
-  background: none;
-  border: none;
-  color: var(--color-navy);
-  text-decoration: underline;
-  padding: 0;
-  font-size: 0.78rem;
+.demo-preview-header p:not(.panel-kicker) {
+  max-width: 440px;
 }
 
-.demo-login-link {
-  color: var(--color-navy);
-  font-size: 0.78rem;
+.demo-reset-button {
+  flex: 0 0 auto;
+  min-height: 40px;
+}
+
+.demo-reset-status {
+  display: none;
+  margin: 0 0 12px !important;
+  padding: 9px 11px;
+  border: 1px solid #bfe8dc;
+  border-radius: var(--radius-sm);
+  background: #eafaf6;
+  color: #146c56;
   font-weight: 800;
-  text-decoration: underline;
+}
+
+.demo-reset-status.visible {
+  display: block;
+}
+
+.demo-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.demo-workflow-card {
+  display: flex;
+  min-height: 160px;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-navy);
+  text-decoration: none;
+  box-shadow: var(--shadow-subtle);
+}
+
+.demo-workflow-card:hover,
+.demo-workflow-card:focus-visible {
+  border-color: var(--color-coral);
+  box-shadow: 0 0 0 3px rgba(238, 106, 86, 0.14), var(--shadow-subtle);
+  outline: none;
+}
+
+.demo-workflow-card span {
+  color: var(--color-coral);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.demo-workflow-card strong {
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.demo-workflow-card small {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 760px) {
+  .login-card {
+    max-width: 440px;
+  }
+
+  .real-login-panel li,
+  .demo-preview-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .real-login-panel span {
+    white-space: normal;
+  }
+
+  .demo-workflow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .demo-workflow-card {
+    min-height: auto;
+  }
 }
 
 /* ---------- Entry forms (e.g. owner-side Add Placement) ---------- */
