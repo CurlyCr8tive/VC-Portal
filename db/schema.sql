@@ -31,10 +31,8 @@ create table profiles (
   role text not null check (role in ('owner', 'pr_client', 'coaching_mentee')),
   name text not null,
   email text not null unique,
-  -- Only set when role = 'pr_client'. The invite trigger below fills this
-  -- from auth.users.raw_user_meta_data.client_id when Tenyse invites a
-  -- client through the owner portal; Express still rejects pr_client
-  -- sessions with no assigned client_id as a final guard.
+  -- Assigned by the owner API on invite or from trusted app metadata.
+  -- Express rejects pr_client sessions without an assigned client_id.
   -- No inline `references clients(id)` here on purpose — clients doesn't
   -- exist yet at this point in the script (profiles/clients reference each
   -- other both ways: clients.created_by -> profiles, profiles.client_id ->
@@ -205,8 +203,8 @@ create table placements (
 -- placements always includes `notes` regardless of notes_shareable. This
 -- view nulls it out itself when notes_shareable is false. server/client-api
 -- (and any other pr_client-facing read) should query this view, not the
--- base table, for placements. Owner-side reads still use the base table
--- directly — this restriction is client-facing only.
+-- base table, for placements. The client API must also scope every query
+-- to the verified profile's client_id. Neither relation is browser-readable.
 -- ---------------------------------------------------------------------------
 create view placements_for_client as
 select
@@ -217,6 +215,11 @@ select
   case when notes_shareable then notes else null end as notes,
   notes_shareable, source, created_at, created_by
 from placements;
+
+revoke all privileges on table public.placements, public.placements_for_client
+  from public, anon, authenticated;
+grant select, insert, update, delete on table public.placements to service_role;
+grant select on table public.placements_for_client to service_role;
 
 -- ---------------------------------------------------------------------------
 -- outlet_rates — Agent 2's (AVE Calculation) seed/lookup table.
@@ -495,17 +498,13 @@ create table errors (
 -- build (src/auth.js says this outright: "do not treat requireSession()
 -- passing as proof that access control works"). The Express APIs
 -- (server/owner-api, server/client-api) check role/client_id in app code
--- too, using the service-role key — that's a UX-friendly 403 with a message,
--- not the actual security boundary. RLS below is what holds even if an
--- Express route has a bug, since Supabase enforces it at the database
--- connection level for any non-service-role key.
+-- too. The service-role key bypasses RLS, so the APIs must enforce client
+-- scoping independently. RLS below protects direct non-service-role access.
 --
 -- One thing RLS can't do: hide a single COLUMN (e.g. placements.notes when
 -- notes_shareable = false) while still exposing the rest of that row — RLS
--- filters rows, not columns. If per-column visibility is still wanted once
--- this is live, that needs a view (e.g. a `placements_for_client` view that
--- omits/nulls the notes column) or Postgres column-level GRANTs, not RLS.
--- Not built here — flagging so it isn't assumed to already work.
+-- filters rows, not columns. The API-only placements_for_client view masks
+-- notes before they are returned to the client.
 -- =============================================================================
 
 -- is_owner() — SECURITY DEFINER helper, fixes the RLS recursion bug found

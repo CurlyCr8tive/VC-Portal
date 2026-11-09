@@ -163,3 +163,21 @@ earlier profile read are not database-admin access. Have a project admin apply
 the specific trusted-profile migration, or provide project access through
 Supabase, before releasing the coordinated update. Do not share database
 passwords or provider tokens in chat.
+
+## Follow-Up: Two-Client Isolation Gate
+
+The placements view can bypass row-level security when browser roles have
+direct SELECT access. The base table can also expose private notes on the
+client's own rows. The placement-browser-access migration revokes direct
+browser access to both relations and preserves service-role API access.
+The updated client API still scopes its view query to the authenticated
+profile's client ID and masks private notes.
+
+Both migrations ran successfully on a disposable PostgreSQL 15 instance.
+The fixture exercised two authenticated identities, owner-metadata forgery,
+draft report privacy, placement grants, and API-side note masking. This is
+not proof of live Supabase Auth, deployed API isolation, or email delivery.
+
+Apply both migrations before the coordinated deploy. Keep real client
+invitations on hold until the [two-client release gate](real-account-handoff-test-plan.md)
+passes. Check Gmail and Calendar separately afterward.

@@ -4,6 +4,32 @@ Use this plan to move the PR platform from mock/demo proof to real accounts, rea
 
 Scope note: this plan applies to the PR platform / VC Portal only. Raise Local account setup, nonprofit/business matching, Grove Park demo prep, and Google Places work are separate.
 
+## Release Gate: Two Separate Client Accounts
+
+Keep all real client invitations on hold until this gate passes. The older
+single-client handoff examples below are not sufficient for this release.
+
+1. A Supabase project admin applies the trusted-profile and placement-browser-access
+   migrations. Verify the trigger trusts app metadata and `anon`/`authenticated`
+   lack direct access to `placements` and `placements_for_client`.
+2. Deploy both updated APIs and the VC frontend. Confirm their origins, CORS,
+   Supabase Auth redirect allowlist, deployed commit, and production auth flags.
+3. Use two designated test inboxes and two separate client records with synthetic
+   campaigns and reports. From the owner portal, invite each test account. Each
+   tester opens their own link, sets a password, signs out, and signs back in
+   using a separate browser session. Do not share passwords or invitation links.
+4. Confirm each account sees its own data. Try the other client's campaign and
+   related records through the client API and direct Supabase requests using
+   each tester's session. Both directions must return no other-client data;
+   private placement notes, draft reports, and owner routes must remain blocked.
+5. After access passes, test Gmail with a note from a test account and confirm
+   receipt in the designated test inbox. Separately create a test-only Calendar
+   event with no real client guests and verify the calendar, time zone, and time.
+
+For an isolated database regression before production, run
+`bash scripts/test-db-isolation.sh` with PostgreSQL server binaries first on
+`PATH`. This does not exercise live Auth, delivery, or the deployed APIs.
+
 ## Core Rule
 
 Do not convert mock accounts into production accounts.
