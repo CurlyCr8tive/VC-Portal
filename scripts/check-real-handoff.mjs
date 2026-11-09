@@ -4,6 +4,8 @@ import { join } from "node:path";
 const root = process.cwd();
 const checks = [];
 
+console.log("Scope: local configuration files and their configured health URLs. Hosted environment variables and authenticated workflows are not verified by this check.");
+
 function add(status, label, detail = "") {
   checks.push({ status, label, detail });
 }
@@ -95,15 +97,17 @@ add(gmailClient && gmailSecret && gmailRefresh && notifyTo ? "pass" : "warn", "R
 if (ownerApiBase) {
   const ownerHealth = await readHealth("Owner API", `${ownerApiBase.replace(/\/$/, "")}/health`);
   if (ownerHealth) {
-    add(ownerHealth.supabaseConnected ? "pass" : "fail", "Owner API Supabase connected", JSON.stringify(ownerHealth));
-    add(ownerHealth.localDemoAuthEnabled ? "fail" : "pass", "Owner API demo auth runtime", `localDemoAuthEnabled=${ownerHealth.localDemoAuthEnabled}`);
+    add(ownerHealth.service === "owner-api" ? "pass" : "fail", "Owner API service identity", ownerHealth.service === "owner-api" ? "owner-api" : "Unexpected or missing service identity.");
+    add(ownerHealth.supabaseConnected ? "pass" : "fail", "Owner API Supabase credentials configured", "Health reports configuration presence only; authenticated database access still needs testing.");
+    add(ownerHealth.localDemoAuthEnabled === false ? "pass" : "fail", "Owner API demo auth runtime", ownerHealth.localDemoAuthEnabled === false ? "Explicitly disabled." : "Enabled or missing from health response; cannot verify the production guard.");
   }
 }
 
 if (clientApiBase) {
   const clientHealth = await readHealth("Client API", `${clientApiBase.replace(/\/$/, "")}/health`);
   if (clientHealth) {
-    add(clientHealth.supabaseConnected ? "pass" : "fail", "Client API Supabase connected", JSON.stringify(clientHealth));
+    add(clientHealth.service === "client-api" ? "pass" : "fail", "Client API service identity", clientHealth.service === "client-api" ? "client-api" : "Unexpected or missing service identity.");
+    add(clientHealth.supabaseConnected ? "pass" : "fail", "Client API Supabase credentials configured", "Health reports configuration presence only; authenticated database access still needs testing.");
     add(clientHealth.gmailNotificationsConfigured ? "pass" : "warn", "Client API Gmail runtime", `gmailNotificationsConfigured=${clientHealth.gmailNotificationsConfigured}`);
   }
 }

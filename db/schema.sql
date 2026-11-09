@@ -77,9 +77,9 @@ alter table clients add column notes text;
 -- ---------------------------------------------------------------------------
 -- Supabase Auth owns login/passwords. The app owns roles and client scoping
 -- in public.profiles. When Tenyse sends a client invite, owner-api includes
--- raw_user_meta_data: { role: "pr_client", client_id, client_name }. This
--- trigger turns that Auth user into the profile row the portal needs for
--- login/routing, while leaving users with no recognized app role untouched.
+-- display metadata with the invitation. The owner API provisions the profile
+-- explicitly. This trigger trusts only administrator-controlled app metadata;
+-- a public signup cannot grant itself a role or choose a client.
 create or replace function public.handle_new_app_user()
 returns trigger
 language plpgsql
@@ -87,8 +87,8 @@ security definer
 set search_path = public
 as $$
 declare
-  app_role text := new.raw_user_meta_data->>'role';
-  app_client_id uuid := nullif(new.raw_user_meta_data->>'client_id', '')::uuid;
+  app_role text := new.raw_app_meta_data->>'role';
+  app_client_id uuid := nullif(new.raw_app_meta_data->>'client_id', '')::uuid;
 begin
   if app_role is null or app_role not in ('owner', 'pr_client', 'coaching_mentee') then
     return new;

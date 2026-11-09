@@ -1,5 +1,17 @@
 # Live Feature Activation Plan
 
+## November 9, 2026 Review
+
+See `docs/pr-platform-readiness-2026-11-09.md` for current local checks,
+hosted probe results, pending migration, and account-owner actions. The
+September verification entries below are historical, not proof of today's
+hosted configuration. Local Google OAuth credentials remain incomplete.
+
+Client invitations now provision `profiles` explicitly through the authenticated
+owner API. Apply `db/migrations/2026-11-09-trusted-profile-provisioning.sql`
+to an existing database before new invitations. Signup roles/client IDs must
+come only from administrator-controlled app metadata, never user metadata.
+
 This build has two different states that must stay separate:
 
 - **Built / demoable:** the UI, local data flow, guardrails, and preview workflow exist.

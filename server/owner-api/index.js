@@ -1390,9 +1390,8 @@ app.get(
 // `clients` has no email column (see db/schema.sql) — nothing has ever
 // collected one, so the owner types the email in at invite time.
 // inviteUserByEmail creates the auth.users row and emails the invite link;
-// db/migrations/2026-08-31-auth-profile-trigger.sql turns that auth row's
-// metadata into the matching public.profiles row (role, client_id) that
-// login/routing requires.
+// this owner-gated handler provisions the matching public.profiles row.
+// The auth trigger must not grant roles from user-editable invite metadata.
 app.post(
   "/api/clients/:clientId/invite",
   ownerRoute(async (req, res) => {
@@ -1415,9 +1414,15 @@ app.post(
 
     // APP_BASE_URL is the deployed static frontend's origin — local dev
     // fallback matches the static server's actual port (see README/run docs).
-    const redirectTo = `${process.env.APP_BASE_URL || "http://localhost:8420"}/set-up-account.html`;
+    const appBase = process.env.APP_BASE_URL || (IS_PRODUCTION ? "" : "http://localhost:8420");
+    let inviteOrigin;
+    try { inviteOrigin = new URL(appBase); } catch {}
+    if (!inviteOrigin || (IS_PRODUCTION && (inviteOrigin.protocol !== "https:" || /^(localhost|127\.|\[::1\])/.test(inviteOrigin.hostname))) || inviteOrigin.username || inviteOrigin.password || inviteOrigin.pathname !== "/" || inviteOrigin.search || inviteOrigin.hash) {
+      return res.status(503).json({ error: "invite_redirect_not_configured", message: "Set APP_BASE_URL to the deployed frontend HTTPS origin before sending invitations." });
+    }
+    const redirectTo = `${inviteOrigin.origin}/set-up-account.html`;
 
-    const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
+    const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
       redirectTo,
       data: { client_id: client.id, client_name: client.name, role: "pr_client" },
     });
@@ -1430,6 +1435,26 @@ app.post(
         error_message: inviteError.message,
       });
       return res.status(502).json({ error: "invite_failed", message: inviteError.message });
+    }
+
+    // User-editable invite metadata is display context, never authorization.
+    // Only this authenticated owner route may assign the new client's scope.
+    if (!inviteData?.user?.id) {
+      return res.status(502).json({ error: "invite_profile_failed", message: "Invitation response did not include a user. Check Supabase Auth before retrying." });
+    }
+    const { error: profileError } = await supabase.from("profiles").upsert({
+      id: inviteData.user.id,
+      role: "pr_client",
+      client_id: client.id,
+      name: client.name,
+      email,
+    });
+    if (profileError) {
+      await supabase.from("client_invites").insert({
+        client_id: client.id, email, status: "failed", sent_by: req.profile.id,
+        error_message: "Invite email sent, but client profile provisioning failed.",
+      });
+      return res.status(502).json({ error: "invite_profile_failed", message: "The invite email was sent, but portal access could not be assigned. Ask the administrator to repair the client profile before using the link." });
     }
 
     await supabase.from("client_invites").insert({

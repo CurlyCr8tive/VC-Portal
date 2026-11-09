@@ -1,9 +1,8 @@
 -- Adds the Supabase Auth -> public.profiles bridge for client invites.
 --
 -- Safe to run more than once. Run in Supabase SQL Editor after db/schema.sql.
--- owner-api sends raw_user_meta_data with role/client_id/client_name when
--- Tenyse invites a client; this trigger creates the matching profile row the
--- login flow requires.
+-- Only administrator-controlled app metadata may establish authorization.
+-- Owner API invitations provision profiles explicitly after creating the user.
 
 create or replace function public.handle_new_app_user()
 returns trigger
@@ -12,8 +11,8 @@ security definer
 set search_path = public
 as $$
 declare
-  app_role text := new.raw_user_meta_data->>'role';
-  app_client_id uuid := nullif(new.raw_user_meta_data->>'client_id', '')::uuid;
+  app_role text := new.raw_app_meta_data->>'role';
+  app_client_id uuid := nullif(new.raw_app_meta_data->>'client_id', '')::uuid;
 begin
   if app_role is null or app_role not in ('owner', 'pr_client', 'coaching_mentee') then
     return new;

@@ -6,6 +6,11 @@ This is the source-of-truth index for today's PR Platform handoff. It separates 
 
 ## Handoff Status
 
+Current review: [November 9 PR Platform readiness](pr-platform-readiness-2026-11-09.md).
+This includes dependency fixes, observed hosted service mismatch, pending
+security migration, validation results, and account-owner actions. The dated
+handoff checklist below remains historical context.
+
 The build is **deploy-prepared**, not fully production-cleared until deployed QA is complete.
 
 Ready:

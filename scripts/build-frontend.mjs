@@ -33,6 +33,21 @@ const config = {
   CLIENT_API_BASE_URL: env("PUBLIC_CLIENT_API_BASE_URL", configValue(localConfig, "CLIENT_API_BASE_URL")),
 };
 
+// Local builds may use localhost; a Render artifact must have explicit live URLs.
+if (process.env.RENDER === "true") {
+  for (const key of ["SUPABASE_URL", "APP_BASE_URL", "OWNER_API_BASE_URL", "CLIENT_API_BASE_URL"]) {
+    const value = env(`PUBLIC_${key}`);
+    let url;
+    try { url = new URL(value); } catch {}
+    if (!url || url.protocol !== "https:" || /^(localhost|127\.|\[::1\])/.test(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error(`PUBLIC_${key} must be an explicit deployed HTTPS origin for Render builds.`);
+    }
+  }
+  if (!env("PUBLIC_SUPABASE_ANON_KEY")) {
+    throw new Error("PUBLIC_SUPABASE_ANON_KEY is required for Render builds.");
+  }
+}
+
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 

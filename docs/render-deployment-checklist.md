@@ -32,6 +32,7 @@ The repo includes `render.yaml` with:
 
 ```bash
 npm run check
+npm run test:api-security
 npm run build:frontend
 ```
 
@@ -62,6 +63,17 @@ In Render:
 2. Connect GitHub repo: `CurlyCr8tive/VC-Portal`.
 3. Render should detect `render.yaml`.
 4. Create all three services.
+
+Record the actual URLs shown in Render; service names do not guarantee their
+public hostnames. The services share one Blueprint but remain three services.
+Render frontend builds now require all five public variables. A first build
+may fail until the actual URLs are assigned; set the values and rebuild.
+Do not use localhost or blank URLs for a deployable frontend artifact.
+
+Before sending live invitations, apply the additive migration
+`db/migrations/2026-11-09-trusted-profile-provisioning.sql` through the
+Supabase owner's SQL Editor. Existing profiles remain intact. Deploy the
+updated owner API so invitations explicitly provision client profiles.
 
 ## Step 3: Set Frontend Public Env Vars
 
@@ -101,6 +113,8 @@ PERPLEXITY_API_KEY=<optional>
 GOOGLE_CLIENT_ID=<optional>
 GOOGLE_CLIENT_SECRET=<optional>
 GOOGLE_REFRESH_TOKEN=<optional>
+GOOGLE_CALENDAR_ID=primary
+GOOGLE_CALENDAR_TIME_ZONE=America/New_York
 ```
 
 ## Step 5: Set Client API Env Vars
@@ -154,10 +168,19 @@ On the deployed frontend:
 
 - Deployed frontend loads.
 - Both API `/health` endpoints respond.
-- Owner/client API health shows `supabaseConnected=true`.
+- Owner health identifies `service=owner-api`; client health identifies `service=client-api`.
+- `supabaseConnected=true` currently means credentials are present, not that a database query or real login succeeded. Verify authenticated reads separately.
 - Owner API health shows `localDemoAuthEnabled=false`.
 - Login works for owner/admin.
 - Pilot invite email points to the deployed frontend, not localhost.
 - Pilot client can set password and log in.
 - Pilot client cannot see other clients.
 - Visible CTAs give real results or useful feedback.
+
+Google account owner actions: enable Gmail/Calendar APIs, authorize a refresh
+token with Gmail read/send and Calendar event scopes, and install secrets only
+in backend settings. Credential presence alone does not prove scopes, token
+validity, email receipt, or Calendar access. Verify scheduling in the intended
+time zone; current scheduling parses local dates using the Node runtime time
+zone, so configure the owner service `TZ=America/New_York` to match the Calendar
+setting for this installation before testing actual meeting times.

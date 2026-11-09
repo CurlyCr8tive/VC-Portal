@@ -3,7 +3,8 @@
 // trusted backend, and enforces "must be role=owner" itself in requireOwner()
 // below, the same way db/schema.sql's comments describe ("enforce at the
 // application layer"). RLS in db/schema.sql is the second, independent layer
-// that still holds even if a route here has a bug — not the only layer.
+// that protects direct browser queries. It does not protect service-role
+// queries here: every owner/client handler must enforce authorization itself.
 //
 // No project exists yet (per the PRD, must be created under Tenyse's own
 // account/payment method, not the builder's) — so these env vars are unset
