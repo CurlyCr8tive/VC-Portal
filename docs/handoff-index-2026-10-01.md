@@ -40,12 +40,10 @@ Use these for user-facing handoff and testing.
 | Document | Purpose |
 | --- | --- |
 | [Tenyse Use Guide](tenyse-use-guide.md) | Founder-facing guide for using the PR platform and understanding the workflows. |
-| [Final Client Handoff Email And Doc](final-client-handoff-email-and-doc.md) | Client-facing email draft and Google Doc copy for the final handoff. |
 | [Google SMB Handoff Sheet](l3-capstone-handoff-sheet.md) | Supporting detail sheet behind the handoff email, following the Pursuit template. |
 | [Client Onboarding](client-onboarding.md) | How client invites/password setup should work. |
 | [Local User Test](local-user-test.md) | Local testing steps before deployed URLs exist. |
 | [Render Deployment Checklist](render-deployment-checklist.md) | Step-by-step Render deployment and env var checklist. |
-| [Deploy And Handoff Plan](deploy-and-handoff-plan.md) | Overall deploy/test/final handoff plan. |
 
 ## Developer / Technical Handoff
 
@@ -65,7 +63,6 @@ Use these when explaining or extending the AI/agent system.
 
 | Document | Purpose |
 | --- | --- |
-| [Agent Build Discussion Summary](agent-build-discussion-summary.md) | Q&A summary about how the agents were built. |
 | [Agent Learning Next Steps](agent-learning-next-steps.md) | Proposed memory/learning improvements. |
 | [Agent Notes](agent-notes.md) | Case-study source notes and AVE context. |
 | [AVE Agent Details](ave-agent-details.md) | AVE calculation details and caveats. |
